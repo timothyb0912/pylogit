@@ -17,7 +17,7 @@ Where to get it
 ===============
 
 Available from PyPi
-    http://pypi.python.org/pypi/pylogit/
+    https://pypi.python.org/pypi/pylogit/0.0.0
 
 License
 =======
