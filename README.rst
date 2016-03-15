@@ -8,7 +8,7 @@ Main Features
 
 * Conditional Logit Models
 * Supports datasets where the choice set differs across observations
-* Supports model specifications where the coefficients for a given variable may be
+* Supports model specifications where the coefficient for a given variable may be
    - completely alternative-specific (i.e. one coefficient per alternative, subject to identification of the coefficients),
    - subset-specific (i.e. one coefficient per subset of alternatives, where each alternative belongs to only one subset, and there are more than 1 but less than J subsets, where J is the maximum number of available alternatives in the dataset),
    - completely generic (i.e. one coefficient across all alternatives). 
