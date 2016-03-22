@@ -744,15 +744,15 @@ class MNDC_Model(object):
         new_mapping_res = create_long_form_mappings(dataframe,
                                                     self.obs_id_col,
                                                     self.alt_id_col)
-        new_alt_to_obs, new_alt_to_shapes = new_mapping_res
+        new_row_to_obs, new_row_to_shapes = new_mapping_res
         
         # Get the probability of each observation choosing each available 
         # alternative
         return calc_probabilities(self.coefs.values, 
                                   new_design,
                                   new_alt_IDs, 
-                                  new_alt_to_obs,
-                                  new_alt_to_shapes,
+                                  new_row_to_obs,
+                                  new_row_to_shapes,
                                   self.utility_transform,
                                   intercept_params=self.intercepts,
                                   shape_params = self.shapes,

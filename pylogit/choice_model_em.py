@@ -172,7 +172,7 @@ def calc_psi_gradient_theta(
                         design,                        
                         sys_utilities,
                         alt_IDs,
-                        alt_to_shapes,
+                        row_to_shapes,
                         h_vec,
                         chosen_row_indices,
                         rejected_row_indices,
@@ -195,7 +195,7 @@ def calc_psi_gradient_theta(
                                 corresponding to the given row of the design 
                                 matrix.
                         
-    alt_to_shapes:              2D numpy array with one row per observation per 
+    row_to_shapes:              2D numpy array with one row per observation per 
                                 available alternative and one column per 
                                 possible alternative. This matrix maps the rows
                                 of the design matrix to the possible 
@@ -291,15 +291,15 @@ def calc_psi_gradient_theta(
     # Differentiate the transformed utilities with respect to the shape params
     # Note that dh_dc should be a sparse matrix
     dh_dc = transform_first_deriv_c(sys_utilities, alt_IDs, 
-                                    alt_to_shapes, shape_params)
+                                    row_to_shapes, shape_params)
     # Differentiate the transformed utilities by the intercept params
     # Note that dh_d_alpha should be a sparse matrix
     dh_d_alpha = transform_deriv_alpha(sys_utilities, alt_IDs,
-                                       alt_to_shapes, intercept_params)
+                                       row_to_shapes, intercept_params)
     # Differentiate the transformed utilities with respect to the systematic 
     # utilities. Note that dh_dv should be a sparse matrix
     dh_dv = transform_first_deriv_v(sys_utilities, alt_IDs, 
-                                    alt_to_shapes, shape_params)
+                                    row_to_shapes, shape_params)
     # Differentiate the transformed utilities with respect to the utility 
     # coefficients. Note that dh_db should be a dense **matrix**, not a dense
     # 2D array. This is because the dot product of a 2D scipy sparse array and
@@ -432,7 +432,7 @@ def calc_neg_complete_data_log_likelihood_and_gradient(theta,
                                                        w_vec,
                                                        design,
                                                        alt_IDs,
-                                                       alt_to_shapes,
+                                                       row_to_shapes,
                                                        splitting_func,
                                                        utility_transform,
                                                        chosen_row_indices,
@@ -471,7 +471,7 @@ def calc_neg_complete_data_log_likelihood_and_gradient(theta,
                                 corresponding to the given row of the design 
                                 matrix.
                                 
-    alt_to_shapes:              2D numpy array with one row per observation 
+    row_to_shapes:              2D numpy array with one row per observation 
                                 per available alternative and one column per
                                 possible alternative. This matrix maps the 
                                 rows of the design matrix to the possible 
@@ -583,7 +583,7 @@ def calc_neg_complete_data_log_likelihood_and_gradient(theta,
     """
     # Separate the shape, intercept, and beta parameters
     shape_vec, intercept_vec, coefficient_vec = splitting_func(theta, 
-                                                               alt_to_shapes,
+                                                               row_to_shapes,
                                                                design)
     
     # Calculate the systematic utility for each alternative for each individual
@@ -593,7 +593,7 @@ def calc_neg_complete_data_log_likelihood_and_gradient(theta,
     # The transformed utilities will be of shape (num_rows, 1)
     transformed_utilities = utility_transform(sys_utilities,
                                               alt_IDs,
-                                              alt_to_shapes,
+                                              row_to_shapes,
                                               shape_vec,
                                               intercept_vec).ravel()
     
@@ -620,7 +620,7 @@ def calc_neg_complete_data_log_likelihood_and_gradient(theta,
     d_psi_d_theta = calc_psi_gradient_theta(design,                        
                                             sys_utilities,
                                             alt_IDs,
-                                            alt_to_shapes,
+                                            row_to_shapes,
                                             transformed_utilities,
                                             chosen_row_indices,
                                             rejected_row_indices,
@@ -644,7 +644,7 @@ def calc_neg_hessian_complete_data_log_likelihood(theta,
                                                   w_vec,
                                                   design,
                                                   alt_IDs,
-                                                  alt_to_shapes,
+                                                  row_to_shapes,
                                                   splitting_func,
                                                   utility_transform,
                                                   chosen_row_indices,
@@ -790,7 +790,7 @@ def calc_neg_hessian_complete_data_log_likelihood(theta,
     """
     # Separate the shape, intercept, and beta parameters
     shape_vec, intercept_vec, coefficient_vec = splitting_func(theta, 
-                                                               alt_to_shapes,
+                                                               row_to_shapes,
                                                                design)
     
     # Calculate the systematic utility for each alternative for each individual
@@ -800,7 +800,7 @@ def calc_neg_hessian_complete_data_log_likelihood(theta,
     # The transformed utilities will be of shape (num_rows, 1)
     transformed_utilities = utility_transform(sys_utilities,
                                               alt_IDs,
-                                              alt_to_shapes,
+                                              row_to_shapes,
                                               shape_vec,
                                               intercept_vec).ravel()
     
@@ -814,7 +814,7 @@ def calc_neg_hessian_complete_data_log_likelihood(theta,
     d_psi_d_theta = calc_psi_gradient_theta(design,                        
                                             sys_utilities,
                                             alt_IDs,
-                                            alt_to_shapes,
+                                            row_to_shapes,
                                             transformed_utilities,
                                             chosen_row_indices,
                                             rejected_row_indices,
@@ -836,8 +836,8 @@ def calc_neg_hessian_complete_data_log_likelihood(theta,
 def naive_em_algorithm(theta,
                        design,
                        alt_IDs,
-                       alt_to_obs,
-                       alt_to_shapes,
+                       row_to_obs,
+                       row_to_shapes,
                        choice_vector,
                        splitting_func,
                        utility_transform,
@@ -871,13 +871,13 @@ def naive_em_algorithm(theta,
                                 corresponding to the given row of the design 
                                 matrix.
                                 
-    alt_to_obs:                 2D numpy array with one row per observation 
+    row_to_obs:                 2D numpy array with one row per observation 
                                 per available alternative and one column 
                                 per observation. This matrix maps the rows of 
                                 the design matrix to the unique observations 
                                 (on the columns).
                                 
-    alt_to_shapes:              2D numpy array with one row per observation 
+    row_to_shapes:              2D numpy array with one row per observation 
                                 per available alternative and one column per
                                 possible alternative. This matrix maps the 
                                 rows of the design matrix to the possible 
@@ -988,19 +988,19 @@ def naive_em_algorithm(theta,
     
     # Select the rows of the mapping matrices that correspond to the
     # rejected alternatives
-    rejected_row_to_obs = alt_to_obs[rejected_row_indices, :]
-    rejected_row_to_alts = alt_to_shapes[rejected_row_indices, :]
+    rejected_row_to_obs = row_to_obs[rejected_row_indices, :]
+    rejected_row_to_alts = row_to_shapes[rejected_row_indices, :]
     # Get the indices of the rows and columns that correspond to
     # alternatives that are unavailable to particular individuals
     # in wide format. All alternatives for the dataset are on the
     # columns and the observations correspond to the rows.
-    wide_unavailable_idxs = np.where(alt_to_obs.transpose()
-                                               .dot(alt_to_shapes)
+    wide_unavailable_idxs = np.where(row_to_obs.transpose()
+                                               .dot(row_to_shapes)
                                                .toarray() == 0)
     
     # Create a sparse diagonal matrix of the correct shape for use
     # in computing the complete data log-likelihood
-    base_diag = diags(np.ones(alt_to_obs.shape[1]), 0, format='csr')
+    base_diag = diags(np.ones(row_to_obs.shape[1]), 0, format='csr')
     
     ###########
     # Get the initial values and containers needed for the
@@ -1019,7 +1019,7 @@ def naive_em_algorithm(theta,
     
     # Separate the shape, intercept, and beta parameters
     shape_vec, intercept_vec, coefficient_vec = splitting_func(theta, 
-                                                               alt_to_shapes,
+                                                               row_to_shapes,
                                                                design)
     
     # Start the timer
@@ -1055,7 +1055,7 @@ def naive_em_algorithm(theta,
         # The transformed utilities will be of shape (num_rows, 1)
         transformed_utilities = utility_transform(sys_utilities,
                                                   alt_IDs,
-                                                  alt_to_shapes,
+                                                  row_to_shapes,
                                                   shape_vec,
                                                   intercept_vec).ravel()
 
@@ -1085,7 +1085,7 @@ def naive_em_algorithm(theta,
                            args = (weights,
                                    design,
                                    alt_IDs,
-                                   alt_to_shapes,
+                                   row_to_shapes,
                                    splitting_func,
                                    utility_transform,
                                    chosen_row_indices,
@@ -1109,7 +1109,7 @@ def naive_em_algorithm(theta,
         
         # Separate the shape, intercept, and beta parameters
         shape_vec, intercept_vec, coefficient_vec = splitting_func(theta, 
-                                                                 alt_to_shapes,
+                                                                 row_to_shapes,
                                                                    design)
         
         # Calculate the true objective functions log-likelihood 
@@ -1117,8 +1117,8 @@ def naive_em_algorithm(theta,
         new_ll = calc_log_likelihood(coefficient_vec,
                                      design, 
                                      alt_IDs,
-                                     alt_to_obs,
-                                     alt_to_shapes,
+                                     row_to_obs,
+                                     row_to_shapes,
                                      choice_vector,
                                      utility_transform,
                                      intercept_params=intercept_vec,
@@ -1132,8 +1132,8 @@ def naive_em_algorithm(theta,
         gradient = calc_gradient(coefficient_vec, 
                                  design,
                                  alt_IDs, 
-                                 alt_to_obs,
-                                 alt_to_shapes,
+                                 row_to_obs,
+                                 row_to_shapes,
                                  choice_vector,
                                  utility_transform,
                                  transform_first_deriv_c,

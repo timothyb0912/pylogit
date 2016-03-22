@@ -4,7 +4,7 @@ Created on Thu Feb 25 07:19:49 2016
 
 @name:      MultiNomial Logit
 @author:    Timothy Brathwaite
-@summary:   Contains functions necessary for estimating multinomial logit 
+@summary:   Contains functions necessary for estimating conditional logit 
             models (with the help of the "base_multinomial_cm.py" file).
             Differs from version one since it works with the shape, intercept,
             index coefficient partitioning of estimated parameters as opposed
@@ -87,8 +87,8 @@ def _mnl_transform_deriv_alpha(*args, **kwargs):
 
 
 def _calc_neg_log_likelihood_and_neg_gradient(beta, design, 
-                                              alt_IDs, alt_to_obs,
-                                              alt_to_shapes,
+                                              alt_IDs, row_to_obs,
+                                              row_to_shapes,
                                               choice_vector,
                                               chosen_row_to_obs,
                                               utility_transform,
@@ -112,12 +112,12 @@ def _calc_neg_log_likelihood_and_neg_gradient(beta, design,
                         the alternative corresponding to the given row of the
                         design matrix.
                         
-    alt_to_obs:         2D numpy array with one row per observation per 
+    row_to_obs:         2D numpy array with one row per observation per 
                         available alternative and one column per observation.
                         This matrix maps the rows of the design matrix to the 
                         unique observations (on the columns).
                         
-    alt_to_shapes:      2D numpy array with one row per observation per 
+    row_to_shapes:      2D numpy array with one row per observation per 
                         available alternative and one column per possible
                         alternative. This matrix maps the rows of the design
                         matrix to the possible alternatives for this dataset.
@@ -144,7 +144,7 @@ def _calc_neg_log_likelihood_and_neg_gradient(beta, design,
                         being evaluated.
                         
     block_matrix_idxs:  list. list of arrays. There will be one array per 
-                        column in alt_to_obs. The array will note which rows 
+                        column in row_to_obs. The array will note which rows 
                         correspond to which observations.
     
     ridge:              int, float, long, or None. Determines whether or not 
@@ -174,8 +174,8 @@ def _calc_neg_log_likelihood_and_neg_gradient(beta, design,
     neg_log_likelihood = -1 * general_log_likelihood(beta,
                                                      design, 
                                                      alt_IDs,
-                                                     alt_to_obs,
-                                                     alt_to_shapes,
+                                                     row_to_obs,
+                                                     row_to_shapes,
                                                      choice_vector,
                                                      utility_transform,
                                                      ridge=ridge)
@@ -183,8 +183,8 @@ def _calc_neg_log_likelihood_and_neg_gradient(beta, design,
     neg_beta_gradient_vec = -1 * general_gradient(beta,
                                                   design,
                                                   alt_IDs,
-                                                  alt_to_obs,
-                                                  alt_to_shapes,
+                                                  row_to_obs,
+                                                  row_to_shapes,
                                                   choice_vector,
                                                   utility_transform,
                                                   _mnl_transform_deriv_c,
@@ -200,8 +200,8 @@ def _calc_neg_log_likelihood_and_neg_gradient(beta, design,
 def _calc_neg_hessian(beta,
                       design, 
                       alt_IDs,
-                      alt_to_obs,
-                      alt_to_shapes,
+                      row_to_obs,
+                      row_to_shapes,
                       choice_vector,
                       chosen_row_to_obs,
                       utility_transform,
@@ -225,12 +225,12 @@ def _calc_neg_hessian(beta,
                         the alternative corresponding to the given row of the
                         design matrix.
                         
-    alt_to_obs:         2D numpy array with one row per observation per 
+    row_to_obs:         2D numpy array with one row per observation per 
                         available alternative and one column per observation.
                         This matrix maps the rows of the design matrix to the 
                         unique observations (on the columns).
                         
-    alt_to_shapes:      2D numpy array with one row per observation per 
+    row_to_shapes:      2D numpy array with one row per observation per 
                         available alternative and one column per possible
                         alternative. This matrix maps the rows of the design
                         matrix to the possible alternatives for this dataset.
@@ -257,7 +257,7 @@ def _calc_neg_hessian(beta,
                         being evaluated.
                         
     block_matrix_idxs:  list. list of arrays. There will be one array per 
-                        column in alt_to_obs. The array will note which rows 
+                        column in row_to_obs. The array will note which rows 
                         correspond to which observations.
     
     ridge:              int, float, long, or None. Determines whether or not 
@@ -284,8 +284,8 @@ def _calc_neg_hessian(beta,
     return -1 * general_hessian(beta,
                                 design, 
                                 alt_IDs,
-                                alt_to_obs,
-                                alt_to_shapes,
+                                row_to_obs,
+                                row_to_shapes,
                                 utility_transform,
                                 _mnl_transform_deriv_c,
                                 dh_dv_mnl,
@@ -297,7 +297,7 @@ def _calc_neg_hessian(beta,
 
     
 def _estimate(init_values, design_matrix, alt_id_vector, 
-              choice_vector, alt_to_obs, alt_to_shapes,
+              choice_vector, row_to_obs, row_to_shapes,
               chosen_row_to_obs, print_results=True, 
               method='newton-cg', loss_tol=1e-06,
               gradient_tol=1e-06, maxiter=1000,
@@ -326,12 +326,12 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                         Elements denote the alternative which is chosen by the
                         given observation with a 1 and a zero otherwise.
     
-    alt_to_obs:         2D numpy array with one row per observation per 
+    row_to_obs:         2D numpy array with one row per observation per 
                         available alternative and one column per observation. 
                         This matrix maps the rows of the design matrix to the 
                         unique observations (on the columns).
                         
-    alt_to_shapes:      2D numpy array with one row per observation per 
+    row_to_shapes:      2D numpy array with one row per observation per 
                         available alternative and one column per possible
                         alternative. This matrix maps the rows of the design
                         matrix to the possible alternatives for this dataset.
@@ -407,8 +407,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                                               np.zeros(design_matrix.shape[1]),
                                                                  design_matrix, 
                                                                  alt_id_vector,
-                                                                    alt_to_obs,
-                                                                 alt_to_shapes,
+                                                                    row_to_obs,
+                                                                 row_to_shapes,
                                                                  choice_vector,
                                                         _mnl_utility_transform,
                                                                    ridge=ridge)
@@ -419,8 +419,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
         initial_log_likelihood = general_log_likelihood(init_values,
                                                          design_matrix, 
                                                          alt_id_vector,
-                                                         alt_to_obs,
-                                                         alt_to_shapes,
+                                                         row_to_obs,
+                                                         row_to_shapes,
                                                          choice_vector,
                                                         _mnl_utility_transform,
                                                          ridge=ridge)
@@ -430,7 +430,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     # Get the block matrix indices for the hessian matrix. Do it outside the
     # iterative minimization process in order to minimize unnecessary 
     # computations
-    block_matrix_indices = cc.create_matrix_block_indices(alt_to_obs)
+    block_matrix_indices = cc.create_matrix_block_indices(row_to_obs)
     
     # Pre-calculate the derivative of the transformation vector with respect
     # to the vector of systematic utilities
@@ -447,8 +447,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
         results = choice_model_em.naive_em_algorithm(init_values,
                                                      design_matrix,
                                                      alt_id_vector,
-                                                     alt_to_obs,
-                                                     alt_to_shapes,
+                                                     row_to_obs,
+                                                     row_to_shapes,
                                                      choice_vector,
                                                      split_param_vec,
                                                      _mnl_utility_transform,
@@ -466,8 +466,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                            init_values,
                            args = (design_matrix,
                                    alt_id_vector,                               
-                                   alt_to_obs,
-                                   alt_to_shapes,
+                                   row_to_obs,
+                                   row_to_shapes,
                                    choice_vector,
                                    chosen_row_to_obs,
                                    _mnl_utility_transform,
@@ -501,8 +501,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     probability_results = general_calc_probabilities(results.x,
                                                      design_matrix,
                                                      alt_id_vector,
-                                                     alt_to_obs,
-                                                     alt_to_shapes,
+                                                     row_to_obs,
+                                                     row_to_shapes,
                                                      _mnl_utility_transform,
                                         chosen_row_to_obs=chosen_row_to_obs,
                                                     return_long_probs=True)
@@ -513,7 +513,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     
     # Calculate the observation specific chi-squared components
     chi_squared_terms = np.square(residuals) / long_probs
-    individual_chi_squareds = alt_to_obs.T.dot(chi_squared_terms)
+    individual_chi_squareds = row_to_obs.T.dot(chi_squared_terms)
     
     # Store supplementary objects in the estimation results dict
     results["utility_coefs"] = results.x
@@ -534,8 +534,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     results["final_gradient"] = general_gradient(results.x, 
                                                  design_matrix,
                                                  alt_id_vector, 
-                                                 alt_to_obs,
-                                                 alt_to_shapes,
+                                                 row_to_obs,
+                                                 row_to_shapes,
                                                  choice_vector,
                                                  _mnl_utility_transform,
                                                  _mnl_transform_deriv_c,
@@ -548,8 +548,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     results["final_hessian"] = general_hessian(results.x,
                                                design_matrix, 
                                                alt_id_vector,
-                                               alt_to_obs,
-                                               alt_to_shapes,
+                                               row_to_obs,
+                                               row_to_shapes,
                                                _mnl_utility_transform,
                                                _mnl_transform_deriv_c,
                                                calc_dh_dv,
@@ -563,8 +563,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     results["fisher_info"] = cc.calc_fischer_info_matrix(results.x,
                                                          design_matrix,
                                                          alt_id_vector,
-                                                         alt_to_obs,
-                                                         alt_to_shapes,
+                                                         row_to_obs,
+                                                         row_to_shapes,
                                                          choice_vector,
                                                         _mnl_utility_transform,
                                                         _mnl_transform_deriv_c,
@@ -746,7 +746,7 @@ class MNL(base_mcm.MNDC_Model):
         
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
-        alt_to_obs, alt_to_shapes, chosen_row_to_obs =\
+        row_to_obs, row_to_shapes, chosen_row_to_obs =\
                                                     self.get_mappings_for_fit()
         
         # Get the estimation results
@@ -754,8 +754,8 @@ class MNL(base_mcm.MNDC_Model):
                                    self.design,
                                    self.alt_IDs, 
                                    self.choices,
-                                   alt_to_obs,
-                                   alt_to_shapes,
+                                   row_to_obs,
+                                   row_to_shapes,
                                    chosen_row_to_obs,                                   
                                    print_results=print_res,
                                    method=method,
