@@ -1039,9 +1039,9 @@ def naive_em_algorithm(theta,
         if iteration % 100 == 0 and iteration != 0:
             msg = "Currently on iteration {:,.0f}"
             msg_1 = "Current log-likelihood is: {:,.2f}"
-            print msg.format(iteration)
-            print msg_1.format(log_likelihoods[-1])
-            print"\n"
+            print(msg.format(iteration))
+            print(msg_1.format(log_likelihoods[-1]))
+            print("\n")
             sys.stdout.flush()
         
         ###########
@@ -1162,7 +1162,7 @@ def naive_em_algorithm(theta,
         msg = "All entries of the gradient were less than the tolerance."
     elif log_likelihoods[-1] - log_likelihoods[-2] < ll_tol:
         msg = "Change in log-likelihood was below the tolerance level."
-        print "Terminated estimation on iteration {:,.0f}".format(iteration)
+        print("Terminated estimation on iteration {:,.0f}".format(iteration))
     else:
         msg = "The EM Algorithm stopped for an unknown reason."
         
@@ -1174,11 +1174,11 @@ def naive_em_algorithm(theta,
     elapsed_min = elapsed_sec /60.0
     if elapsed_min > 1.0:
         msg = "EM-Algorithm Estimation Time: {:.2f} minutes."
-        print msg.format(elapsed_min)
+        print(msg.format(elapsed_min))
     else:
         msg = "EM-Algorithm Estimation Time: {:.2f} seconds."
-        print msg.format(elapsed_sec)
-    print ""
+        print(msg.format(elapsed_sec))
+    print("")
     
     # Return the results dictionary
     return max_res
