@@ -3,7 +3,7 @@
 Created on Mon Feb 29 22:07:30 2016
 
 @module:    generalized_choice_model
-@name:      MultiNomial, Generalized Conditional Choice Models
+@name:      Python Based Conditional Logit-type Models
 @author:    Timothy Brathwaite
 @summary:   Contains functions necessary for estimating multinomial, asymmetric
             conditional choice models (and standard conditional logit models).
@@ -17,13 +17,14 @@ Created on Mon Feb 29 22:07:30 2016
              multinomial_uneven_logit_2.py,
              multinomial_scobit_2.py,
              multinomial_clog_log_2.py,
-             nested_logit.py]
+             nested_logit.py
+             mixed_logit.py]
 """
-import integrated_mnl_2 as mnl
-import multinomial_asym_logit_3 as asym_logit
-import multinomial_uneven_logit_3 as uneven_logit
-import multinomial_scobit_2 as scobit
-import multinomial_clog_log_2 as clog_log
+import conditional_logit as mnl
+import asym_logit
+import uneven_logit
+import scobit
+import clog_log
 import nested_logit
 import mixed_logit
 
