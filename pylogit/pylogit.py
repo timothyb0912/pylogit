@@ -12,11 +12,11 @@ Created on Mon Feb 29 22:07:30 2016
             [base_multinomial_cm_v2.py,
              choice_calcs.py,
              choice_tools.py,
-             integrated_mnl_2.py,
-             multinomial_asym_logit_3.py,
-             multinomial_uneven_logit_2.py,
-             multinomial_scobit_2.py,
-             multinomial_clog_log_2.py,
+             conditional_logit.py,
+             asym_logit.py,
+             uneven_logit.py,
+             scobit.py,
+             clog_log.py,
              nested_logit.py
              mixed_logit.py]
 """
