@@ -108,18 +108,18 @@ class MNDC_Model(object):
         alternative ids, denoting which alternatives belong to which nests.
         Each alternative id must only be associated with a single nest!
         Default == None.
-    mixing_vars : list, or None, optional.
-        All elements of the list should be strings. Each string should be
-        present in the values of `names.values()` and they're associated
-        variables should only be index variables (i.e. part of the design
-        matrix). If `model_type == "Mixed Logit"`, then `mixing_vars` must be
-        passed. Default == None.
     mixing_id_col : str, or None, optional.
         Should be a column heading in `data`. Should denote the column in
         `data` which contains the identifiers of the units of observation over
         which the coefficients of the model are thought to be randomly
         distributed. If `model_type == "Mixed Logit"`, then `mixing_id_col`
         must be passed. Default == None.
+    mixing_vars : list, or None, optional.
+        All elements of the list should be strings. Each string should be
+        present in the values of `names.values()` and they're associated
+        variables should only be index variables (i.e. part of the design
+        matrix). If `model_type == "Mixed Logit"`, then `mixing_vars` must be
+        passed. Default == None.
     model_type : str, optional.
         Denotes the model type of the choice model being instantiated.
         Default == "".
