@@ -1,6 +1,5 @@
 What PyLogit is
 ===============
-
 PyLogit is a Python package for performing maximum likelihood estimation of conditional logit models and similar logit-like models.
 
 Main Features
@@ -27,7 +26,6 @@ Main Features
 
 Where to get it
 ===============
-
 Available from PyPi
     https://pypi.python.org/pypi/pylogit/0.1.0
 
@@ -36,16 +34,13 @@ Available through Anaconda::
 
 For More Information
 ====================
-
 For more information about the asymmetric models that can be estimated with PyLogit, see the following paper
     Brathwaite, Timothy, and Joan Walker. "Asymmetric, Closed-Form, Finite-Parameter Models of Multinomial Choice." arXiv preprint arXiv:1606.05900 (2016). http://arxiv.org/abs/1606.05900.
 
 Attribution
 ===========
-
 If PyLogit (or its constituent models) is useful in your research or work, please cite this package by citing the paper above.
 
 License
 =======
-
 Modified BSD (3-clause)
