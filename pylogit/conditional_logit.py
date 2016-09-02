@@ -12,6 +12,7 @@ Created on Thu Feb 25 07:19:49 2016
 """
 import time
 import sys
+import warnings
 import numpy as np
 from scipy.optimize import minimize
 from scipy.sparse import diags
@@ -19,6 +20,18 @@ from scipy.sparse import diags
 import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 import choice_model_em
+
+# Create a variable that will be printed if there is a non-fatal error
+# in the MNL class construction
+_msg_1 = "The Multinomial Logit Model has no shape parameters. "
+_msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
+_shape_ignore_msg = _msg_1 + _msg_2
+
+# Create a warning string that will be issued if ridge regression is performed.
+_msg_3 = "NOTE: An L2-penalized regression is being performed. The "
+_msg_4 = "reported standard errors and robust standard errors "
+_msg_5 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg_3 + _msg_4 + _msg_5
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = cc.calc_log_likelihood
@@ -406,7 +419,7 @@ def _estimate(init_values,
                                                                 alt_to_obs,
                                                              alt_to_shapes,
                                                              choice_vector,
-                                                    _mnl_utility_transform,
+                                                     _mnl_utility_transform,
                                                                ridge=ridge)
 
     # Calculate the initial log-likelihood
@@ -644,13 +657,9 @@ class MNL(base_mcm.MNDC_Model):
         # Print a helpful message for users who have included shape parameters
         # or shape names unneccessarily
         ##########
-        msg_1 = "The Multinomial Logit Model has no shape parameters. "
-        msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
-        shape_ignore_msg = msg_1 + msg_2
-
         for keyword in ["shape_names", "shape_ref_pos"]:
             if keyword in kwargs and kwargs[keyword] is not None:
-                print(shape_ignore_msg)
+                warnings.warn(_shape_ignore_msg)
                 break
 
         if "intercept_ref_pos" in kwargs:
@@ -687,7 +696,7 @@ class MNL(base_mcm.MNDC_Model):
         Parameters
         ----------
         init_vals : 1D ndarray.
-            The initial values to start the optimizatin process with. There
+            The initial values to start the optimization process with. There
             should be one value for each utility coefficient being estimated.
         print_res : bool, optional.
             Determines whether the timing and initial and final log likelihood
@@ -722,27 +731,20 @@ class MNL(base_mcm.MNDC_Model):
         None. Estimation results are saved to the model instance.
         """
         # Check integrity of passed arguments
-        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_index"]
+        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_coefs"]
         if any([x in kwargs for x in kwargs_to_be_ignored]):
             msg = "MNL model does not use of any of the following kwargs:\n{}"
             msg_2 = "Remove such kwargs and pass a single init_vals argument"
             raise ValueError(msg.format(kwargs_to_be_ignored) + msg_2)
+
+        if ridge is not None:
+            warnings.warn(_ridge_warning_msg)
 
         # Store the optimization method
         self.optimization_method = method
 
         # Store the ridge parameter
         self.ridge_param = ridge
-
-        if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations

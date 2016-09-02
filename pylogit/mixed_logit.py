@@ -496,7 +496,7 @@ class MixedLogit(base_mcm.MNDC_Model):
         None. Estimation results are saved to the model instance.
         """
         # Check integrity of passed arguments
-        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_index"]
+        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_coefs"]
         if any([x in kwargs for x in kwargs_to_be_ignored]):
             msg = "MNL model does not use of any of the following kwargs:\n{}"
             msg_2 = "Remove such kwargs and pass a single init_vals argument"

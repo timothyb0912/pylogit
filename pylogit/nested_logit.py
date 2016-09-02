@@ -662,8 +662,10 @@ class NestedLogit(base_mcm.MNDC_Model):
         ----------
         init_vals : 1D ndarray.
             Should containn the initial values to start the optimization
-            process with. There should be one value for each utility
-            coefficient and shape parameter being estimated.
+            process with. There should be one value for each nest parameter and
+            utility coefficient. Note nest parameters not being estimated should
+            still be included. Handle these parameters using the
+            `constrained_pos` kwarg.
         constrained_pos : list, or None, optional.
             Denotes the positions of the array of estimated parameters that are
             not to change from their initial values. If a list is passed, the
@@ -694,7 +696,7 @@ class NestedLogit(base_mcm.MNDC_Model):
         None. Estimation results are saved to the model instance.
         """
         # Check integrity of passed arguments
-        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_index"]
+        kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_coefs"]
         if any([x in kwargs for x in kwargs_to_be_ignored]):
             msg = "MNL model does not use of any of the following kwargs:\n{}"
             msg_2 = "Remove such kwargs and pass a single init_vals argument"
