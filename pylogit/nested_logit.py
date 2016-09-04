@@ -10,6 +10,7 @@ Created on Sun Jul  3 11:26:33 2016
 """
 import time
 import sys
+import warnings
 import numpy as np
 from scipy.optimize import minimize
 
@@ -21,6 +22,12 @@ general_log_likelihood = nc.calc_nested_log_likelihood
 general_gradient = nc.calc_nested_gradient
 general_calc_probabilities = nc.calc_nested_probs
 bhhh_approx = nc.calc_bhhh_hessian_approximation
+
+# Create a warning string that will be issued if ridge regression is performed.
+_msg_3 = "NOTE: An L2-penalized regression is being performed. The "
+_msg_4 = "reported standard errors and robust standard errors "
+_msg_5 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg_3 + _msg_4 + _msg_5
 
 
 # Define a functionto split the combined parameter array into nest coefficients
@@ -230,10 +237,8 @@ def calc_neg_nested_log_likelihood_and_gradient(all_coefs,
 
 def _estimate(init_values,
               design_matrix,
-              alt_id_vector,
               choice_vector,
               rows_to_obs,
-              rows_to_alts,
               rows_to_nests,
               chosen_row_to_obs,
               constrained_pos,
@@ -255,10 +260,6 @@ def _estimate(init_values,
         There should be one row per observation per available alternative.
         There should be one column per utility coefficient being estimated.
         All elements should be ints, floats, or longs.
-    alt_id_vector : 1D ndarray.
-        All elements should be ints. There should be one row per observation
-        per available alternative for the given observation. Elements denote
-        the alternative corresponding to the given row of the design matrix.
     choice_vector : 1D ndarray.
         All elements should be either ones or zeros. There should be one row
         per observation per available alternative for the given observation.
@@ -268,11 +269,6 @@ def _estimate(init_values,
         There should be one row per observation per available alternative and
         one column per observation. This matrix maps the rows of the design
         matrix to the unique observations (on the columns).
-    rows_to_alts : 2D ndarray.
-        There should be one row per observation per available alternative and
-        one column per possible alternative. This matrix maps the rows of the
-        design matrix to the possible alternatives for this dataset. Included
-        simply for conformity with other models.
     rows_to_nests : 2D scipy sparse array.
         There should be one row per observation per available alternative and
         one column per nest. This matrix maps the rows of the design matrix to
@@ -369,7 +365,7 @@ def _estimate(init_values,
                                                     choice_vector,
                                                     ridge=ridge)
 
-    # Note the clog-log model has no shape parameters so there is no such
+    # Note the nested logit model has no shape parameters so there is no such
     # parameter included in the log-likelihood calculations below or above
     natural_init_nest_params = nc.naturalize_nest_coefs(init_nest_params)
     initial_log_likelihood = general_log_likelihood(natural_init_nest_params,
@@ -444,8 +440,6 @@ def _estimate(init_values,
     results["nest_params"] = final_nest_params
 
     # Calculate the predicted probabilities
-    # Note we don't include shape parameters because the clog-log model doesn't
-    # have shape parameters
     c2obs = chosen_row_to_obs
     desired_res = "long_and_chosen_probs"
     probability_results = general_calc_probabilities(natural_final_nest_params,
@@ -498,7 +492,7 @@ def _estimate(init_values,
 #                                               final_intercept_params,
 #                                               final_shape_params,
 #                                               ridge)
-    # Use the BHHH approximation for now, since the analytic gradient seems
+    # Use the BHHH approximation for now, since the analytic hessian seems
     # hard to compute.
     results["final_hessian"] = bhhh_approx(final_nest_params,
                                            final_utility_coefs,
@@ -621,9 +615,9 @@ class NestedLogit(base_mcm.MNDC_Model):
         ##########
         # Print a helpful message if nest_spec has not been included
         ##########
-        missing_nest_spec = (nest_spec is None and
-                             "nest_spec" not in kwargs and
-                             kwargs["nest_spec"] is None)
+        condition_1 = nest_spec is None and "nest_spec" not in kwargs
+        condition_2 = "nest_spec" in kwargs and kwargs["nest_spec"] is None
+        missing_nest_spec = condition_1 or condition_2
         if missing_nest_spec:
             msg = "The Nested Logit Model REQUIRES a nest specification dict."
             raise ValueError(msg)
@@ -643,7 +637,7 @@ class NestedLogit(base_mcm.MNDC_Model):
         ##########
         # Store the utility transform function
         ##########
-        self.utility_transform = lambda x, *args, **kwargs: x
+        self.utility_transform = lambda x, *args, **kwargs: x[:, None]
 
         return None
 
@@ -662,9 +656,9 @@ class NestedLogit(base_mcm.MNDC_Model):
         ----------
         init_vals : 1D ndarray.
             Should containn the initial values to start the optimization
-            process with. There should be one value for each nest parameter and
-            utility coefficient. Note nest parameters not being estimated should
-            still be included. Handle these parameters using the
+            process with. There should be one value for each nest parameter
+            and utility coefficient. Nest parameters not being estimated
+            should still be included. Handle these parameters using the
             `constrained_pos` kwarg.
         constrained_pos : list, or None, optional.
             Denotes the positions of the array of estimated parameters that are
@@ -698,7 +692,7 @@ class NestedLogit(base_mcm.MNDC_Model):
         # Check integrity of passed arguments
         kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_coefs"]
         if any([x in kwargs for x in kwargs_to_be_ignored]):
-            msg = "MNL model does not use of any of the following kwargs:\n{}"
+            msg = "Nested Logit model does not use the following kwargs:\n{}"
             msg_2 = "Remove such kwargs and pass a single init_vals argument"
             raise ValueError(msg.format(kwargs_to_be_ignored) + msg_2)
 
@@ -709,20 +703,12 @@ class NestedLogit(base_mcm.MNDC_Model):
         self.ridge_param = ridge
 
         if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
+            warnings.warn(_ridge_warning_msg)
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
         mapping_res = self.get_mappings_for_fit()
         rows_to_obs = mapping_res["rows_to_obs"]
-        rows_to_alts = mapping_res["rows_to_alts"]
         rows_to_nests = mapping_res["rows_to_nests"]
         chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
@@ -741,10 +727,8 @@ class NestedLogit(base_mcm.MNDC_Model):
         # Get the estimation results
         estimation_res = _estimate(init_vals,
                                    self.design,
-                                   self.alt_IDs,
                                    self.choices,
                                    rows_to_obs,
-                                   rows_to_alts,
                                    rows_to_nests,
                                    chosen_row_to_obs,
                                    final_constrained_pos,
