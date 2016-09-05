@@ -30,7 +30,7 @@ max_exp = 700
 min_exp = -700
 
 # Create a variable that will be printed if there is a non-fatal error
-# in the MNL class construction
+# in the Clog-log class construction
 _msg_1 = "The Multinomial Clog-Log Model has no shape parameters. "
 _msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
 _shape_ignore_msg = _msg_1 + _msg_2
