@@ -74,7 +74,7 @@ class HelperFuncTests(unittest.TestCase):
 
     def test_mnl_transform_deriv_alpha(self):
         """
-        Ensures that mnl_transform_deriv_c returns None.
+        Ensures that mnl_transform_deriv_alpha returns None.
         """
         derivative_results = mnl._mnl_transform_deriv_alpha(self.fake_index,
                                                             *self.fake_args,
