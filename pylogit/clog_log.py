@@ -14,6 +14,7 @@ Created on Sun Feb 28 15:45:08 2016
 from functools import partial
 import time
 import sys
+import warnings
 import numpy as np
 from scipy.optimize import minimize
 from scipy.sparse import diags
@@ -27,6 +28,18 @@ min_comp_value = 1e-300
 
 max_exp = 700
 min_exp = -700
+
+# Create a variable that will be printed if there is a non-fatal error
+# in the MNL class construction
+_msg_1 = "The Multinomial Clog-Log Model has no shape parameters. "
+_msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
+_shape_ignore_msg = _msg_1 + _msg_2
+
+# Create a warning string that will be issued if ridge regression is performed.
+_msg_3 = "NOTE: An L2-penalized regression is being performed. The "
+_msg_4 = "reported standard errors and robust standard errors "
+_msg_5 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg_3 + _msg_4 + _msg_5
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = cc.calc_log_likelihood
@@ -121,16 +134,25 @@ def _cloglog_utility_transform(systematic_utilities,
         array contains the transformed utility values for this model. All
         elements will be ints, longs, or floats.
     """
-    # Calculatae the data dependent part of the transformation
+    # Calculate the data dependent part of the transformation
     # Also, along the way, guard against numeric underflow or overflow
     exp_v = np.exp(systematic_utilities)
-    exp_v[np.isposinf(exp_v)] = max_comp_value
+    # exp_v[np.isposinf(exp_v)] = max_comp_value
 
     exp_exp_v = np.exp(exp_v)
-    exp_exp_v[np.isposinf(exp_exp_v)] = max_comp_value
+    # exp_exp_v[np.isposinf(exp_exp_v)] = max_comp_value
 
     # Calculate the transformed systematic utilities
     transformations = np.log(exp_exp_v - 1)
+    # Guard against underflow
+    transformations[np.isneginf(transformations)] = -1 * max_comp_value
+    # Guard against overflow when systematic utilities are moderately large
+    too_big_idx = np.where(systematic_utilities >= 3.7)
+    transformations[too_big_idx] = np.exp(systematic_utilities[too_big_idx])
+    # Guard against overflow when systematic utilities are completely too big.
+    inf_idx = np.isposinf(transformations)
+    transformations[inf_idx] = max_comp_value
+
 
     # Account for the outside intercept parameters if there are any.
     if intercept_params is not None and intercept_ref_pos is not None:
@@ -217,17 +239,19 @@ def _cloglog_transform_deriv_v(systematic_utilities,
     # This term can go to positive infinity or zero. If it goes to positive
     # infinity, then this is okay because denom_part_1 will just go to 1.
     # If exp_v goes to zero, then denom_part_1 will go to zero. We will simply
-    # cater to that last outcome since we can't divide by zero.
-#    denom_part_1[np.where(denom_part_1 == 0)] = min_comp_value
+    # cater to that last outcome since we can't divide by zero. The next line
+    # is retained to show what should NOT be done. We will use L'Hopital's rule
+    # after calculating derivs, as should be done.
+    # denom_part_1[np.where(denom_part_1 == 0)] = min_comp_value
 
     ##########
-    # Calculate the required derivatives
+    # Calculate the required derivatives and guard against underflow
     ##########
     derivs = 1.0 / (denom_part_1 * exp_neg_v)
     # Note that the limiting value of the expression above, as the systematic
-    # utility goes to negative infinity, is one. This can be checked using
-    # L'Hopital's rule. We will define infinity as being so negative that
-    # denom_part_1 == 0
+    # utility goes to negative infinity (i.e. as denom_part_1 goes to zero),
+    # is one. This can be checked using L'Hopital's rule. We will define
+    # infinity as being so negative that `denom_part_1 == 0`
     derivs[np.where(denom_part_1 == 0)] = 1
     derivs[np.isposinf(derivs)] = max_comp_value
 
@@ -246,8 +270,7 @@ def _cloglog_transform_deriv_c(*args, **kwargs):
     None. This is a place holder function since the Clog-log model has no shape
     parameters.
     """
-    # This is a place holder function since the Clog-log model has no shape
-    # parameters.
+
     return None
 
 
@@ -943,8 +966,11 @@ class MNCL(base_mcm.MNDC_Model):
         Any other keyword arguments that are passed to the class constructor
         will be directly given to the MNDC_Model class constructor.
     """
-    def __init__(self, data, alt_id_col,
-                 obs_id_col, choice_col,
+    def __init__(self,
+                 data,
+                 alt_id_col,
+                 obs_id_col,
+                 choice_col,
                  specification,
                  intercept_ref_pos=None,
                  names=None,
@@ -954,14 +980,9 @@ class MNCL(base_mcm.MNDC_Model):
         # Print a helpful message for users who have included shape parameters
         # or shape names unneccessarily
         ##########
-        msg_1 = "The Multinomial Logit Model has no shape parameters. "
-        msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
-        shape_ignore_msg = msg_1 + msg_2
-
         for keyword in ["shape_names", "shape_ref_pos"]:
             if keyword in kwargs and kwargs[keyword] is not None:
-                print(shape_ignore_msg)
-                print(kwargs[keyword])
+                warnings.warn(_shape_ignore_msg)
                 break
 
         ##########
@@ -1044,21 +1065,21 @@ class MNCL(base_mcm.MNDC_Model):
         -------
         None. Estimation results are saved to the model instance.
         """
+        # Check integrity of passed arguments.
+        if "init_shapes" in kwargs:
+            msg = "Clog-log model does not use the 'init_shapes' kwarg. "
+            msg_2 = "Remove such kwargs and pass a single init_vals argument "
+            msg_3 = "or init_intercepts and init_coefs."
+            raise ValueError(msg + msg_2 + msg_3)
+
+        if ridge is not None:
+            warnings.warn(_ridge_warning_msg)
+
         # Store the optimization method
         self.optimization_method = method
 
         # Store the ridge parameter
         self.ridge_param = ridge
-
-        if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
@@ -1067,9 +1088,9 @@ class MNCL(base_mcm.MNDC_Model):
         rows_to_alts = mapping_res["rows_to_alts"]
         chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
-        # Create init_vals from init_coefs, init_intercepts, and init_shapes if
-        # those arguments are passed to the function and init_vals is None.
-        if init_vals is None and all([x is not None for x in [init_intercepts,
+        # Create init_vals from init_coefs and init_intercepts if those
+        # arguments are passed to the function and init_vals is None.
+        if init_vals is None and any([x is not None for x in [init_intercepts,
                                                               init_coefs]]):
             ##########
             # Check the integrity of the parameter kwargs
@@ -1077,17 +1098,17 @@ class MNCL(base_mcm.MNDC_Model):
             num_alternatives = rows_to_alts.shape[1]
             try:
                 assert init_intercepts.shape[0] == (num_alternatives - 1)
-            except AssertionError as e:
-                msg = "init_shapes is of length {} but should be of length {}"
-                print(msg.format(init_intercepts.shape, num_alternatives - 1))
-                raise e
+            except AssertionError:
+                msg = "init_intercepts has length {} but should have length {}"
+                raise ValueError(msg.format(init_intercepts.shape,
+                                            num_alternatives - 1))
 
             try:
                 assert init_coefs.shape[0] == self.design.shape[1]
-            except AssertionError as e:
-                msg = "init_coefs has length {} but should have length {}"
-                print(msg.format(init_coefs.shape, self.design.shape[1]))
-                raise e
+            except AssertionError:
+                msg = "init_coefs has length {} but should have length {}."
+                raise ValueError(msg.format(init_coefs.shape,
+                                            self.design.shape[1]))
 
             if init_intercepts is not None:
                 init_vals = np.concatenate((init_intercepts,
