@@ -715,7 +715,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
             assumed_param_dimensions = num_index_coefs + num_alts
         assert init_values.shape[0] == assumed_param_dimensions
     except AssertionError as e:
-        print("The initial values are of the wrong dimension")
+        print("The initial values are of the wrong dimension.")
         print("It should be of dimension {}".format(assumed_param_dimensions))
         print("But instead it has dimension {}".format(init_values.shape[0]))
         raise e
