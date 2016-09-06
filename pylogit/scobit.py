@@ -35,6 +35,12 @@ _msg_2 = "reported standard errors and robust standard errors "
 _msg_3 = "***WILL BE INCORRECT***."
 _ridge_warning_msg = _msg + _msg_2 + _msg_3
 
+# Create a warning string that will be issued if "shape_ref_pos" is passed to
+# the MNSL constructor as a kwarg
+_msg_4 = "The Multinomial Scobit model estimates all shape parameters"
+_msg_5 = ", so shape_ref_pos will be ignored if passed."
+_shape_ref_msg = _msg_4 + _msg_5
+
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = cc.calc_log_likelihood
 general_gradient = cc.calc_gradient
@@ -176,6 +182,9 @@ def _scobit_utility_transform(systematic_utilities,
     term_2 = np.log(powered_term - 1)
 
     transformations = long_intercepts - term_2
+    # Guard against overflow
+    transformations[np.isposinf(transformations)] = max_comp_value
+    transformations[np.isneginf(transformations)] = -1 * max_comp_value
 
     # Be sure to return a 2D array since other functions will be expecting that
     if len(transformations.shape) == 1:
@@ -1049,9 +1058,7 @@ class MNSL(base_mcm.MNDC_Model):
         # Print a helpful message if shape_ref_pos has been included
         ##########
         if "shape_ref_pos" in kwargs and kwargs["shape_ref_pos"] is not None:
-            msg = "The Multinomial Scobit model estimates all shape parameters"
-            msg_2 = ", so shape_ref_pos will be ignored if passed."
-            warnings.warn(msg + msg_2)
+            warnings.warn(_shape_ref_msg)
 
         ##########
         # Carry out the common instantiation process for all choice models
@@ -1212,7 +1219,7 @@ class MNSL(base_mcm.MNDC_Model):
         elif init_vals is None:
             msg = "If init_vals is None, then users must pass both init_coefs "
             msg_2 = "and init_shapes."
-            raise Exception(msg + msg_2)
+            raise ValueError(msg + msg_2)
 
         # Get the estimation results
         estimation_res = _estimate(init_vals,
