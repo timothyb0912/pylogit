@@ -24,7 +24,7 @@ class GenericTestCase(unittest.TestCase):
         # Create the betas to be used during the tests
         self.fake_betas = np.array([-0.6])
 
-        # Create the fake nest coefficients to be used during the tests
+        # Create the fake outside intercepts to be used during the tests
         self.fake_intercepts = np.array([1, 0.5])
 
         # Create names for the intercept parameters
