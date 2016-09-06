@@ -361,8 +361,8 @@ class ChoiceObjectTests(GenericTestCase):
             num_intercepts = self.fake_intercepts.shape[0] + i
             kwargs["init_intercepts"] = np.arange(num_intercepts)
 
-            # Test to ensure that the ValueError when using an init_intercepts
-            # kwarg with an incorrect number of parameters
+            # Test to ensure that the ValueError is raised when using an
+            # init_intercepts kwarg with an incorrect number of parameters
             self.assertRaises(ValueError, self.base_clog.fit_mle,
                               *fit_args, **kwargs)
 
