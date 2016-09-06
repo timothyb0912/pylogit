@@ -180,6 +180,10 @@ def _scobit_utility_transform(systematic_utilities,
     powered_term[np.isposinf(powered_term)] = max_comp_value
 
     term_2 = np.log(powered_term - 1)
+    # Guard against overvlow
+    too_big_idx = np.isposinf(powered_term)
+    term_2[too_big_idx] = (-1 * long_natural_shapes[too_big_idx] * 
+                           systematic_utilities[too_big_idx])
 
     transformations = long_intercepts - term_2
     # Guard against overflow
@@ -327,7 +331,7 @@ def _scobit_transform_deriv_shape(systematic_utilities,
     # of the natural shape params (i.e. exp(shape_param)) with respect to the
     # shape param is simply exp(shape_param) = natural shape param. The
     # multipication comes from the chain rule
-    curve_derivs = (-1 * np.log(1 + exp_neg_v) *
+    curve_derivs = (-1 * np.log1p(exp_neg_v) *
                     powered_term / (powered_term - 1)) * long_curve_shapes
     curve_derivs[np.isposinf(curve_derivs)] = max_comp_value
     curve_derivs[np.isneginf(curve_derivs)] = min_comp_value
