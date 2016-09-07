@@ -508,5 +508,3 @@ class HelperFuncTests(GenericTestCase):
                             np.diag(derivative.A))
 
         return None
-
-
