@@ -256,13 +256,15 @@ def _scobit_transform_deriv_v(systematic_utilities,
               exp_neg_v *
               small_powered_term /
               (powered_term - 1))
-    # Use L'Hopitals rule to deal with overflow, i.e v --> -inf
+    # Use L'Hopitals rule to deal with overflow from v --> -inf
+    # From plots, the assignment below may also correctly handle cases where we
+    # have overflow from moderate v (say |v| <= 10) and large shape parameters.
     too_big_idx = (np.isposinf(derivs) +
                    np.isposinf(exp_neg_v) +
                    np.isposinf(powered_term) +
                    np.isposinf(small_powered_term)).astype(bool)
     derivs[too_big_idx] = long_curve_shapes[too_big_idx]
-    # Use L'Hopitals rule to deal with underflow, i.e v --> inf
+    # Use L'Hopitals rule to deal with underflow from v --> inf
     too_small_idx = np.where((exp_neg_v == 0) | (powered_term - 1 == 0))
     derivs[too_small_idx] = 1.0
 
