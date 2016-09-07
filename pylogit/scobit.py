@@ -247,20 +247,24 @@ def _scobit_transform_deriv_v(systematic_utilities,
     # Generate the needed terms for the derivative of the transformation with
     # respect to the systematic utility and guard against underflow or overflow
     exp_neg_v = np.exp(-1 * systematic_utilities)
-    exp_neg_v[np.isposinf(exp_neg_v)] = max_comp_value
 
     powered_term = np.power(1 + exp_neg_v, long_curve_shapes)
-    powered_term[np.isposinf(powered_term)] = max_comp_value
 
     small_powered_term = np.power(1 + exp_neg_v, long_curve_shapes - 1)
-    small_powered_term[np.isposinf(small_powered_term)] = max_comp_value
 
     derivs = (long_curve_shapes *
               exp_neg_v *
               small_powered_term /
               (powered_term - 1))
-    derivs[np.isposinf(derivs)] = max_comp_value
-    derivs[np.isneginf(derivs)] = min_comp_value
+    # Use L'Hopitals rule to deal with overflow, i.e v --> -inf
+    too_big_idx = (np.isposinf(derivs) +
+                   np.isposinf(exp_neg_v) +
+                   np.isposinf(powered_term) +
+                   np.isposinf(small_powered_term)).astype(bool)
+    derivs[too_big_idx] = long_curve_shapes[too_big_idx]
+    # Use L'Hopitals rule to deal with underflow, i.e v --> inf
+    too_small_idx = np.where((exp_neg_v == 0) | (powered_term - 1 == 0))
+    derivs[too_small_idx] = 1.0
 
     # Assign the calculated derivatives to the output array
     output_array.data = derivs
