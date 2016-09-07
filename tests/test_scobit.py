@@ -364,41 +364,80 @@ class HelperFuncTests(GenericTestCase):
 
         return None
 
-    # def test_scobit_transform_deriv_v(self):
-    #     """
-    #     Tests basic behavior of the scobit_transform_deriv_v.
-    #     """
-    #     # Note the index has a value that is <= -40 to test whether or not
-    #     # the function correctly uses L'Hopital's rule to deal with underflow
-    #     # and calculating the derivative. When the index is <= -40, the
-    #     # derivative should be 1.
-    #     test_index = np.array([-40, 1, 7])
-    #     # Note we use a compressed sparse-row matrix so that we can easily
-    #     # convert the output matrix to a numpy array using the '.A' attribute.
-    #     test_output = diags(np.ones(test_index.shape[0]),
-    #                         0, format='csr')
+    def test_scobit_transform_deriv_v(self):
+        """
+        Tests basic behavior of the scobit_transform_deriv_v.
+        """
+        # Note the index has a value that is small and a value that is large to
+        # test whether or not the function correctly uses L'Hopital's rule to
+        # deal with underflow and overflow when calculating the derivative.
+        # When the index is small, the derivative should be the associated
+        # shape parameter value. When the index is large the derivative should
+        # be 1.
+        test_index = np.array([-2, 0, 2, -800, 300])
+        # Note we use a compressed sparse-row matrix so that we can easily
+        # convert the output matrix to a numpy array using the '.A' attribute.
+        num_rows = test_index.shape[0]
+        test_output = diags(np.ones(num_rows),
+                            0, format='csr')
 
-    #     # Bundle the arguments needed for the function
-    #     # Not all elements except for test_index are completely fake and only
-    #     # needed because the function requires a given number of arguments.
-    #     # This is for api compatibility with other models.
-    #     args = [test_index,
-    #             np.ones(3),
-    #             diags(np.ones(3), 0, format='csr'),
-    #             None]
+        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        args = [test_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                self.fake_shapes]
 
-    #     # Get the derivative using the function defined in clog_log.py.
-    #     derivative = clog._cloglog_transform_deriv_v(*args,
-    #                                                  output_array=test_output)
+        # Get the derivative using the function defined in clog_log.py.
+        derivative = scobit._scobit_transform_deriv_v(*args,
+                                                      output_array=test_output)
 
-    #     # Calculate, 'by hand' what the results should be
-    #     correct_derivatives = np.diag(np.array([1,
-    #                                             2.910328703250801,
-    #                                             1096.6331584284585]))
+        # Initialize an array of correct results
+        # Note the second element is by design where each of the terms in the
+        # derivative should evaluate to 1 and we get 1 / 1 = 1.
+        correct_derivatives = np.array([np.nan,
+                                        1.0,
+                                        np.nan,
+                                        np.exp(self.fake_shapes[0]),
+                                        1.0])
 
-    #     self.assertIsInstance(derivative, type(test_output))
-    #     self.assertEqual(len(derivative.shape), 2)
-    #     self.assertEqual(derivative.shape, (3, 3))
-    #     npt.assert_allclose(correct_derivatives, derivative.A)
+        # Calculate 'by hand' what the correct results should be
+        for i in [0, 2]:
+            shape = np.exp(self.fake_shapes[i])
+            numerator = (shape * 
+                         np.exp(-test_index[i]) * 
+                         np.power(1 + np.exp(-test_index[i]), shape - 1))
+            denominator = np.power(1 + np.exp(-test_index[i]), shape) - 1
+            correct_derivatives[i] = numerator / denominator
 
-    #     return None
+        self.assertIsInstance(derivative, type(test_output))
+        self.assertEqual(len(derivative.shape), 2)
+        self.assertEqual(derivative.shape, (num_rows, num_rows))
+        npt.assert_allclose(correct_derivatives,
+                            np.diag(derivative.A))
+
+        return None
+
+    def test_scobit_transform_deriv_alpha(self):
+        """
+        Ensures that scobit_transform_deriv_alpha returns the `output_array`
+        kwarg.
+        """
+        # Bundle the args for the function being tested
+        args = [self.fake_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                self.fake_intercepts]
+
+        # Take the relevant columns of rows_to_alts, as would be done with
+        # outside intercepts, or test None for when there are no outside
+        # intercepts.
+        for test_output in [None, self.fake_rows_to_alts[:, [0, 1]]]:
+            kwargs = {"output_array": test_output}
+            derivative_results = scobit._scobit_transform_deriv_alpha(*args,
+                                                                      **kwargs)
+            if test_output is None:
+                self.assertIsNone(derivative_results)
+            else:
+                npt.assert_allclose(test_output.A, derivative_results.A)
+
+        return None
