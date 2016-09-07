@@ -318,9 +318,9 @@ def _scobit_transform_deriv_shape(systematic_utilities,
         the transformed utilities with respect to the shape parameters. All
         elements are ints, floats, or longs.
     """
-    # Note  the np.exp is  needed because the raw curvature params are the log
+    # Note the np.exp is needed because the raw curvature params are the log
     # of the 'natural' curvature params. This is to ensure the natural shape
-    # params are always positive
+    # params are always positive.
     curve_shapes = np.exp(shape_params)
     curve_shapes[np.isposinf(curve_shapes)] = max_comp_value
     long_curve_shapes = rows_to_alts.dot(curve_shapes)
@@ -328,19 +328,28 @@ def _scobit_transform_deriv_shape(systematic_utilities,
     # Generate the needed terms for the derivative of the transformation with
     # respect to the systematic utility and guard against underflow or overflow
     exp_neg_v = np.exp(-1 * systematic_utilities)
-    exp_neg_v[np.isposinf(exp_neg_v)] = max_comp_value
 
     powered_term = np.power(1 + exp_neg_v, long_curve_shapes)
-    powered_term[np.isposinf(powered_term)] = max_comp_value
 
     # Note the "* long_curve_shapes" accounts for the fact that the derivative
     # of the natural shape params (i.e. exp(shape_param)) with respect to the
     # shape param is simply exp(shape_param) = natural shape param. The
-    # multipication comes from the chain rule
+    # multipication comes from the chain rule.
     curve_derivs = (-1 * np.log1p(exp_neg_v) *
                     powered_term / (powered_term - 1)) * long_curve_shapes
-    curve_derivs[np.isposinf(curve_derivs)] = max_comp_value
-    curve_derivs[np.isneginf(curve_derivs)] = min_comp_value
+    # Note that all of the following overflow and underflow guards are based
+    # on L'Hopital's rule.
+    # Guard against underflow from v --> inf. Note we end up with '-1' after
+    # accounting for the jacobian.
+    too_big_idx = np.where((powered_term - 1) == 0)
+    curve_derivs[too_big_idx] = -1
+    # Guard against overflow from v --> -inf.
+    too_small_idx = np.isposinf(exp_neg_v)
+    curve_derivs[too_small_idx] = max_comp_value
+    # Guard against overflow from moderate v but shape --> inf.
+    shape_too_big_idx = np.where((np.abs(systematic_utilities) <= 10) &
+                                 np.isposinf(powered_term))
+    curve_derivs[shape_too_big_idx] = -1 * np.log1p(exp_neg_v)
 
     # Assign the calculated derivatives to the output array
     output_array.data = curve_derivs
