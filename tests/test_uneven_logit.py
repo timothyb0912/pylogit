@@ -365,58 +365,53 @@ class HelperFuncTests(GenericTestCase):
 
         return None
 
-    # def test_uneven_transform_deriv_v(self):
-    #     """
-    #     Tests basic behavior of the scobit_transform_deriv_v.
-    #     """
-    #     # Note the index has a value that is small and a value that is large to
-    #     # test whether or not the function correctly uses L'Hopital's rule to
-    #     # deal with underflow and overflow when calculating the derivative.
-    #     # When the index is small, the derivative should be the associated
-    #     # shape parameter value. When the index is large the derivative should
-    #     # be 1.
-    #     test_index = np.array([-2, 0, 2, -800, 300])
-    #     # Note we use a compressed sparse-row matrix so that we can easily
-    #     # convert the output matrix to a numpy array using the '.A' attribute.
-    #     num_rows = test_index.shape[0]
-    #     test_output = diags(np.ones(num_rows),
-    #                         0, format='csr')
+    def test_uneven_transform_deriv_v(self):
+        """
+        Tests basic behavior of the scobit_transform_deriv_v.
+        """
+        # Note the index has a value that is small and a value that is large to
+        # test whether or not the function correctly deals with underflow and
+        # overflow when calculating the derivative.
+        test_index = np.array([-2, 0, 2, -3000, 800])
+        # Note we use a compressed sparse-row matrix so that we can easily
+        # convert the output matrix to a numpy array using the '.A' attribute.
+        num_rows = test_index.shape[0]
+        test_output = diags(np.ones(num_rows),
+                            0, format='csr')
 
-    #     # Bundle the arguments needed for _scobit_transform_deriv_v()
-    #     args = [test_index,
-    #             self.fake_df[self.alt_id_col].values,
-    #             self.fake_rows_to_alts,
-    #             self.fake_shapes]
+        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        args = [test_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                self.fake_shapes]
 
-    #     # Get the derivative using the function defined in clog_log.py.
-    #     derivative = uneven._scobit_transform_deriv_v(*args,
-    #                                                   output_array=test_output)
+        # Get the derivative using the function defined in clog_log.py.
+        derivative = uneven._uneven_transform_deriv_v(*args,
+                                                      output_array=test_output)
 
-    #     # Initialize an array of correct results
-    #     # Note the second element is by design where each of the terms in the
-    #     # derivative should evaluate to 1 and we get 1 / 1 = 1.
-    #     correct_derivatives = np.array([np.nan,
-    #                                     1.0,
-    #                                     np.nan,
-    #                                     np.exp(self.fake_shapes[0]),
-    #                                     1.0])
+        # Initialize an array of correct results
+        # Note the second element is by design where each of the terms in the
+        # derivative should evaluate to 1 and we get 1 / 1 = 1.
+        correct_derivatives = np.array([np.nan,
+                                        (1 + np.exp(self.fake_shapes[1])) / 2,
+                                        np.nan,
+                                        np.exp(self.fake_shapes[0]),
+                                        1.0])
 
-    #     # Calculate 'by hand' what the correct results should be
-    #     for i in [0, 2]:
-    #         shape = np.exp(self.fake_shapes[i])
-    #         numerator = (shape * 
-    #                      np.exp(-test_index[i]) * 
-    #                      np.power(1 + np.exp(-test_index[i]), shape - 1))
-    #         denominator = np.power(1 + np.exp(-test_index[i]), shape) - 1
-    #         correct_derivatives[i] = numerator / denominator
+        # Calculate 'by hand' what the correct results should be
+        for i in [0, 2]:
+            shape = np.exp(self.fake_shapes[i])
+            index_val = test_index[i]
+            correct_derivatives[i] = ((1 + np.exp(-index_val))**-1 +
+                                       shape / (1 + np.exp(shape * index_val)))
 
-    #     self.assertIsInstance(derivative, type(test_output))
-    #     self.assertEqual(len(derivative.shape), 2)
-    #     self.assertEqual(derivative.shape, (num_rows, num_rows))
-    #     npt.assert_allclose(correct_derivatives,
-    #                         np.diag(derivative.A))
+        self.assertIsInstance(derivative, type(test_output))
+        self.assertEqual(len(derivative.shape), 2)
+        self.assertEqual(derivative.shape, (num_rows, num_rows))
+        npt.assert_allclose(correct_derivatives,
+                            np.diag(derivative.A))
 
-    #     return None
+        return None
 
     def test_uneven_transform_deriv_alpha(self):
         """
