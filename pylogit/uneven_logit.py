@@ -20,6 +20,7 @@ Created on Thu Feb 25 08:02:45 2016
 from functools import partial
 import time
 import sys
+import warnings
 import math
 import numpy as np
 from scipy.optimize import minimize
@@ -40,6 +41,18 @@ general_log_likelihood = cc.calc_log_likelihood
 general_gradient = cc.calc_gradient
 general_calc_probabilities = cc.calc_probabilities
 general_hessian = cc.calc_hessian
+
+# Create a warning string that will be issued if ridge regression is performed.
+_msg = "NOTE: An L2-penalized regression is being performed. The "
+_msg_2 = "reported standard errors and robust standard errors "
+_msg_3 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg + _msg_2 + _msg_3
+
+# Create a warning string that will be issued if "shape_ref_pos" is passed to
+# the MNSL constructor as a kwarg
+_msg_4 = "The Multinomial Uneven Logit model estimates all shape parameters"
+_msg_5 = ", so shape_ref_pos will be ignored if passed."
+_shape_ref_msg = _msg_4 + _msg_5
 
 
 def split_param_vec(param_vec, rows_to_alts, design):
@@ -1045,9 +1058,7 @@ class MNUL(base_mcm.MNDC_Model):
         # or shape names unneccessarily
         ##########
         if "shape_ref_pos" in kwargs and kwargs["shape_ref_pos"] is not None:
-            msg = "The Multinomial Uneven Logit Model estimates all shape "
-            msg_2 = "parameters, so shape_ref_pos will be ignored if passed."
-            print(msg + msg_2)
+            warnings.warn(_shape_ref_msg)
 
         # Carry out the common instantiation process for all choice models
         super(MNUL, self).__init__(data,
@@ -1141,14 +1152,7 @@ class MNUL(base_mcm.MNDC_Model):
         self.ridge_param = ridge
 
         if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
+            warnings.warn(_ridge_warning_msg)
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
@@ -1167,25 +1171,25 @@ class MNUL(base_mcm.MNDC_Model):
             num_alternatives = rows_to_alts.shape[1]
             try:
                 assert init_shapes.shape[0] == num_alternatives
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_shapes is of length {} but should be of length {}"
-                print(msg.format(init_shapes.shape, num_alternatives))
-                raise e
+                raise ValueError(msg.format(init_shapes.shape,
+                                            num_alternatives))
 
             try:
                 assert init_coefs.shape[0] == self.design.shape[1]
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_coefs has length {} but should have length {}"
-                print(msg.format(init_coefs.shape, self.design.shape[1]))
-                raise e
+                raise ValueError(msg.format(init_coefs.shape,
+                                            self.design.shape[1]))
 
             try:
                 if init_intercepts is not None:
                     assert init_intercepts.shape[0] == (num_alternatives - 1)
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_intercepts has length {} but should have length {}"
-                print(msg.format(init_intercepts.shape, num_alternatives - 1))
-                raise e
+                raise ValueError(msg.format(init_intercepts.shape,
+                                            num_alternatives - 1))
 
             # The code block below will limit users to only having 'inside'
             # OR 'outside' intercept parameters but not both.
@@ -1209,6 +1213,10 @@ class MNUL(base_mcm.MNDC_Model):
             else:
                 init_vals = np.concatenate((init_shapes,
                                             init_coefs), axis=0)
+        elif init_vals is None:
+            msg = "If init_vals is None, then users must pass both init_coefs "
+            msg_2 = "and init_shapes."
+            raise ValueError(msg + msg_2)
 
         # Get the estimation results
         estimation_res = _estimate(init_vals,
