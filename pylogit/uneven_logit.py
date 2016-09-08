@@ -185,6 +185,10 @@ def _uneven_utility_transform(systematic_utilities,
     transformed_utilities = (systematic_utilities +
                              log_1_plus_exp_neg_utilitiles -
                              log_1_plus_exp_neg_shape_utilities)
+    # Perform a final guard against numbers that are too large to deal with
+    transformed_utilities[np.isposinf(transformed_utilities)] = max_comp_value
+    transformed_utilities[np.isneginf(transformed_utilities)] = -max_comp_value
+    transformed_utilities[np.isneginf(systematic_utilities)] = -max_comp_value
 
     # Account for the outside intercept parameters if there are any.
     if intercept_params is not None and intercept_ref_pos is not None:
