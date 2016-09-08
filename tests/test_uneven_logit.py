@@ -438,69 +438,63 @@ class HelperFuncTests(GenericTestCase):
 
         return None
 
-    # def test_uneven_transform_deriv_shape(self):
-    #     """
-    #     Ensures that the scobit_transform_deriv_shape() function provides
-    #     correct results, and handles all forms of overflow and underflow
-    #     correctly.
-    #     """
-    #     # Note the index has a value that is small and a value that is large to
-    #     # test whether or not the function correctly uses L'Hopital's rule to
-    #     # deal with underflow and overflow from the index when calculating the
-    #     # derivative. When the index is large, the derivative should be the
-    #     # negative of the inverse of the 'natural' shape parameter. When the
-    #     # index is small the derivative should be max_comp_value (theoretically
-    #     # inf). When the shape is large, the derivative should be the negative
-    #     # of the natural log of 1 + exp(-index).
-    #     test_index = np.array([-10, 0, 2, -800, 300])
-    #     # Note we use a compressed sparse-row matrix so that we can easily
-    #     # convert the output matrix to a numpy array using the '.A' attribute.
-    #     num_rows = test_index.shape[0]
-    #     test_output = diags(np.ones(num_rows),
-    #                         0, format='csr')
+    def test_uneven_transform_deriv_shape(self):
+        """
+        Ensures that the scobit_transform_deriv_shape() function provides
+        correct results, and handles all forms of overflow and underflow
+        correctly.
+        """
+        # Note the index has a value that is small and a value that is large to
+        # test whether or not the function correctly uses L'Hopital's rule to
+        # deal with underflow and overflow from the index when calculating the
+        # derivative. When the index is large, the derivative should be the
+        # negative of the inverse of the 'natural' shape parameter. When the
+        # index is small the derivative should be max_comp_value (theoretically
+        # inf). When the shape is large, the derivative should be the negative
+        # of the natural log of 1 + exp(-index).
+        test_index = np.array([-10, 0, 2, -10000, 1e8])
 
-    #     # Create new test shapes to use. We make the first shape parameter big
-    #     # to test overflow handling from this situation and L'Hopital's rule.
-    #     test_shapes = deepcopy(self.fake_shapes)
-    #     test_shapes[0] = np.log(80)
+        # Note we use a compressed sparse-row matrix so that we can easily
+        # convert the output matrix to a numpy array using the '.A' attribute.
+        num_rows = test_index.shape[0]
+        test_output = diags(np.ones(num_rows),
+                            0, format='csr')
 
-    #     # Bundle the arguments needed for _scobit_transform_deriv_v()
-    #     args = [test_index,
-    #             self.fake_df[self.alt_id_col].values,
-    #             self.fake_rows_to_alts,
-    #             test_shapes]
-    #     kwargs = {"output_array": test_output}
+        # Create new test shapes to use. We make the first shape parameter big
+        # to test overflow handling from this situation and L'Hopital's rule.
+        new_shapes = deepcopy(self.fake_shapes)
+        new_shapes[0] = np.log(80)
+        natural_shapes = np.exp(new_shapes)
 
-    #     # Get the derivative using the function defined in clog_log.py.
-    #     derivative = uneven._uneven_transform_deriv_shape(*args, **kwargs)
+        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        args = [test_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                new_shapes]
+        kwargs = {"output_array": test_output}
 
-    #     # Initialize an array of correct results
-    #     # Note the second element is by design so the derivative equals 2ln(2)
-    #     # Also, we precompute the results and multiply by natural shapes to
-    #     # account for the jacobian when computing the gradient with respect to
-    #     # reparameterized shape parameters.
-    #     result_1 = -np.log1p(np.exp(-test_index[0])) * np.exp(test_shapes[0])
-    #     result_2 = -2 * np.log(2) * np.exp(test_shapes[1])
-    #     result_5 = -1
-    #     correct_derivatives = np.array([result_1,
-    #                                     result_2,
-    #                                     np.nan,
-    #                                     uneven.max_comp_value,
-    #                                     result_5])
+        # Get the derivative using the function defined in clog_log.py.
+        derivative = uneven._uneven_transform_deriv_shape(*args, **kwargs)
 
-    #     # Calculate 'by hand' what the correct results should be for the third
-    #     # index value
-    #     shape = np.exp(test_shapes[2])
-    #     numerator = (-shape * 
-    #                  np.log1p(np.exp(-test_index[2])) * 
-    #                  np.power(1 + np.exp(-test_index[2]), shape))
-    #     denominator = np.power(1 + np.exp(-test_index[2]), shape) - 1
-    #     correct_derivatives[2] = numerator / denominator
+        # Initialize an array of correct results
+        # Note the second element is by design so the derivative equals 2ln(2)
+        # Also, we precompute the results and multiply by natural shapes to
+        # account for the jacobian when computing the gradient with respect to
+        # reparameterized shape parameters.
+        result_1 = (test_index[0] /
+                    (1 + np.exp(natural_shapes[0] * test_index[0])))
+        result_3 = (test_index[2] /
+                    (1 + np.exp(natural_shapes[2] * test_index[2])))
+        correct_derivatives = np.array([result_1 * natural_shapes[0],
+                                        0,
+                                        result_3 * natural_shapes[2],
+                                        test_index[3] * natural_shapes[0],
+                                        0])
 
-    #     self.assertIsInstance(derivative, type(test_output))
-    #     self.assertEqual(len(derivative.shape), 2)
-    #     self.assertEqual(derivative.shape, (num_rows, num_rows))
-    #     npt.assert_allclose(correct_derivatives,
-    #                         np.diag(derivative.A))
+        self.assertIsInstance(derivative, type(test_output))
+        self.assertEqual(len(derivative.shape), 2)
+        self.assertEqual(derivative.shape, (num_rows, num_rows))
+        npt.assert_allclose(correct_derivatives,
+                            np.diag(derivative.A))
 
-    #     return None
+        return None
