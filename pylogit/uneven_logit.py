@@ -154,7 +154,7 @@ def _uneven_utility_transform(systematic_utilities,
     exp_neg_utilities = np.exp(-1 * systematic_utilities)
 
     # Get the log of 1 + exponentiated negative utilities
-    log_1_plus_exp_neg_utilitiles = np.log(1 + exp_neg_utilities)
+    log_1_plus_exp_neg_utilitiles = np.log1p(exp_neg_utilities)
 
     # Guard against overflow. Underflow not a problem since we add one to a
     # near zero number and log of one will evaluate to zero
@@ -167,7 +167,7 @@ def _uneven_utility_transform(systematic_utilities,
                                      systematic_utilities)
 
     # Get the log of 1 + exponentiated (negative utiltiies times the shape)
-    log_1_plus_exp_neg_shape_utilities = np.log(1 + exp_neg_shape_utilities)
+    log_1_plus_exp_neg_shape_utilities = np.log1p(exp_neg_shape_utilities)
 
     ##########
     # Guard against overflow
