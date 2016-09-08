@@ -338,11 +338,14 @@ def _uneven_transform_deriv_shape(systematic_utilities,
     # Get the exponentiated (utilities times the shape parameter)
     exp_shape_utilities = np.exp(long_shapes * systematic_utilities)
 
-    # Guard against overflow
-    exp_shape_utilities[np.isinf(exp_shape_utilities)] = math.exp(max_exp)
-
     # Calculate the derivative of h_ij with respect to shape_j.
     derivs = (systematic_utilities / (1.0 + exp_shape_utilities))
+    # Guard against overflow. Only for cases of systematic_utilities becomming
+    # huge. It is unlikely this safeguard will be needed.
+    derivs[np.isposinf(systematic_utilities)] = 0
+    # Guard against underflow from v --> -inf.
+    huge_index = np.isneginf(systematic_utilities)
+    derivs[huge_index] = -max_comp_value
 
     # Return the matrix of dh_dshapes. Note the matrix should be of dimension
     # (systematic_utilities.shape[0], shape_params.shape[0])
