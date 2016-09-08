@@ -1193,18 +1193,18 @@ class MNUL(base_mcm.MNDC_Model):
 
             # The code block below will limit users to only having 'inside'
             # OR 'outside' intercept parameters but not both.
-#            try:
-#                condition_1 = "intercept" not in self.specification
-#                condition_2 = init_intercepts is None
-#                assert condition_1 or condition_2
-#            except AssertionError as e:
-#                msg = "init_intercepts should only be used if 'intercept' is "
-#                msg_2 = "not in one's index specification."
-#                msg_3 = "Either make init_intercepts = None or remove "
-#                msg_4 = "'intercept' from the specification."
-#                print(msg + msg_2 )
-#                print(msg_3 + msg_4)
-#                raise e
+            # try:
+            #     condition_1 = "intercept" not in self.specification
+            #     condition_2 = init_intercepts is None
+            #     assert condition_1 or condition_2
+            # except AssertionError as e:
+            #     msg = "init_intercepts should only be used if 'intercept' is "
+            #     msg_2 = "not in one's index specification."
+            #     msg_3 = "Either make init_intercepts = None or remove "
+            #     msg_4 = "'intercept' from the specification."
+            #     print(msg + msg_2 )
+            #     print(msg_3 + msg_4)
+            #     raise e
 
             if init_intercepts is not None:
                 init_vals = np.concatenate((init_shapes,
