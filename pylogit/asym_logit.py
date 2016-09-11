@@ -15,6 +15,7 @@ Created on Sun Feb 28 20:16:35 2016
 """
 
 from functools import partial
+import warnings
 import time
 import sys
 import numpy as np
@@ -37,6 +38,18 @@ general_log_likelihood = cc.calc_log_likelihood
 general_gradient = cc.calc_gradient
 general_calc_probabilities = cc.calc_probabilities
 general_hessian = cc.calc_hessian
+
+# Create a warning string that will be issued if ridge regression is performed.
+_msg = "NOTE: An L2-penalized regression is being performed. The "
+_msg_2 = "reported standard errors and robust standard errors "
+_msg_3 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg + _msg_2 + _msg_3
+
+# Create a warning that tells users to pass the shape_ref_pos keyword argument.
+_msg_4 = "shape_ref_pos must be an integer. It is not an optional "
+_msg_5 = "parameter for the asymmetric logit model. All shape "
+_msg_6 = "parameters are not identified."
+_shape_ref_msg = _msg_4 + _msg_5 + _msg_6
 
 
 def split_param_vec(param_vec, rows_to_alts, design):
@@ -1218,12 +1231,8 @@ class MNAL(base_mcm.MNDC_Model):
         ##########
         try:
             assert isinstance(shape_ref_pos, int)
-        except AssertionError as e:
-            msg = "shape_ref_pos must be an integer. It is not an optional "
-            msg_2 = "parameter for the asymmetric logit model. All shape "
-            msg_3 = "parameters are not identified."
-            print(msg + msg_2 + msg_3)
-            raise e
+        except AssertionError:
+            warnings.warn(_shape_ref_msg)
 
         # Carry out the common instantiation process for all choice models
         model_title = "Multinomial Asymmetric Logit Model"
@@ -1250,9 +1259,12 @@ class MNAL(base_mcm.MNDC_Model):
                 init_shapes=None,
                 init_intercepts=None,
                 init_coefs=None,
-                print_res=True, method="BFGS",
-                loss_tol=1e-06, gradient_tol=1e-06,
-                maxiter=1000, ridge=None,
+                print_res=True,
+                method="BFGS",
+                loss_tol=1e-06,
+                gradient_tol=1e-06,
+                maxiter=1000,
+                ridge=None,
                 **kwargs):
         """
         Parameters
@@ -1317,14 +1329,7 @@ class MNAL(base_mcm.MNDC_Model):
         self.ridge_param = ridge
 
         if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
+            warnings.warn(_ridge_warning_msg)
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
@@ -1343,40 +1348,40 @@ class MNAL(base_mcm.MNDC_Model):
             num_alternatives = alt_to_shapes.shape[1]
             try:
                 assert init_shapes.shape[0] == num_alternatives - 1
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_shapes is of length {} but should be of length {}"
-                print(msg.format(init_shapes.shape, num_alternatives))
-                raise e
+                raise ValueError(msg.format(init_shapes.shape,
+                                            num_alternatives - 1))
 
             try:
                 assert init_coefs.shape[0] == self.design.shape[1]
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_coefs has length {} but should have length {}"
-                print(msg.format(init_coefs.shape, self.design.shape[1]))
-                raise e
+                raise ValueError(msg.format(init_coefs.shape,
+                                            self.design.shape[1]))
 
             try:
                 if init_intercepts is not None:
                     assert init_intercepts.shape[0] == (num_alternatives - 1)
-            except AssertionError as e:
+            except AssertionError:
                 msg = "init_intercepts has length {} but should have length {}"
-                print(msg.format(init_intercepts.shape, num_alternatives - 1))
-                raise e
+                raise ValueError(msg.format(init_intercepts.shape,
+                                            num_alternatives - 1))
 
             # The code block below will limit users to only having 'inside'
             # OR 'outside' intercept parameters but not both.
-#            try:
-#                condition_1 = "intercept" not in self.specification
-#                condition_2 = init_intercepts is None
-#                assert condition_1 or condition_2
-#            except AssertionError as e:
-#                msg = "init_intercepts should only be used if 'intercept' is "
-#                msg_2 = "not in one's index specification."
-#                msg_3 = "Either make init_intercepts = None or remove "
-#                msg_4 = "'intercept' from the specification."
-#                print(msg + msg_2)
-#                print(msg_3 + msg_4)
-#                raise e
+            # try:
+            #     condition_1 = "intercept" not in self.specification
+            #     condition_2 = init_intercepts is None
+            #     assert condition_1 or condition_2
+            # except AssertionError as e:
+            #     msg = "init_intercepts should only be used if 'intercept' is"
+            #     msg_2 = " not in one's index specification."
+            #     msg_3 = "Either make init_intercepts = None or remove "
+            #     msg_4 = "'intercept' from the specification."
+            #     print(msg + msg_2)
+            #     print(msg_3 + msg_4)
+            #     raise e
 
             if init_intercepts is not None:
                 init_vals = np.concatenate((init_shapes,
@@ -1385,6 +1390,11 @@ class MNAL(base_mcm.MNDC_Model):
             else:
                 init_vals = np.concatenate((init_shapes,
                                             init_coefs), axis=0)
+
+        elif init_vals is None:
+            msg = "If init_vals is None, then users must pass both init_coefs "
+            msg_2 = "and init_shapes."
+            raise ValueError(msg + msg_2)
 
         # Get the estimation results
         estimation_res = _estimate(init_vals,
