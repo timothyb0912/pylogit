@@ -93,7 +93,6 @@ def split_param_vec(param_vec, rows_to_alts, design):
 
     return shapes, intercepts, betas
 
-
 def _convert_eta_to_c(eta, ref_position):
     """
     Parameters
@@ -119,6 +118,8 @@ def _convert_eta_to_c(eta, ref_position):
 
     # Guard against overflow
     exp_eta[np.isposinf(exp_eta)] = max_comp_value
+    # Guard against underflow
+    exp_eta[exp_eta == 0] = min_comp_value
 
     # Calculate the denominator in a logistic transformation
     # Note the +1 is for the reference alternative which has been
@@ -1232,7 +1233,7 @@ class MNAL(base_mcm.MNDC_Model):
         try:
             assert isinstance(shape_ref_pos, int)
         except AssertionError:
-            warnings.warn(_shape_ref_msg)
+            raise ValueError(_shape_ref_msg)
 
         # Carry out the common instantiation process for all choice models
         model_title = "Multinomial Asymmetric Logit Model"
