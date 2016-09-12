@@ -304,6 +304,10 @@ def _asym_utility_transform(systematic_utilities,
         # Add the intercept values to f(x, beta, c)
         transformed_utilities += rows_to_alts.dot(all_intercepts)
 
+    # Perform final guards against over/underflow in the transformations
+    transformed_utilities[np.isposinf(transformed_utilities)] = max_comp_value
+    transformed_utilities[np.isneginf(transformed_utilities)] = -max_comp_value
+
     # Be sure to return a 2D array since other functions will be expecting that
     if len(transformed_utilities.shape) == 1:
         transformed_utilities = transformed_utilities[:, np.newaxis]
