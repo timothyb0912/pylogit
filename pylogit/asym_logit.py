@@ -97,11 +97,12 @@ def _convert_eta_to_c(eta, ref_position):
     """
     Parameters
     ----------
-    eta : 1D ndarray.
+    eta : 1D or 2D ndarray.
         The elements of the array should be this model's 'transformed' shape
         parameters, i.e. the natural log of (the corresponding shape parameter
         divided by the reference shape parameter). This array's elements will
-        be real valued.
+        be real valued. If `eta` is 2D, then its shape should be
+        (num_estimated_shapes, num_parameter_samples).
     ref_position : int.
         Specifies the position in the resulting array of shape ==
         `(eta.shape[0] + 1,)` that should be equal to 1 - the sum of the other
@@ -109,9 +110,11 @@ def _convert_eta_to_c(eta, ref_position):
 
     Returns
     -------
-    c_vector : 1D ndarray.
-        Should have shape `== (eta.shape[0] + 1, )`. Contains the 'natural'
-        shape parameters that correspond to `eta`.
+    c_vector : 1D or 2D ndarray based on `eta`.
+        If `eta` is 1D then `c_vector` should have shape
+        `(eta.shape[0] + 1, )`. If `eta` is 2D then `c_vector` should have
+        shape `(eta.shape[0] + 1, eta.shape[1])`. The returned array will
+        contains the 'natural' shape parameters that correspond to `eta`.
     """
     # Exponentiate eta
     exp_eta = np.exp(eta)
