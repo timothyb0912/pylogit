@@ -61,7 +61,7 @@ class GenericTestCase(unittest.TestCase):
 
         # Create the fake design matrix with columns denoting X
         # The intercepts are not included because they are kept outside the
-        # index in the scobit model.
+        # index in the uneven model.
         self.fake_design = np.array([[1],
                                      [2],
                                      [3],
@@ -310,7 +310,7 @@ class HelperFuncTests(GenericTestCase):
 
     def test_uneven_utility_transform(self):
         """
-        Ensures that `_scobit_utility_transform()` returns correct results
+        Ensures that `_uneven_utility_transform()` returns correct results
         """
         # Create a set of systematic utilities that will test the function for
         # correct calculations, for proper dealing with overflow, and for
@@ -367,7 +367,7 @@ class HelperFuncTests(GenericTestCase):
 
     def test_uneven_transform_deriv_v(self):
         """
-        Tests basic behavior of the scobit_transform_deriv_v.
+        Tests basic behavior of the uneven_transform_deriv_v.
         """
         # Note the index has a value that is small and a value that is large to
         # test whether or not the function correctly deals with underflow and
@@ -379,13 +379,13 @@ class HelperFuncTests(GenericTestCase):
         test_output = diags(np.ones(num_rows),
                             0, format='csr')
 
-        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        # Bundle the arguments needed for _uneven_transform_deriv_v()
         args = [test_index,
                 self.fake_df[self.alt_id_col].values,
                 self.fake_rows_to_alts,
                 self.fake_shapes]
 
-        # Get the derivative using the function defined in clog_log.py.
+        # Get the derivative using the function defined in uneven_logit.py.
         derivative = uneven._uneven_transform_deriv_v(*args,
                                                       output_array=test_output)
 
@@ -415,7 +415,7 @@ class HelperFuncTests(GenericTestCase):
 
     def test_uneven_transform_deriv_alpha(self):
         """
-        Ensures that scobit_transform_deriv_alpha returns the `output_array`
+        Ensures that uneven_transform_deriv_alpha returns the `output_array`
         kwarg.
         """
         # Bundle the args for the function being tested
@@ -440,7 +440,7 @@ class HelperFuncTests(GenericTestCase):
 
     def test_uneven_transform_deriv_shape(self):
         """
-        Ensures that the scobit_transform_deriv_shape() function provides
+        Ensures that the uneven_transform_deriv_shape() function provides
         correct results, and handles all forms of overflow and underflow
         correctly.
         """
@@ -466,14 +466,14 @@ class HelperFuncTests(GenericTestCase):
         new_shapes[0] = np.log(80)
         natural_shapes = np.exp(new_shapes)
 
-        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        # Bundle the arguments needed for _uneven_transform_deriv_v()
         args = [test_index,
                 self.fake_df[self.alt_id_col].values,
                 self.fake_rows_to_alts,
                 new_shapes]
         kwargs = {"output_array": test_output}
 
-        # Get the derivative using the function defined in clog_log.py.
+        # Get the derivative using the function defined in uneven_log.py.
         derivative = uneven._uneven_transform_deriv_shape(*args, **kwargs)
 
         # Initialize an array of correct results
