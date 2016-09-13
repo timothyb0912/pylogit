@@ -26,7 +26,9 @@ Main Features
 
 Where to get it
 ===============
-Available from PyPi
+Available from PyPi::
+    pip install pylogit
+
     https://pypi.python.org/pypi/pylogit/0.1.1
 
 Available through Anaconda::
