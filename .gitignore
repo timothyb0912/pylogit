@@ -14,3 +14,6 @@ dist
 
 # setup.py working directory
 build
+
+# Mac OS binary file
+.DS_Store
