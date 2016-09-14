@@ -7,6 +7,7 @@ import warnings
 import unittest
 from collections import OrderedDict
 from copy import deepcopy
+from functools import partial
 
 import numpy as np
 import numpy.testing as npt
@@ -370,163 +371,181 @@ class HelperFuncTests(GenericTestCase):
 
         return None
 
-    # def test_asym_utility_transform(self):
-    #     """
-    #     Ensures that `_asym_utility_transform()` returns correct results
-    #     """
-    #     # Create a set of systematic utilities that will test the function for
-    #     # correct calculations, for proper dealing with overflow, and for
-    #     # proper dealing with underflow.
+    def test_asym_utility_transform(self):
+        """
+        Ensures that `_asym_utility_transform()` returns correct results
+        """
+        # Create a set of systematic utilities that will test the function for
+        # correct calculations, for proper dealing with overflow, and for
+        # proper dealing with underflow.
 
-    #     # The first and third elements tests general calculation.
-    #     # The second element of index_array should lead to the transformation
-    #     # equaling the 'natural' shape parameter for alternative 2.
-    #     # The fourth element should test what happens with underflow and should
-    #     # lead to max_comp_value.
-    #     # The fifth element should test what happens with overflow and should
-    #     # lead to -1.0 * max_comp_value
-    #     index_array = np.array([1, 0, -1, 1e400, -1e400])
+        # The first and third elements tests general calculation.
+        # The second element of index_array should lead to the transformation
+        # equaling the 'natural' shape parameter for alternative 2.
+        # The fourth element should test what happens with underflow and should
+        # lead to max_comp_value.
+        # The fifth element should test what happens with overflow and should
+        # lead to -1.0 * max_comp_value
+        index_array = np.array([1, 0, -1, 1e400, -1e400])
 
-    #     # We can use a the following two arrays of the shape parameters to test
-    #     # the overflow and underflow capabilities with respect to the shape
-    #     # parameters.
-    #     test_shapes_2 = np.array([-800, 0])
-    #     test_shapes_3 = np.array([800, 0])
+        # We can use a the following array of the shape parameters to test
+        # the underflow capabilities with respect to the shape
+        # parameters.
+        test_shapes_2 = np.array([-800, 0])
 
-    #     # Figure out the value of the 'natural' shape parameters
-    #     natural_shapes_2 = asym._convert_eta_to_c(test_shapes_2,
-    #                                               self.fake_shape_ref_pos)
-    #     natural_shapes_3 = asym._convert_eta_to_c(test_shapes_3,
-    #                                               self.fake_shape_ref_pos)
+        test_shapes_3 = np.array([800, 0])
 
-    #     # Crerate the array of expected results when using shape parameters
-    #     # of 'normal' magnitudes.
-    #     intercept_1 = self.fake_intercepts[0]
-    #     intercept_2 = self.fake_intercepts[1]
-    #     intercept_3 = 0
+        # Figure out the value of the 'natural' shape parameters
+        natural_shapes_2 = asym._convert_eta_to_c(test_shapes_2,
+                                                  self.fake_shape_ref_pos)
+        natural_shapes_3 = asym._convert_eta_to_c(test_shapes_3,
+                                                  self.fake_shape_ref_pos)
 
-    #     result_1 = (intercept_1 +
-    #                 np.log(self.natural_shapes[0]) * (1 - index_array[0]))
+        # Crerate the array of expected results when using shape parameters
+        # of 'normal' magnitudes.
+        intercept_1 = self.fake_intercepts[0]
+        intercept_2 = self.fake_intercepts[1]
+        intercept_3 = 0
 
-    #     result_2 = intercept_2 + np.log(self.natural_shapes[1])
+        result_1 = (intercept_1 +
+                    np.log(self.natural_shapes[0]) * (1 - index_array[0]))
 
-    #     result_3 = (intercept_3 +
-    #                 np.log(self.natural_shapes[2]) -
-    #                 np.log(1 - self.natural_shapes[2]) * index_array[2])
+        result_2 = intercept_2 + np.log(self.natural_shapes[1])
 
-    #     expected_results = np.array([result_1,
-    #                                  result_2,
-    #                                  result_3,
-    #                                  asym.max_comp_value + intercept_1,
-    #                                  - asym.max_comp_value])[:, None]
+        # Note the division by 2 is due to the 'J - 1' term. See the original
+        # definition of the transformation.
+        result_3 = (intercept_3 +
+                    np.log(self.natural_shapes[2]) -
+                    np.log((1 - self.natural_shapes[2]) / 2) * index_array[2])
 
-    #     # Crerate the array of expected results when using shape parameters
-    #     # of 'abnormally' small magnitudes.
-    #     result_2_2 = intercept_2 + np.log(natural_shapes_2[1])
-    #     result_3_2 = (intercept_3 +
-    #                   np.log(natural_shapes_2[2]) -
-    #                   np.log(1 - natural_shapes_2[2]) * index_array[2])
+        expected_results = np.array([result_1,
+                                     result_2,
+                                     result_3,
+                                     asym.max_comp_value + intercept_1,
+                                     - asym.max_comp_value])[:, None]
 
-    #     expected_results_2 = np.array([-asym.max_comp_value,
-    #                                    result_2_2,
-    #                                    result_3_2,
-    #                                    -asym.max_comp_value + intercept_1,
-    #                                    -asym.max_comp_value])[:, None]
+        # Crerate the array of expected results when using shape parameters
+        # of 'abnormally' small magnitudes.
+        # Note the division by 2 is due to the 'J - 1' term. See the original
+        # definition of the transformation.
+        result_2_2 = intercept_2 + np.log(natural_shapes_2[1])
+        result_3_2 = (intercept_3 +
+                      np.log(natural_shapes_2[2]) -
+                      np.log((1 - natural_shapes_2[2]) / 2) * index_array[2])
 
-    #     # Crerate the array of expected results when using shape parameters
-    #     # of 'abnormally' large magnitudes.
-    #     expected_results_3 = np.array([0 + intercept_1,
-    #                                    -asym.max_comp_value + intercept_2,
-    #                                    -asym.max_comp_value + intercept_3,
-    #                                    0 + intercept_1,
-    #                                    -asym.max_comp_value])[:, None]
+        # Note the '0' comes from (1-1) * ln(shape)
+        expected_results_2 = np.array([0 + intercept_1,
+                                       result_2_2,
+                                       result_3_2,
+                                       asym.max_comp_value + intercept_1,
+                                       -asym.max_comp_value])[:, None]
 
-    #     #####
-    #     # Perform various rounds of checking
-    #     #####
-    #     # Use the utility transformation function, round_1
-    #     alt_id_vals = self.fake_df[self.alt_id_col].values
-    #     args = [index_array,
-    #             alt_id_vals,
-    #             self.fake_rows_to_alts,
-    #             self.fake_shapes,
-    #             self.fake_intercepts]
-    #     kwargs = {"intercept_ref_pos": self.fake_intercept_ref_pos,
-    #               "shape_ref_position": self.fake_shape_ref_pos}
-    #     func_results = asym._asym_utility_transform(*args, **kwargs)
+        # Create the array of expected results when using shape parameters
+        # of 'abnormally' large magnitudes.
+        result_2_3 = intercept_2 + np.log(natural_shapes_3[1])
+        result_3_3 = (intercept_3 +
+                      np.log(natural_shapes_3[2]) -
+                      np.log((1 - natural_shapes_3[2]) / 2) * index_array[2])
 
-    #     # Use the utility transformation function, round_2
-    #     args[3] = test_shapes_2
-    #     func_results_2 = asym._asym_utility_transform(*args, **kwargs)
+        expected_results_3 = np.array([0 + intercept_1,
+                                       result_2_3,
+                                       result_3_3,
+                                       0 + intercept_1,
+                                       -asym.max_comp_value])[:, None]
 
-    #     # Use the utility transformation function, round_3
-    #     args[3] = test_shapes_3
-    #     func_results_3 = asym._asym_utility_transform(*args, **kwargs)
+        #####
+        # Perform various rounds of checking
+        #####
+        # Use the utility transformation function, round_1
+        alt_id_vals = self.fake_df[self.alt_id_col].values
+        args = [index_array,
+                alt_id_vals,
+                self.fake_rows_to_alts,
+                self.fake_shapes,
+                self.fake_intercepts]
+        kwargs = {"intercept_ref_pos": self.fake_intercept_ref_pos,
+                  "shape_ref_position": self.fake_shape_ref_pos}
+        func_results = asym._asym_utility_transform(*args, **kwargs)
 
-    #     # Check the correctness of the results
-    #     all_results = [(func_results, expected_results),
-    #                    (func_results_2, expected_results_2),
-    #                    (func_results_3, expected_results_3)]
+        # Use the utility transformation function, round_2
+        args[3] = test_shapes_2
+        func_results_2 = asym._asym_utility_transform(*args, **kwargs)
 
-    #     for pos, (test_results, correct_results) in enumerate(all_results):
-    #         print("Result pair {}".format(pos))
-    #         print("Function results: {}".format(test_results))
-    #         print("Correct results: {}".format(correct_results))
-    #         self.assertIsInstance(test_results, np.ndarray)
-    #         self.assertEqual(len(test_results.shape), 2)
-    #         self.assertEqual(test_results.shape[1], correct_results.shape[1])
-    #         self.assertEqual(test_results.shape[0], correct_results.shape[0])
-    #         npt.assert_allclose(test_results, correct_results)
+        # Use the utility transformation function, round_3
+        args[3] = test_shapes_3
+        func_results_3 = asym._asym_utility_transform(*args, **kwargs)
 
-    #     return None
+        # Check the correctness of the results
+        all_results = [(func_results, expected_results),
+                       (func_results_2, expected_results_2),
+                       (func_results_3, expected_results_3)]
 
-    # def test_asym_transform_deriv_v(self):
-    #     """
-    #     Tests basic behavior of the asym_transform_deriv_v.
-    #     """
-    #     # Note the index has a value that is small and a value that is large to
-    #     # test whether or not the function correctly deals with underflow and
-    #     # overflow when calculating the derivative.
-    #     test_index = np.array([-2, 0, 2, -3000, 800])
-    #     # Note we use a compressed sparse-row matrix so that we can easily
-    #     # convert the output matrix to a numpy array using the '.A' attribute.
-    #     num_rows = test_index.shape[0]
-    #     test_output = diags(np.ones(num_rows),
-    #                         0, format='csr')
+        for pos, (test_results, correct_results) in enumerate(all_results):
+            self.assertIsInstance(test_results, np.ndarray)
+            self.assertEqual(len(test_results.shape), 2)
+            self.assertEqual(test_results.shape[1], correct_results.shape[1])
+            self.assertEqual(test_results.shape[0], correct_results.shape[0])
+            npt.assert_allclose(test_results, correct_results)
 
-    #     # Bundle the arguments needed for _asym_transform_deriv_v()
-    #     args = [test_index,
-    #             self.fake_df[self.alt_id_col].values,
-    #             self.fake_rows_to_alts,
-    #             self.fake_shapes]
+        return None
 
-    #     # Get the derivative using the function defined in asym_logit.py.
-    #     derivative = asym._asym_transform_deriv_v(*args,
-    #                                                   output_array=test_output)
+    def test_asym_transform_deriv_v(self):
+        """
+        Tests basic behavior of the asym_transform_deriv_v. Essentially the
+        only things that can go wrong is underflow or overflow from the shape
+        parameters going to zero or 1.0.
+        """
+        # Declare  set of index values to be tested
+        test_index = np.array([1, 0, -1, -2, 2])
+        # Figure out how many alternatives are there
+        num_alts = self.fake_rows_to_alts.shape[1]
+        # Test what happens with large shape parameters (that result in
+        # 'natural' shape parameters near 1.0)
+        large_shapes = np.array([800, 0])
+        large_results = np.array([0,
+                                  -np.log(asym.min_comp_value),
+                                  np.log(num_alts - 1),
+                                  asym.max_comp_value,
+                                  -np.log(asym.min_comp_value)])
+        # Test what happens with large shape parameters (that result in
+        # 'natural' shape parameters near 1.0)
+        small_shapes = np.array([-800, 0])
+        natural_small_shapes = asym._convert_eta_to_c(small_shapes,
+                                                      self.fake_shape_ref_pos)
+        small_results = np.array([-np.log(natural_small_shapes[0]),
+                                  -np.log(natural_small_shapes[1]),
+                                  (np.log(num_alts - 1) -
+                                   np.log(1 - natural_small_shapes[2])),
+                                  (np.log(num_alts - 1) -
+                                   np.log(1 - natural_small_shapes[0])),
+                                  -np.log(natural_small_shapes[2])])
 
-    #     # Initialize an array of correct results
-    #     # Note the second element is by design where each of the terms in the
-    #     # derivative should evaluate to 1 and we get 1 / 1 = 1.
-    #     correct_derivatives = np.array([np.nan,
-    #                                     (1 + np.exp(self.fake_shapes[1])) / 2,
-    #                                     np.nan,
-    #                                     np.exp(self.fake_shapes[0]),
-    #                                     1.0])
+        # Bundle the arguments needed for _asym_transform_deriv_v()
+        args = [test_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                self.fake_shapes]
 
-    #     # Calculate 'by hand' what the correct results should be
-    #     for i in [0, 2]:
-    #         shape = np.exp(self.fake_shapes[i])
-    #         index_val = test_index[i]
-    #         correct_derivatives[i] = ((1 + np.exp(-index_val))**-1 +
-    #                                    shape / (1 + np.exp(shape * index_val)))
+        # Create the needed output array
+        num_rows = test_index.shape[0]
+        output = diags(np.ones(num_rows), 0, format='csr')
 
-    #     self.assertIsInstance(derivative, type(test_output))
-    #     self.assertEqual(len(derivative.shape), 2)
-    #     self.assertEqual(derivative.shape, (num_rows, num_rows))
-    #     npt.assert_allclose(correct_derivatives,
-    #                         np.diag(derivative.A))
+        # Validate the results from asym_transform_deriv_v
+        for shape_array, results in [(large_shapes, large_results),
+                                     (small_shapes, small_results)]:
+            # Get the reslts from asym_transform_deriv_v
+            args[-1] = shape_array
+            kwargs = {"ref_position": self.fake_shape_ref_pos,
+                      "output_array": output}
+            derivative = asym._asym_transform_deriv_v(*args, **kwargs)
 
-    #     return None
+            # Ensure the results are as expected
+            self.assertIsInstance(derivative, type(output))
+            self.assertEqual(len(derivative.shape), 2)
+            self.assertEqual(derivative.shape, (num_rows, num_rows))
+            npt.assert_allclose(np.diag(derivative.A), results)
+
+        return None
 
     def test_asym_transform_deriv_alpha(self):
         """
@@ -553,63 +572,154 @@ class HelperFuncTests(GenericTestCase):
 
         return None
 
-    # def test_asym_transform_deriv_shape(self):
-    #     """
-    #     Ensures that the asym_transform_deriv_shape() function provides
-    #     correct results, and handles all forms of overflow and underflow
-    #     correctly.
-    #     """
-    #     # Note the index has a value that is small and a value that is large to
-    #     # test whether or not the function correctly uses L'Hopital's rule to
-    #     # deal with underflow and overflow from the index when calculating the
-    #     # derivative. When the index is large, the derivative should be the
-    #     # negative of the inverse of the 'natural' shape parameter. When the
-    #     # index is small the derivative should be max_comp_value (theoretically
-    #     # inf). When the shape is large, the derivative should be the negative
-    #     # of the natural log of 1 + exp(-index).
-    #     test_index = np.array([-10, 0, 2, -10000, 1e8])
+    def test_calc_deriv_c_with_respect_to_eta(self):
+        """
+        Ensure the calculation of the derivative of the natural shape
+        parameters with respect to the reparameterized shape parameters is
+        correct.
+        """
+        # Specify some shape parameters to test the function
+        natural_test_shapes = np.array([0.5, 0.25, 0.25])
+        # Specify an alternative to serve as the reference parameter
+        ref_position = 2
+        # Create an output array that will contain the derivative
+        output = np.zeros((natural_test_shapes.shape[0],
+                           natural_test_shapes.shape[0] - 1))
 
-    #     # Note we use a compressed sparse-row matrix so that we can easily
-    #     # convert the output matrix to a numpy array using the '.A' attribute.
-    #     num_rows = test_index.shape[0]
-    #     test_output = diags(np.ones(num_rows),
-    #                         0, format='csr')
+        # Record the correct derivatives
+        interim_results = np.array([[0.5 - 0.25, -0.5 * 0.25, -0.5 * 0.25],
+                                    [-0.5 * 0.25, 0.25 - 0.0625, -0.25**2],
+                                    [-0.5 * 0.25, -0.25**2, 0.25 - 0.0625]])
+        correct_results = interim_results[:, [0, 1]]
 
-    #     # Create new test shapes to use. We make the first shape parameter big
-    #     # to test overflow handling from this situation and L'Hopital's rule.
-    #     new_shapes = deepcopy(self.fake_shapes)
-    #     new_shapes[0] = np.log(80)
-    #     natural_shapes = np.exp(new_shapes)
+        # Get the results from the function
+        deriv_args = (natural_test_shapes, ref_position)
+        kwargs = {'output_array': output}
+        function_results = asym._calc_deriv_c_with_respect_to_eta(*deriv_args,
+                                                                  **kwargs)
 
-    #     # Bundle the arguments needed for _scobit_transform_deriv_v()
-    #     args = [test_index,
-    #             self.fake_df[self.alt_id_col].values,
-    #             self.fake_rows_to_alts,
-    #             new_shapes]
-    #     kwargs = {"output_array": test_output}
+        # Ensure that the results are what I expect them to be
+        self.assertIsInstance(function_results, np.ndarray)
+        self.assertEqual(len(function_results.shape), 2)
+        self.assertEqual(function_results.shape, output.shape)
+        npt.assert_allclose(function_results, correct_results)
 
-    #     # Get the derivative using the function defined in asym_logit.py.
-    #     derivative = asym._asym_transform_deriv_shape(*args, **kwargs)
+        return None
 
-    #     # Initialize an array of correct results
-    #     # Note the second element is by design so the derivative equals 2ln(2)
-    #     # Also, we precompute the results and multiply by natural shapes to
-    #     # account for the jacobian when computing the gradient with respect to
-    #     # reparameterized shape parameters.
-    #     result_1 = (test_index[0] /
-    #                 (1 + np.exp(natural_shapes[0] * test_index[0])))
-    #     result_3 = (test_index[2] /
-    #                 (1 + np.exp(natural_shapes[2] * test_index[2])))
-    #     correct_derivatives = np.array([result_1 * natural_shapes[0],
-    #                                     0,
-    #                                     result_3 * natural_shapes[2],
-    #                                     test_index[3] * natural_shapes[0],
-    #                                     0])
+    def test_asym_transform_deriv_shape(self):
+        """
+        Ensures that the asym_transform_deriv_shape() function provides
+        correct results, and handles all forms of overflow and underflow
+        correctly.
+        """
+        # Create index values to test the function with.
+        test_index = np.array([1, 0, -2, -1e400, 1e400])
 
-    #     self.assertIsInstance(derivative, type(test_output))
-    #     self.assertEqual(len(derivative.shape), 2)
-    #     self.assertEqual(derivative.shape, (num_rows, num_rows))
-    #     npt.assert_allclose(correct_derivatives,
-    #                         np.diag(derivative.A))
+        # Figure out how many alternatives are there
+        num_alts = self.fake_rows_to_alts.shape[1]
 
-    #     return None
+        # Test what happens with shape parameters of 'normal' magnitude
+        regular_shapes = self.fake_shapes
+        natural_reg_shapes = self.natural_shapes
+
+        result_2 = (natural_reg_shapes[2]**-1 +
+                    test_index[2] / (1.0 - natural_reg_shapes[2]))
+
+        regular_results = np.array([0,
+                                    natural_reg_shapes[1]**-1,
+                                    result_2,
+                                    -asym.max_comp_value,
+                                    -asym.max_comp_value])
+
+        # Test what happens with large shape parameters (that result in
+        # 'natural' shape parameters near 1.0)
+        large_shapes = np.array([800, 0])
+        natural_large_shapes = asym._convert_eta_to_c(large_shapes,
+                                                      self.fake_shape_ref_pos)
+        large_results = np.array([0,
+                                  asym.max_comp_value,
+                                  asym.max_comp_value,
+                                  -asym.max_comp_value,
+                                  -asym.max_comp_value])
+
+        # Test what happens with large shape parameters (that result in
+        # 'natural' shape parameters near 1.0)
+        small_index = test_index.copy()
+        small_index[0] = 0.5
+
+        small_shapes = np.array([-800, 0])
+        natural_small_shapes = asym._convert_eta_to_c(small_shapes,
+                                                      self.fake_shape_ref_pos)
+        result_3_3 = (natural_small_shapes[2]**-1 +
+                      test_index[2] / (1 - natural_small_shapes[2]))
+        small_results = np.array([asym.max_comp_value,
+                                  natural_small_shapes[1]**-1,
+                                  result_3_3,
+                                  -asym.max_comp_value,
+                                  -asym.max_comp_value])
+
+        # Bundle the arguments needed for _asym_transform_deriv_shape()
+        args = [test_index,
+                self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                self.fake_shapes]
+
+        # Create the needed output array for the overall derivative with
+        # respect to the reparameterized shape parameters
+        num_rows = test_index.shape[0]
+        output = np.matrix(np.zeros((num_rows, num_alts - 1)), dtype=float)
+
+        # Create the needed output array for the intermediate derivative of the
+        # 'natural' shape parameters with respect to the reparameterized shape
+        # parameters.
+        deriv_output = np.zeros((num_alts, num_alts - 1), dtype=float)
+
+        # Create the array needed for dh_dc
+        dh_dc_array = self.fake_rows_to_alts.copy()
+
+        # Create a function that will take the reparameterized shapes and the
+        # shape reference position and return the derivative of the natural
+        # shapes with respect to the reparameterized shapes.
+        interim_deriv_func = partial(asym._calc_deriv_c_with_respect_to_eta,
+                                     output_array=deriv_output)
+
+        # Take note of the kwargs needed for asym_transform_deriv_shape()
+        deriv_kwargs = {"ref_position": self.fake_shape_ref_pos,
+                        "dh_dc_array": dh_dc_array,
+                        "fill_dc_d_eta": interim_deriv_func,
+                        "output_array": output}
+
+        # Validate the results from asym_transform_deriv_shape
+        test_arrays = [(regular_shapes, natural_reg_shapes, regular_results),
+                       (large_shapes, natural_large_shapes, large_results),
+                       (small_shapes, natural_small_shapes, small_results)]
+        for shape_array, natural_shape_array, interim_results in test_arrays:
+            if shape_array[0] == small_shapes[0]:
+                args[0] = small_index
+
+            # Get the reslts from asym_transform_deriv_shape()
+            args[-1] = shape_array
+            derivative = asym._asym_transform_deriv_shape(*args,
+                                                          **deriv_kwargs)
+
+            # Calculate the derivative of the 'natural' shape parameters with
+            # espect to the reparameterized shape parameters.
+            interim_args = (natural_shape_array, self.fake_shape_ref_pos)
+            kwargs = {"output_array": deepcopy(deriv_output)}
+            dc_d_eta = asym._calc_deriv_c_with_respect_to_eta(*interim_args,
+                                                              **kwargs)
+
+            # Place the interim results in the correct shape
+            interim_results = interim_results[:, None]
+            interim_results = self.fake_rows_to_alts.multiply(interim_results)
+
+            # Calculate the correct results
+            results = interim_results.A.dot(dc_d_eta)
+
+            # Ensure the results are as expected
+            self.assertIsInstance(derivative, type(output))
+            self.assertEqual(len(derivative.shape), 2)
+            self.assertEqual(derivative.shape, (num_rows, num_alts - 1))
+            npt.assert_allclose(derivative.A, results)
+
+        return None
