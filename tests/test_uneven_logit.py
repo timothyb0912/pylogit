@@ -466,7 +466,7 @@ class HelperFuncTests(GenericTestCase):
         new_shapes[0] = np.log(80)
         natural_shapes = np.exp(new_shapes)
 
-        # Bundle the arguments needed for _uneven_transform_deriv_v()
+        # Bundle the arguments needed for _uneven_transform_deriv_shape()
         args = [test_index,
                 self.fake_df[self.alt_id_col].values,
                 self.fake_rows_to_alts,

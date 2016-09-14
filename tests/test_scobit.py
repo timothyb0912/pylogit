@@ -387,7 +387,7 @@ class HelperFuncTests(GenericTestCase):
                 self.fake_rows_to_alts,
                 self.fake_shapes]
 
-        # Get the derivative using the function defined in clog_log.py.
+        # Get the derivative using the function defined in scobit.py.
         derivative = scobit._scobit_transform_deriv_v(*args,
                                                       output_array=test_output)
 
@@ -468,14 +468,14 @@ class HelperFuncTests(GenericTestCase):
         test_shapes = deepcopy(self.fake_shapes)
         test_shapes[0] = np.log(80)
 
-        # Bundle the arguments needed for _scobit_transform_deriv_v()
+        # Bundle the arguments needed for _scobit_transform_deriv_shape()
         args = [test_index,
                 self.fake_df[self.alt_id_col].values,
                 self.fake_rows_to_alts,
                 test_shapes]
         kwargs = {"output_array": test_output}
 
-        # Get the derivative using the function defined in clog_log.py.
+        # Get the derivative using the function defined in scobit.py.
         derivative = scobit._scobit_transform_deriv_shape(*args, **kwargs)
 
         # Initialize an array of correct results
