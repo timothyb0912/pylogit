@@ -471,7 +471,6 @@ def _asym_transform_deriv_shape(systematic_utilities,
     # Convert the reduced shape parameters to the natural shape parameters
     ##########
     natural_shape_params = _convert_eta_to_c(eta, ref_position)
-    assert not np.isnan(natural_shape_params).any()
 
     ##########
     # Calculate the derivative of the transformed utilities with respect to
