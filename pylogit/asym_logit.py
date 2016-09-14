@@ -279,6 +279,13 @@ def _asym_utility_transform(systematic_utilities,
                   (systematic_utilities < 0) * log_1_sub_long_shapes)
     transformed_utilities = log_long_shapes - systematic_utilities * multiplier
 
+    # Perform a guard for shape --> 1 and V --> infinity.
+    # It is DEFINITELY not clear if this is the correct thing to do. The limit
+    # might not even exist, and there is no clear multivariate L'Hopital's
+    # rule. So this is an arbitrary decision
+    weird_case = np.isposinf(systematic_utilities) * (long_shapes == 1)
+    transformed_utilities[weird_case] = 0
+
     # Account for the outside intercept parameters if there are any
     if intercept_params is not None and intercept_ref_pos is not None:
         # Get a list of all the indices (or row indices) corresponding to the
@@ -307,6 +314,7 @@ def _asym_utility_transform(systematic_utilities,
     # Perform final guards against over/underflow in the transformations
     transformed_utilities[np.isposinf(transformed_utilities)] = max_comp_value
     transformed_utilities[np.isneginf(transformed_utilities)] = -max_comp_value
+
 
     # Be sure to return a 2D array since other functions will be expecting that
     if len(transformed_utilities.shape) == 1:
@@ -376,13 +384,15 @@ def _asym_transform_deriv_v(systematic_utilities,
 
     # Get the natural log of the long_shapes
     log_long_shapes = np.log(long_shapes)
-    # Guard against underflow, aka long_shapes too close to zero
+    # Guard against underflow, aka long_shapes too close to zero.
+    # I assume this should never happen because convert_eta_to_c never outputs
+    # zeros, by design.
     log_long_shapes[np.isneginf(log_long_shapes)] = -1 * max_comp_value
 
     # Get the natural log of (1 - long_shapes) / (num_alts - 1)
     log_1_sub_long_shapes = np.log((1 - long_shapes) /
                                    (num_alts - 1))
-    # Guard against underflow, aka 1 - long_shapes too close to zero
+    # Guard against underflow, aka 1 - long_shapes too close to zero.
     small_idx = np.isneginf(log_1_sub_long_shapes)
     log_1_sub_long_shapes[small_idx] = -1 * max_comp_value
 
@@ -437,6 +447,8 @@ def _asym_transform_deriv_shape(systematic_utilities,
     dh_dc_array : 2D scipy sparse matrix.
         Its data is to be replaced with the correct derivatives of the
         transformed index vector with respect to the shape parameter vector.
+        Should have shape
+        `(systematic_utilities.shape[0], rows_to_alts.shape[1])`.
     fill_dc_d_eta : callable.
         Should accept `eta` and `ref_position` and return a 2D numpy array
         containing the derivatives of the 'natural' shape parameter vector with
@@ -444,7 +456,8 @@ def _asym_transform_deriv_shape(systematic_utilities,
     output_array : 2D numpy matrix.
         This matrix's data is to be replaced with the correct derivatives of
         the transformed systematic utilities with respect to the vector of
-        transformed shape parameters.
+        transformed shape parameters. Should have shape 
+        `(systematic_utilities.shape[0], shape_params.shape[0])`.
 
     Returns
     -------
@@ -458,6 +471,7 @@ def _asym_transform_deriv_shape(systematic_utilities,
     # Convert the reduced shape parameters to the natural shape parameters
     ##########
     natural_shape_params = _convert_eta_to_c(eta, ref_position)
+    assert not np.isnan(natural_shape_params).any()
 
     ##########
     # Calculate the derivative of the transformed utilities with respect to
@@ -476,17 +490,21 @@ def _asym_transform_deriv_shape(systematic_utilities,
     # Calculate d_ln((1-long_shape)/(J-1))_d_long_shape
     d_lnShapeComp_dShape = -1.0 / (1 - long_shapes)
     # Guard against overflow
-    d_lnShapeComp_dShape[np.isposinf(d_lnShapeComp_dShape)] = max_comp_value
+    d_lnShapeComp_dShape[np.isneginf(d_lnShapeComp_dShape)] = -max_comp_value
 
     # Differentiate the multiplier with respect to natural_shape_j.
     deriv_multiplier = ((systematic_utilities >= 0) * d_lnShape_dShape +
                         (systematic_utilities < 0) * d_lnShapeComp_dShape)
+    # assert not np.isnan(deriv_multiplier).any()
 
     # Calculate the derivative of h_ij with respect to natural_shape_j.
     # Store these derivatives in their respective places in the dh_dc array
     # Note that d_hij_d_ck = 0 for k != j
-    dh_dc_array.data = (d_lnShape_dShape -
-                        systematic_utilities * deriv_multiplier)
+    dh_dc_values = d_lnShape_dShape - systematic_utilities * deriv_multiplier
+    # Guard against overflow
+    dh_dc_values[np.isinf(dh_dc_values)] = -1 * max_comp_value
+    # Assign the computed values to the scipy sparse array
+    dh_dc_array.data = dh_dc_values
 
     ##########
     # Calculate the derivative of the natural shape parameters, c with
@@ -494,9 +512,9 @@ def _asym_transform_deriv_shape(systematic_utilities,
     ##########
     # Return the matrix of dh_d_eta. Note the matrix should be of dimension
     # (systematic_utilities.shape[0], shape_params.shape[0])
+    # Note the calculation is essentially dh_dc * dc_d_eta = dh_d_eta
     output_array[:, :] = dh_dc_array.dot(fill_dc_d_eta(natural_shape_params,
                                                        ref_position))
-    assert not np.all(output_array == 0)
     return output_array
 
 
@@ -778,7 +796,7 @@ def _calc_neg_hessian(beta,
 
 
 def _estimate(init_values, design_matrix, alt_id_vector,
-              choice_vector, alt_to_obs, alt_to_shapes,
+              choice_vector, rows_to_obs, rows_to_alts,
               chosen_row_to_obs, shape_ref_position,
               intercept_ref_pos, print_results=True,
               method='bfgs', loss_tol=1e-06,
@@ -882,7 +900,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     ##########
     # Figure out how many shape parameters we should have and how many index
     # coefficients we should have
-    num_alts = alt_to_shapes.shape[1]
+    num_alts = rows_to_alts.shape[1]
     num_index_coefs = design_matrix.shape[1]
 
     try:
@@ -913,16 +931,16 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     ##########
     pre_dc_d_eta = np.zeros((num_alts, num_alts - 1), dtype=float)
     pre_dh_dv = diags(np.ones(design_matrix.shape[0]), 0, format='csr')
-    pre_dh_dc = alt_to_shapes.copy()
+    pre_dh_dc = rows_to_alts.copy()
     pre_dh_d_eta = np.matrix(np.zeros((design_matrix.shape[0],
                                        num_alts - 1), dtype=float))
 
     # Pre-create the sparse matrix that will be used as the derivative of the
     # transformation vector with respect to the intercept parameters
-    needed_idxs = range(alt_to_shapes.shape[1])
+    needed_idxs = range(rows_to_alts.shape[1])
     if intercept_ref_pos is not None:
         needed_idxs.remove(intercept_ref_pos)
-        pre_dh_d_alpha = (alt_to_shapes.copy()
+        pre_dh_d_alpha = (rows_to_alts.copy()
                                        .transpose()[needed_idxs, :]
                                        .transpose())
     else:
@@ -958,7 +976,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     ##########
     # Isolate the initial shape, intercept, and beta parameters.
     init_shapes, init_intercepts, init_betas = split_param_vec(init_values,
-                                                               alt_to_shapes,
+                                                               rows_to_alts,
                                                                design_matrix)
 
     # create the shape parameters that correspond to the 'simple' model
@@ -973,8 +991,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                                           np.zeros(design_matrix.shape[1]),
                                                              design_matrix,
                                                              alt_id_vector,
-                                                                alt_to_obs,
-                                                             alt_to_shapes,
+                                                               rows_to_obs,
+                                                              rows_to_alts,
                                                              choice_vector,
                                                     easy_utility_transform,
                                                 shape_params=simple_shapes,
@@ -983,8 +1001,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     initial_log_likelihood = general_log_likelihood(init_betas,
                                                          design_matrix,
                                                          alt_id_vector,
-                                                         alt_to_obs,
-                                                         alt_to_shapes,
+                                                         rows_to_obs,
+                                                         rows_to_alts,
                                                          choice_vector,
                                                        easy_utility_transform,
                                              intercept_params=init_intercepts,
@@ -1005,7 +1023,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     # Get the block matrix indices for the hessian matrix. Do it outside the
     # iterative minimization process in order to minimize unnecessary
     # computations
-    block_matrix_indices = cc.create_matrix_block_indices(alt_to_obs)
+    block_matrix_indices = cc.create_matrix_block_indices(rows_to_obs)
 
     # Start timing the estimation process
     start_time = time.time()
@@ -1014,8 +1032,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                        init_values,
                        args=(design_matrix,
                              alt_id_vector,
-                             alt_to_obs,
-                             alt_to_shapes,
+                             rows_to_obs,
+                             rows_to_alts,
                              choice_vector,
                              easy_utility_transform,
                              block_matrix_indices,
@@ -1051,7 +1069,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
         sys.stdout.flush()
 
     # Separate the final shape, intercept, and beta parameters
-    split_res = split_param_vec(results.x, alt_to_shapes, design_matrix)
+    split_res = split_param_vec(results.x, rows_to_alts, design_matrix)
     final_shape_params, final_intercept_params, final_utility_coefs = split_res
 
     # Store the separate values of the shape, intercept, and beta parameters
@@ -1066,8 +1084,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                                                         final_utility_coefs,
                                                               design_matrix,
                                                               alt_id_vector,
-                                                                 alt_to_obs,
-                                                              alt_to_shapes,
+                                                                 rows_to_obs,
+                                                              rows_to_alts,
                                                      easy_utility_transform,
                                     intercept_params=final_intercept_params,
                                           shape_params = final_shape_params,
@@ -1081,7 +1099,7 @@ def _estimate(init_values, design_matrix, alt_id_vector,
 
     # Calculate the observation specific chi-squared components
     chi_squared_terms = np.square(residuals) / long_probs
-    individual_chi_squareds = alt_to_obs.T.dot(chi_squared_terms)
+    individual_chi_squareds = rows_to_obs.T.dot(chi_squared_terms)
 
     # Store the log-likelihood at zero
     results["log_likelihood_null"] = log_likelihood_at_zero
@@ -1097,8 +1115,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     results["final_gradient"] = general_gradient(final_utility_coefs,
                                                  design_matrix,
                                                  alt_id_vector,
-                                                 alt_to_obs,
-                                                 alt_to_shapes,
+                                                 rows_to_obs,
+                                                 rows_to_alts,
                                                  choice_vector,
                                         easy_utility_transform,
                                             easy_calc_dh_d_eta,
@@ -1111,8 +1129,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
     results["final_hessian"] = general_hessian(final_utility_coefs,
                                                design_matrix,
                                                alt_id_vector,
-                                               alt_to_obs,
-                                               alt_to_shapes,
+                                               rows_to_obs,
+                                               rows_to_alts,
                                                easy_utility_transform,
                                                easy_calc_dh_d_eta,
                                                easy_calc_dh_dv,
@@ -1127,8 +1145,8 @@ def _estimate(init_values, design_matrix, alt_id_vector,
                                                           final_utility_coefs,
                                                                 design_matrix,
                                                                 alt_id_vector,
-                                                                   alt_to_obs,
-                                                                alt_to_shapes,
+                                                                   rows_to_obs,
+                                                                rows_to_alts,
                                                                 choice_vector,
                                                        easy_utility_transform,
                                                            easy_calc_dh_d_eta,
@@ -1342,8 +1360,8 @@ class MNAL(base_mcm.MNDC_Model):
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
         mapping_res = self.get_mappings_for_fit()
-        alt_to_obs = mapping_res["rows_to_obs"]
-        alt_to_shapes = mapping_res["rows_to_alts"]
+        rows_to_obs = mapping_res["rows_to_obs"]
+        rows_to_alts = mapping_res["rows_to_alts"]
         chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
         # Create init_vals from init_coefs, init_intercepts, and init_shapes if
@@ -1353,7 +1371,7 @@ class MNAL(base_mcm.MNDC_Model):
             ##########
             # Check the integrity of the parameter kwargs
             ##########
-            num_alternatives = alt_to_shapes.shape[1]
+            num_alternatives = rows_to_alts.shape[1]
             try:
                 assert init_shapes.shape[0] == num_alternatives - 1
             except AssertionError:
@@ -1409,8 +1427,8 @@ class MNAL(base_mcm.MNDC_Model):
                                    self.design,
                                    self.alt_IDs,
                                    self.choices,
-                                   alt_to_obs,
-                                   alt_to_shapes,
+                                   rows_to_obs,
+                                   rows_to_alts,
                                    chosen_row_to_obs,
                                    self.shape_ref_position,
                                    self.intercept_ref_position,
