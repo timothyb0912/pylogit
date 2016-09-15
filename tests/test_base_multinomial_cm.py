@@ -5,6 +5,8 @@ the predict function.
 """
 import warnings
 import unittest
+import os
+import pickle
 from collections import OrderedDict
 from copy import deepcopy
 from functools import partial
@@ -17,11 +19,10 @@ from scipy.sparse import diags
 
 import pylogit.base_multinomial_cm_v2 as base_cm
 
-class InitializationTests(unittest.TestCase):
-    """
-    This suite of tests should ensure that the logic in the initialization
-    process is correctly executed.
-    """
+
+# Create a generic TestCase class so that we can define a single setUp method
+# that is used by all the test suites.
+class GenericTestCase(unittest.TestCase):
     def setUp(self):
         """
         Create a fake dataset and specification from which we can initialize a
@@ -97,6 +98,11 @@ class InitializationTests(unittest.TestCase):
         self.fake_specification["x"] = [[1, 2, 3]]
         self.fake_names["x"] = ["x (generic coefficient)"]
 
+        # Create a fake nest specification for the model
+        self.fake_nest_spec = OrderedDict()
+        self.fake_nest_spec["Nest 1"] = [1, 3]
+        self.fake_nest_spec["Nest 2"] = [2]
+
          # Bundle args and kwargs used to construct the Asymmetric Logit model.
         self.constructor_args = [self.fake_df,
                                  self.alt_id_col,
@@ -111,8 +117,19 @@ class InitializationTests(unittest.TestCase):
                                    "names": self.fake_names,
                                    "intercept_names":
                                    self.fake_intercept_names,
-                                   "shape_names": self.fake_shape_names}
+                                   "shape_names": self.fake_shape_names,
+                                   "nest_spec": self.fake_nest_spec}
 
+        # Create a generic model object
+        self.model_obj = base_cm.MNDC_Model(*self.constructor_args,
+                                            **self.constructor_kwargs)
+
+
+class InitializationTests(GenericTestCase):
+    """
+    This suite of tests should ensure that the logic in the initialization
+    process is correctly executed.
+    """
     def test_column_presence_in_data(self):
         """
         Ensure that the check for the presence of key columns works.
@@ -146,17 +163,21 @@ class InitializationTests(unittest.TestCase):
         """
         # Create column headings that are not in the dataframe used for testing
         bad_specification_col = "foo"
-        bad_specification = deepcopy(self.fake_specification)
+        bad_spec_1 = deepcopy(self.fake_specification)
 
         good_col = self.fake_specification.keys()[0]
-        bad_specification[bad_specification_col] = bad_specification[good_col]
+        bad_spec_1[bad_specification_col] = bad_spec_1[good_col]
+
+        # Create a second bad specification dictionary by simply using a dict
+        # instead of an OrderedDict.
+        bad_spec_2 = dict.update(self.fake_specification)
 
         # Create the list of needed arguments
-        args = [bad_specification, self.fake_df]
+        for bad_specification in [bad_spec_1, bad_spec_2]:
+            args = [bad_specification, self.fake_df]
+            func = base_cm.ensure_specification_cols_are_in_dataframe
 
-        self.assertRaises(ValueError,
-                          base_cm.ensure_specification_cols_are_in_dataframe,
-                          *args)
+            self.assertRaises(ValueError, func, *args)
 
         return None
 
@@ -377,3 +398,232 @@ class InitializationTests(unittest.TestCase):
 
         return None
 
+
+class PredictHelperTests(GenericTestCase):
+    """
+    This suite tests the behavior of `check_param_list_validity()` and the
+    functions called by this method.
+    """
+    def test_check_num_rows_of_parameter_array(self):
+        """
+        Ensure a ValueError is raised if the number of rows in an array is
+        incorrect.
+        """
+        expected_num_rows = 4
+        title = 'test_array'
+
+        for i in [-1, 1]:
+            test_array = np.zeros((expected_num_rows + i, 3))
+
+            func_args = [test_array, expected_num_rows, title]
+            self.assertRaises(ValueError,
+                              base_cm.check_num_rows_of_parameter_array,
+                              *func_args)
+
+        # Test the behavior when there is no problem either
+        test_array = np.zeros((expected_num_rows, 3))
+        func_args = [test_array, expected_num_rows, title]
+        func_results = base_cm.check_num_rows_of_parameter_array(*func_args)
+        self.assertIsNone(func_results)
+
+        return None
+
+    def test_check_type_and_size_of_param_list(self):
+        """
+        Ensure that a ValueError is raised if param_list is not a list with the
+        expected number of elements
+        """
+        expected_length = 4
+        bad_param_list_1 = set(range(4))
+        bad_param_list_2 = range(5)
+        # Note that for the purposes of the function being tested, good is
+        # defined as a list with four elements. Other functions check the
+        # content of those elements
+        good_param_list = range(4)
+
+        for param_list in [bad_param_list_1, bad_param_list_2]:
+            self.assertRaises(ValueError,
+                              base_cm.check_type_and_size_of_param_list,
+                              param_list,
+                              expected_length)
+
+        args = [good_param_list, expected_length]
+        func_results = base_cm.check_type_and_size_of_param_list(*args)
+        self.assertIsNone(func_results)
+
+        return None
+
+    def test_check_type_of_param_list_elements(self):
+        """
+        Ensures a ValueError is raised if the first element of param_list is
+        not an ndarray and if each of the subsequent elements are not None or
+        ndarrays.
+        """
+        bad_param_list_1 = ['foo', np.zeros(2)]
+        bad_param_list_2 = [np.zeros(2), 'foo']
+        good_param_list = [np.zeros(2), np.ones(2)]
+        good_param_list_2 = [np.zeros(2), None]
+
+        for param_list in [bad_param_list_1, bad_param_list_2]:
+            self.assertRaises(ValueError,
+                              base_cm.check_type_of_param_list_elements,
+                              param_list)
+
+        for param_list in [good_param_list, good_param_list_2]:
+            args = [param_list]
+            func_results = base_cm.check_type_of_param_list_elements(*args)
+            self.assertIsNone(func_results)
+
+        return None
+
+    def test_check_num_columns_in_param_list_arrays(self):
+        """
+        Ensures a ValueError is raised if the various arrays in param_list do
+        not all have the same number of columns
+        """
+        bad_param_list = [np.zeros((2, 3)), np.zeros((2, 4))]
+
+        good_param_list_1 = [np.zeros((2, 3)), np.ones((2, 3))]
+        good_param_list_2 = [np.zeros((2, 3)), None]
+
+        self.assertRaises(ValueError,
+                          base_cm.check_num_columns_in_param_list_arrays,
+                          bad_param_list)
+
+        for param_list in [good_param_list_1, good_param_list_2]:
+            args = [param_list]
+            results = base_cm.check_num_columns_in_param_list_arrays(*args)
+            self.assertIsNone(results)
+
+        return None
+
+    def test_check_dimensional_equality_of_param_list_arrays(self):
+        """
+        Ensure that a ValueError is raised if the various arrays in param_list
+        do not have the same number of dimensions.
+        """
+        bad_param_list_1 = [np.zeros((2, 3)), np.ones(2)]
+        bad_param_list_2 = [np.zeros(3), np.ones((2, 3))]
+
+        good_param_list_1 = [np.zeros((2, 3)), np.ones((2, 3))]
+        good_param_list_2 = [np.zeros((2, 3)), None]
+
+        # alias the function of interest so it fits on one line
+        func = base_cm.check_dimensional_equality_of_param_list_arrays
+        for param_list in [bad_param_list_1, bad_param_list_2]:
+            self.assertRaises(ValueError, func, param_list)
+
+        for param_list in [good_param_list_1, good_param_list_2]:
+            self.assertIsNone(func(param_list))
+
+        return None
+
+    def test_check_param_list_validity(self):
+        """
+        Go thorough all possible types of 'bad' param_list arguments and
+        ensure that the appropriate ValueErrors are raised. Ensure that 'good'
+        param_list arguments make it through the function successfully
+        """
+        # Create a series of good parameter lists that should make it through
+        # check_param_list_validity()
+        good_list_1 = None
+        good_list_2 = [np.zeros(1), np.ones(2), np.ones(2), np.ones(2)]
+        good_list_3 = [np.zeros((1, 3)),
+                       np.ones((2, 3)),
+                       np.ones((2, 3)),
+                       np.ones((2, 3))]
+
+        good_lists = [good_list_1, good_list_2, good_list_3]
+
+        # Create a series of bad parameter lists that should all result in
+        # ValueErrors being raised.
+        bad_list_1 = set(range(4))
+        bad_list_2 = range(5)
+        bad_list_3 = ['foo', np.zeros(2)]
+        bad_list_4 = [np.zeros(2), 'foo']
+        bad_list_5 = [np.zeros((2, 3)), np.zeros((2, 4))]
+        bad_list_6 = [np.zeros((2, 3)), np.ones(2)]
+        bad_list_7 = [np.zeros(3), np.ones((2, 3))]
+
+        bad_lists = [bad_list_1, bad_list_2, bad_list_3,
+                     bad_list_4, bad_list_5, bad_list_6,
+                     bad_list_7]
+
+        # Alias the function of interest to ensure it fits on one line
+        func = self.model_obj.check_param_list_validity
+
+        for param_list in good_lists:
+            self.assertIsNone(func(param_list))
+
+        for param_list in bad_lists:
+            self.assertRaises(ValueError, func, param_list)
+
+        return None
+
+
+class BaseModelMethodTests(GenericTestCase):
+    """
+    This suite tests the behavior of various methods for the base MNDC_Model.
+    """
+    def test_fit_mle_error(self):
+        """
+        Ensures that NotImplementedError is raised if someone tries to call the
+        fit_mle method from the base MNDC_Model.
+        """
+        # Create a set of fake arguments.
+        self.assertRaises(NotImplementedError,
+                          self.model_obj.fit_mle,
+                          np.arange(5))
+
+        return None
+
+    def test_to_pickle(self):
+        """
+        Ensure the to_pickle method works as expected
+        """
+        bad_filepath = 1234
+        good_filepath = "test_model"
+
+        self.assertRaises(ValueError, self.model_obj.to_pickle, bad_filepath)
+
+        # Ensure that the file does not alread exist.
+        self.assertFalse(os.path.exists(good_filepath + ".pkl"))
+
+        # Use the function to be sure that the desired file gets created.
+        self.model_obj.to_pickle(good_filepath)
+        
+        self.assertTrue(os.path.exists(good_filepath + ".pkl"))
+
+        # Remove the newly created file to avoid needlessly creating files.
+        os.remove(good_filepath + ".pkl")
+
+        return None
+
+    def test_print_summary(self):
+        """
+        Ensure that a NotImplementedError is raised when print_summaries is
+        called before a model has actually been estimated.
+        """
+        # When the model object has no summary and fit_summary attributes,
+        # raise a NotImplementedError
+        self.assertRaises(NotImplementedError,
+                          self.model_obj.print_summaries)
+
+        # When the model object has summary and fit_summary attributes, print
+        # them and return None.
+        self.model_obj.summary = 'wombat'
+        self.model_obj.fit_summary = 'koala'
+
+        self.assertIsNone(self.model_obj.print_summaries())
+
+        return None
+
+    def test_get_statsmodels_summary(self):
+        """
+        Ensure that a NotImplementedError is raised if we try to get a
+        statsmodels summary before estimating a model.
+        """
+        # When the model object has no 'estimation_success' attribute and we,
+        # try to get a statsmodels_summary, raise a NotImplementedError
+        self.assertRaises(NotImplementedError,
+                          self.model_obj.get_statsmodels_summary)
