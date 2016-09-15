@@ -53,9 +53,7 @@ def ensure_columns_are_in_dataframe(columns, dataframe):
     assert isinstance(dataframe, pd.DataFrame)
 
     for column in columns:
-        try:
-            assert column in dataframe.columns
-        except AssertionError:
+        if column not in dataframe.columns:
             raise ValueError("{} not in data.columns".format(column))
 
     return None
@@ -467,6 +465,115 @@ def add_intercept_to_dataframe(specification, dataframe):
     """
     if "intercept" in specification and "intercept" not in dataframe.columns:
         dataframe["intercept"] = 1.0
+
+    return None
+
+
+def check_num_rows_of_parameter_array(param_array, correct_num_rows, title):
+    """
+    Ensures that `param_array.shape[0]` has the correct magnitude. Raises a
+    helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    param_array : ndarray.
+    correct_num_rows : int.
+        The int that `param_array.shape[0]` should equal.
+    title : str.
+        The 'name' of the param_array whose shape is being checked.
+
+    Results
+    -------
+    None.
+    """
+    if param_array.shape[0] != correct_num_rows:
+        msg = "{}.shape[0] should equal {}, but it does not"
+        raise ValueError(msg.format(title, correct_num_rows))
+
+    return None
+
+
+def check_type_and_size_of_param_list(param_list, expected_length):
+    """
+    Ensure that param_list is a list with the expected length. Raises a helpful
+    ValueError if this is not the case.
+    """
+    try:
+        assert isinstance(param_list, list)
+        assert len(param_list) == expected_length
+    except AssertionError:
+        msg = "param_list must be a list containing {} elements."
+        raise ValueError(msg.format(expected_length))
+
+    return None
+
+
+def check_type_of_param_list_elements(param_list):
+    """
+    Ensures that all elements of param_list are ndarrays or None. Raises a
+    helpful ValueError if otherwise.
+    """
+    try:
+        assert isinstance(param_list[0], np.ndarray)
+        assert all([(x is None or isinstance(x, np.ndarray))
+                    for x in param_list])
+    except AssertionError:
+        msg = "param_list[0] must be a numpy array."
+        msg_2 = "All other elements must be numpy arrays or None."
+        total_msg = msg + "\n" + msg_2
+        raise ValueError(total_msg)
+
+    return None
+
+
+def check_num_columns_in_param_list_arrays(param_list):
+    """
+    Ensure that each array in param_list, that is not None, has the same number
+    of columns. Raises a helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    param_list : list of ndarrays or None.
+
+    Returns
+    -------
+    None.
+    """
+    try:
+        num_columns = param_list[0].shape[1]
+        assert all([x is None or (x.shape[1] == num_columns)
+                    for x in param_list])
+    except AssertionError:
+        msg = "param_list arrays should have equal number of columns."
+        raise ValueError(msg)
+
+    return None
+
+
+def check_dimensional_equality_of_param_list_arrays(param_list):
+    """
+    Ensures that all arrays in param_list have the same dimension, and that
+    this dimension is either 1 or 2 (i.e. all arrays are 1D arrays or all
+    arrays are 2D arrays.) Raises a helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    param_list : list of ndarrays or None.
+
+    Returns
+    -------
+    None.
+    """
+    try:
+        num_dimensions = len(param_list[0].shape)
+        assert num_dimensions in [1, 2]
+        assert all([(x is None or (len(x.shape) == num_dimensions))
+                    for x in param_list])
+    except AssertionError:
+        msg = "Each array in param_list should be 1D or 2D."
+        msg_2 = "And all arrays should have the same number of dimensions."
+        total_msg = msg + "\n" + msg_2
+        raise ValueError(total_msg)
 
     return None
 
@@ -1033,11 +1140,8 @@ class MNDC_Model(object):
         -------
         None. Saves estimation results to the model instance.
         """
-
-        print("This model class' fit_mle method has not been constructed.")
-        raise NotImplementedError
-
-        return None
+        msg = "This model class' fit_mle method has not been constructed."
+        raise NotImplementedError(msg)
 
     def print_summaries(self):
         """
@@ -1053,7 +1157,7 @@ class MNDC_Model(object):
         else:
             msg = "This {} object has not yet been estimated so there "
             msg_2 = "are no estimation summaries to print."
-            print(msg.format(self.model_type) + msg_2)
+            raise NotImplementedError(msg.format(self.model_type) + msg_2)
 
         return None
 
@@ -1122,15 +1226,13 @@ class MNDC_Model(object):
         try:
             # Get the statsmodels Summary class
             from statsmodels.iolib.summary import Summary
-        except:
+        except ImportError:
             print("statsmodels not installed. Resorting to standard summary")
             return self.print_summaries()
 
-        try:
-            assert hasattr(self, "estimation_success")
-        except AssertionError:
+        if not hasattr(self, "estimation_success"):
             msg = "Must estimate a model before a summary can be returned."
-            raise ValueError(msg)
+            raise NotImplementedError(msg)
 
         # Get an instantiation of the Summary class.
         smry = Summary()
@@ -1199,8 +1301,9 @@ class MNDC_Model(object):
             The first element in the list should be the index coefficients. The
             second element should contain the 'outside' intercept parameters if
             there are any, or None otherwise. The third element should contain
-            the shape parameters if there are any or None otherwise.
-            Default == None.
+            the shape parameters if there are any or None otherwise. The fourth
+            element should contain the nest coefficients if there are any or
+            None otherwise. Default == None.
 
         Returns
         -------
@@ -1211,83 +1314,49 @@ class MNDC_Model(object):
         if param_list is None:
             return None
 
-        # Make sure there are three elements in param_list
-        try:
-            assert isinstance(param_list, list)
-            assert len(param_list) == 4
-        except AssertionError as e:
-            print("param_list must be a list containing 3 elements.")
-            raise e
+        # Make sure there are four elements in param_list
+        check_type_and_size_of_param_list(param_list, 4)
 
         # Make sure each element in the list is a numpy array or is None
-        try:
-            assert isinstance(param_list[0], np.ndarray)
-            assert all([(x is None or isinstance(x, np.ndarray))
-                        for x in param_list])
-        except AssertionError as e:
-            print("param_list[0] must be a numpy array.")
-            print("All other elements must be numpy arrays or None.")
-            raise e
+        check_type_of_param_list_elements(param_list)
 
         # Make sure each array in param_list has the same number of dimensions
-        try:
-            num_dimensions = len(param_list[0].shape)
-            assert num_dimensions in [1, 2]
-            assert all([(x is None or (len(x.shape) == num_dimensions))
-                        for x in param_list])
-        except AssertionError as e:
-            print("Each array in param_list should be 1D or 2D.")
-            print("And all arrays should have the same number of dimensions.")
-            raise e
+        check_dimensional_equality_of_param_list_arrays(param_list)
 
         # If using 2D arrays, ensure each array has the same number of columns.
-        if num_dimensions == 2:
-            try:
-                num_columns = param_list[0].shape[1]
-                assert all([x is None or (x.shape[1] == num_columns)
-                            for x in param_list])
-            except AssertionError as e:
-                print("param_list arrays should have equal number of columns.")
-                raise e
+        if len(param_list[0].shape) == 2:
+            check_num_columns_in_param_list_arrays(param_list)
 
         # Make sure each array has the correct number of elements
-        try:
-            num_index_coefs = len(self.ind_var_names)
-            assert param_list[0].shape[0] == num_index_coefs
-        except AssertionError as e:
-            msg = "param_list[0].shape[0] should equal {}, but it does not"
-            print(msg.format(num_index_coefs))
-            raise e
+        num_index_coefs = len(self.ind_var_names)
+            
+        check_num_rows_of_parameter_array(param_list[0],
+                                          num_index_coefs,
+                                          'param_list[0]')
 
         if param_list[1] is not None:
-            try:
-                num_intercepts = (0 if self.intercept_names is None else
-                                  len(self.intercept_names))
-                assert param_list[1].shape[0] == num_intercepts
-            except AssertionError as e:
-                msg = "param_list[1].shape[0] should equal {}, but it does not"
-                print(msg.format(num_intercepts))
-                raise e
+            num_intercepts = (0 if self.intercept_names is None else
+                              len(self.intercept_names))
+
+            check_num_rows_of_parameter_array(param_list[1],
+                                              num_intercepts,
+                                              'param_list[1]')
 
         if param_list[2] is not None:
-            try:
-                num_shapes = (0 if self.shape_names is None else
-                              len(self.shape_names))
-                assert param_list[2].shape[0] == num_shapes
-            except AssertionError as e:
-                msg = "param_list[2].shape[0] should equal {}, but it does not"
-                print(msg.format(num_shapes))
-                raise e
+            num_shapes = (0 if self.shape_names is None else
+                          len(self.shape_names))
+
+            check_num_rows_of_parameter_array(param_list[2],
+                                              num_shapes,
+                                              'param_list[2]')
 
         if param_list[3] is not None:
-            try:
-                num_nests = (0 if self.nest_names is None else
-                             len(self.nest_names))
-                assert param_list[3].shape[0] == num_nests
-            except AssertionError as e:
-                msg = "param_list[3].shape[0] should equal {}, but it does not"
-                print(msg.format(num_nests))
-                raise e
+            num_nests = (0 if self.nest_names is None else
+                         len(self.nest_names))
+
+            check_num_rows_of_parameter_array(param_list[3],
+                                              num_nests,
+                                              'param_list[3]')
 
         return None
 
@@ -1366,22 +1435,14 @@ class MNDC_Model(object):
 
         # Determine the conditions under which we will add an intercept column
         # to our long format dataframe.
-        condition_1 = "intercept" in self.specification
-        condition_2 = "intercept" not in dataframe.columns
-
-        if condition_1 and condition_2:
-            dataframe["intercept"] = 1.0
+        add_intercept_to_dataframe(self.specification, dataframe)
 
         # Make sure the necessary columns are in the long format dataframe
         for column in [self.alt_id_col,
                        self.obs_id_col,
                        self.mixing_id_col]:
             if column is not None:
-                try:
-                    assert column in dataframe.columns
-                except AssertionError as e:
-                    print("{} not in data.columns".format(column))
-                    raise e
+                ensure_columns_are_in_dataframe([column], dataframe)
 
         # If param_list is passed, check the validity of its elements
         self.check_param_list_validity(param_list)
@@ -1490,11 +1551,15 @@ class MNDC_Model(object):
         -------
         None. Saves the model object to the location specified by `filepath`.
         """
-        assert isinstance(filepath, str)
+        if not isinstance(filepath, str):
+            raise ValueError("filepath must be a string.")
+
         if not filepath.endswith(".pkl"):
             filepath = filepath + ".pkl"
+
         with open(filepath, "wb") as f:
             pickle.dump(self, f)
+
         print("Model saved to {}".format(filepath))
 
         return None
