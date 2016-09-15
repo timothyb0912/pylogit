@@ -31,6 +31,445 @@ from choice_calcs import calc_probabilities, calc_asymptotic_covariance
 from nested_choice_calcs import calc_nested_probs
 import mixed_logit_calcs as mlc
 
+def ensure_columns_are_in_dataframe(columns, dataframe):
+    """
+    Checks whether each column in `columns` is in `dataframe`. Raises
+    ValueError if any of the columns are not in the dataframe.
+
+    Parameters
+    ----------
+    columns : list of strings.
+        Each string should represent a column heading in dataframe.
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    # Make sure columns is an iterable
+    assert hasattr(columns, "__getitem__")
+    # Make sure dataframe is a pandas dataframe
+    assert isinstance(dataframe, pd.DataFrame)
+
+    for column in columns:
+        try:
+            assert column in dataframe.columns
+        except AssertionError:
+            raise ValueError("{} not in data.columns".format(column))
+
+    return None
+
+
+def ensure_specification_cols_are_in_dataframe(specification, dataframe):
+    """
+    Checks whether each column in `specification` is in `dataframe`. Raises
+    ValueError if any of the columns are not in the dataframe.
+
+    Parameters
+    ----------
+    specification : OrderedDict.
+        Keys are a proper subset of the columns in `data`. Values are either a
+        list or a single string, "all_diff" or "all_same". If a list, the
+        elements should be:
+            - single objects that are in the alternative ID column of `data`
+            - lists of objects that are within the alternative ID column of
+              `data`. For each single object in the list, a unique column will
+              be created (i.e. there will be a unique coefficient for that
+              variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification` values, a single column will be created for all
+              the alternatives within the iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    # Make sure specification is an OrderedDict
+    try:
+        assert isinstance(specification, OrderedDict)
+    except AssertionError:
+        raise ValueError("`specification` must be an OrderedDict.")
+    # Make sure dataframe is a pandas dataframe
+    assert isinstance(dataframe, pd.DataFrame)
+
+    problem_cols = []
+    dataframe_cols = dataframe.columns
+    for key in specification:
+        if key not in dataframe_cols:
+            problem_cols.append(key)
+    if problem_cols != []:
+        msg = "The following keys in the specification are not in 'data':\n{}"
+        raise ValueError(msg.format(problem_cols))
+
+    return None
+
+
+def ensure_valid_nums_in_specification_cols(specification, dataframe):
+    """
+    Checks whether each column in `specification` contains numeric data,
+    excluding positive or negative infinity and excluding NaN. Raises
+    ValueError if any of the columns do not meet these requirements.
+
+    Parameters
+    ----------
+    specification : OrderedDict.
+        Keys are a proper subset of the columns in `data`. Values are either a
+        list or a single string, "all_diff" or "all_same". If a list, the
+        elements should be:
+            - single objects that are in the alternative ID column of `data`
+            - lists of objects that are within the alternative ID column of
+              `data`. For each single object in the list, a unique column will
+              be created (i.e. there will be a unique coefficient for that
+              variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification` values, a single column will be created for all
+              the alternatives within the iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    problem_cols = []
+    for col in specification:
+        # The condition below checks for values that are not floats or integers
+        # This will catch values that are strings.
+        if dataframe[col].dtype.kind not in ['f', 'i', 'u']:
+            problem_cols.append(col)
+        # The condition below checks for positive or negative inifinity
+        # values.
+        elif np.isinf(dataframe[col]).any():
+            problem_cols.append(col)
+        # This condition will check for NaN values.
+        elif np.isnan(dataframe[col]).any():
+            problem_cols.append(col)
+
+    if problem_cols != []:
+        msg = "The following columns contain either +/- inifinity values "
+        msg_2 = "NaN values, or values that are not real numbers "
+        msg_3 = "(e.g. strings):\n{}"
+        total_msg = msg + msg_2 + msg_3
+        raise ValueError(total_msg.format(problem_cols))
+
+    return None
+
+
+def ensure_ref_position_is_valid(ref_position, num_alts, param_title):
+    """
+    Ensures that `ref_position` is None or an integer that is in the interval
+    `[0, num_alts - 1]`. If None, ensures that intercepts are not the
+    parameters being estimated. Raises a helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    ref_position : int.
+        An integer denoting the position in an array of parameters that will
+        be constrained for identification purposes.
+    num_alts : int.
+        An integer denoting the total number of alternatives in one's universal
+        choice set.
+    param_title : {'intercept_names', 'shape_names'}.
+        String denoting the name of the parameters that are being estimated,
+        with a constraint for identification. E.g. 'intercept_names'.
+
+    Returns
+    -------
+    None.
+    """
+    assert param_title in ['intercept_names', 'shape_names']
+
+    try:
+        assert ref_position is None or isinstance(ref_position, int)
+    except AssertionError:
+        msg = "ref_position for {} must be an int or None."
+        raise ValueError(msg.format(param_title))
+
+    if param_title == "intercept_names":
+        try:
+            assert ref_position is not None
+        except AssertionError:
+            raise ValueError("At least one intercept should be constrained.")
+
+    try:
+        if ref_position is not None:
+            assert ref_position >= 0 and ref_position <= num_alts - 1
+    except AssertionError:
+        msg = "ref_position must be between 0 and num_alts - 1."
+        raise ValueError(msg)
+
+    return None
+
+
+def check_length_of_shape_or_intercept_names(name_list,
+                                             num_alts,
+                                             constrained_param,
+                                             list_title):
+    """
+    Ensures that the length of the parameter names matches the number of
+    parameters that will be estimated. Will raise a ValueError otherwise.
+
+    Parameters
+    ----------
+    name_list : list of strings.
+        Each element should be the name of a parameter that is to be estimated.
+    num_alts : int.
+        Should be the total number of alternatives in the universal choice set
+        for this dataset.
+    constrainted_param : {0, 1, True, False}
+        Indicates whether (1 or True) or not (0 or False) one of the type of
+        parameters being estimated will be constrained. For instance,
+        constraining one of the intercepts.
+    list_title : str.
+        Should specify the type of parameters whose names are being checked.
+        Examples include 'intercept_params' or 'shape_params'.
+
+    Returns
+    -------
+    None.
+    """
+    if len(name_list) != (num_alts - constrained_param):
+        msg_1 = "{} is of the wrong length:".format(list_title)
+        msg_2 = "len({}) == {}".format(list_title, len(name_list))
+        correct_length = num_alts - constrained_param
+        msg_3 = "The correct length is: {}".format(correct_length)
+        total_msg = "\n".join([msg_1, msg_2, msg_3])
+        raise ValueError(total_msg)
+
+    return None
+
+
+def ensure_nest_spec_is_ordered_dict(nest_spec):
+    """
+    Checks that the `nest_spec` is an OrderedDict. If not, raises ValueError.
+    """
+    if not isinstance(nest_spec, OrderedDict):
+        msg = "nest_spec must be an OrderedDict."
+        raise ValueError(msg)
+
+    return None
+
+
+
+def check_type_of_nest_spec_keys_and_values(nest_spec):
+    """
+    Ensures that the keys and values of `nest_spec` are strings and lists.
+    Raises a helpful ValueError if they are.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+
+    Returns
+    -------
+    None.
+    """
+    try:
+        assert all([isinstance(k, str) for k in nest_spec])
+        assert all([isinstance(nest_spec[k], list) for k in nest_spec])
+    except AssertionError:
+        msg = "All nest_spec keys/values must be strings/lists."
+        raise ValueError(msg)
+
+    return None
+
+
+def check_for_empty_nests_in_nest_spec(nest_spec):
+    """
+    Ensures that the values of `nest_spec` are not empty lists.
+    Raises a helpful ValueError if they are.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+
+    Returns
+    -------
+    None.
+    """
+    empty_nests = []
+    for k in nest_spec:
+        if len(nest_spec[k]) == 0:
+            empty_nests.append(k)
+    if empty_nests != []:
+        msg = "The following nests are INCORRECTLY empty: {}"
+        raise ValueError(msg.format(empty_nests))
+
+    return None
+
+
+def ensure_alt_ids_in_nest_spec_are_ints(nest_spec, list_elements):
+    """
+    Ensures that the alternative id's in `nest_spec` are integers. Raises a
+    helpful ValueError if they are not.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+    list_elements : list of lists of ints.
+        Each element should correspond to one of the alternatives identified as
+        belonging to a nest.
+
+    Returns
+    -------
+    None.
+    """
+    try:
+        assert all([isinstance(x, int) for x in list_elements])
+    except AssertionError:
+        msg = "All elements of the nest_spec values should be integers"
+        raise ValueError(msg)
+
+    return None
+
+
+def ensure_alt_ids_are_only_in_one_nest(nest_spec, list_elements):
+    """
+    Ensures that the alternative id's in `nest_spec` are only associated with
+    a single nest. Raises a helpful ValueError if they are not.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+    list_elements : list of ints.
+        Each element should correspond to one of the alternatives identified as
+        belonging to a nest.
+
+    Returns
+    -------
+    None.
+    """
+    try:
+        assert len(set(list_elements)) == len(list_elements)
+    except AssertionError:
+        msg = "Each alternative id should only be in a single nest."
+        raise ValueError(msg)
+
+    return None
+
+
+def ensure_all_alt_ids_have_a_nest(nest_spec, list_elements, all_ids):
+    """
+    Ensures that the alternative id's in `nest_spec` are all associated with
+    a nest. Raises a helpful ValueError if they are not.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+    list_elements : list of ints.
+        Each element should correspond to one of the alternatives identified as
+        belonging to a nest.
+    all_ids : list of ints.
+        Each element should correspond to one of the alternatives that is
+        present in the universal choice set for this model.
+
+    Returns
+    -------
+    None.
+    """
+    unaccounted_alt_ids = []
+    for alt_id in all_ids:
+        if alt_id not in list_elements:
+            unaccounted_alt_ids.append(alt_id)
+    if unaccounted_alt_ids != []:
+        msg = "Associate the following alternative ids with a nest: {}"
+        raise ValueError(msg.format(unaccounted_alt_ids))
+
+    return None
+
+
+def ensure_nest_alts_are_valid_alts(nest_spec, list_elements, all_ids):
+    """
+    Ensures that the alternative id's in `nest_spec` are all in the universal
+    choice set for this dataset. Raises a helpful ValueError if they are not.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict, or None, optional.
+        Keys are strings that define the name of the nests. Values are lists of
+        alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+        Default == None.
+    list_elements : list of ints.
+        Each element should correspond to one of the alternatives identified as
+        belonging to a nest.
+    all_ids : list of ints.
+        Each element should correspond to one of the alternatives that is
+        present in the universal choice set for this model.
+
+    Returns
+    -------
+    None.
+    """
+    invalid_alt_ids = []
+    for x in list_elements:
+        if x not in all_ids:
+            invalid_alt_ids.append(x)
+    if invalid_alt_ids != []:
+        msg = "The following elements are not in df[alt_id_col]: {}"
+        raise ValueError(msg.format(invalid_alt_ids))
+
+    return None
+
+
+def add_intercept_to_dataframe(specification, dataframe):
+    """
+    Checks whether `intercept` is in `specification` but not in `dataframe` and
+    adds the required column to dataframe. Note this function is not
+    idempotent--it alters the original argument, `dataframe`.
+
+    Parameters
+    ----------
+    specification : OrderedDict.
+        Keys are a proper subset of the columns in `data`. Values are either a
+        list or a single string, "all_diff" or "all_same". If a list, the
+        elements should be:
+            - single objects that are in the alternative ID column of `data`
+            - lists of objects that are within the alternative ID column of
+              `data`. For each single object in the list, a unique column will
+              be created (i.e. there will be a unique coefficient for that
+              variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification` values, a single column will be created for all
+              the alternatives within the iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    if "intercept" in specification and "intercept" not in dataframe.columns:
+        dataframe["intercept"] = 1.0
+
+    return None
+
 
 # Create a basic class that sets the structure for the discrete outcome models
 # to be specified later. MNDC stands for MultiNomial Discrete Choice.
@@ -144,12 +583,8 @@ class MNDC_Model(object):
         ##########
         # Make sure all necessary columns are in the dataframe
         ##########
-        for column in [alt_id_col, obs_id_col, choice_col]:
-            try:
-                assert column in dataframe.columns
-            except AssertionError as e:
-                print("{} not in data.columns".format(column))
-                raise e
+        ensure_columns_are_in_dataframe([alt_id_col, obs_id_col, choice_col],
+                                        dataframe)
 
         ##########
         # Make sure the various 'name' arguments are of the correct lengths
@@ -166,137 +601,58 @@ class MNDC_Model(object):
                               "intercept_names")]
         for alt_param_names, alt_ref_pos, param_string in name_and_ref_args:
             if alt_param_names is not None:
-                if alt_ref_pos is None:
-                    if param_string == "intercept_names":
-                        msg = "At least one intercept should be constrained"
-                        raise ValueError(msg)
-                    alt_params_not_estimated = 0
-                elif isinstance(alt_ref_pos, int):
-                    alt_params_not_estimated = 1
-                else:
-                    msg = "Ref position is of the wrong type. "
-                    msg_2 = "Should be an integer"
-                    raise AssertionError(msg + msg_2)
-                try:
-                    cond_1 = (len(alt_param_names) ==
-                              (len(all_ids) - alt_params_not_estimated))
-                    assert cond_1
-                except AssertionError as e:
-                    print("{} is of the wrong length".format(param_string))
-                    print("len({}) == {}".format(param_string,
-                                                 len(alt_param_names)))
-                    correct_length = len(all_ids) - alt_params_not_estimated
-                    print("The correct length is: {}".format(correct_length))
-                    raise e
+                ensure_ref_position_is_valid(alt_ref_pos,
+                                             len(all_ids),
+                                             param_string)
+
+                alt_params_not_estimated = 0 if alt_ref_pos is None else 1
+
+                length_args = [alt_param_names,
+                               len(all_ids),
+                               alt_params_not_estimated,
+                               param_string]
+
+                check_length_of_shape_or_intercept_names(*length_args)
 
         ##########
         # Check for validity of the nest_spec argument if necessary
         ##########
         if nest_spec is not None:
-            try:
-                assert isinstance(nest_spec, OrderedDict)
-            except AssertionError:
-                msg = "nest_spec must be an OrderedDict."
-                raise ValueError(msg)
+            ensure_nest_spec_is_ordered_dict(nest_spec)
 
-            try:
-                assert all([isinstance(k, str) for k in nest_spec])
-                assert all([isinstance(nest_spec[k], list) for k in nest_spec])
-            except AssertionError:
-                msg = "All nest_spec keys/values must be strings/lists."
-                raise ValueError(msg)
+            check_type_of_nest_spec_keys_and_values(nest_spec)
 
-            try:
-                empty_nests = []
-                for k in nest_spec:
-                    if len(nest_spec[k]) == 0:
-                        empty_nests.append(k)
-                assert empty_nests == []
-            except AssertionError:
-                msg = "The following nests are INCORRECTLY empty: {}"
-                raise ValueError(msg.format(empty_nests))
+            check_for_empty_nests_in_nest_spec(nest_spec)
 
-            try:
-                list_elements = []
-                for key in nest_spec:
-                    list_elements.extend(nest_spec[key])
-                assert all([isinstance(x, int) for x in list_elements])
-            except AssertionError:
-                msg = "All elements of the nest_spec values should be integers"
-                raise ValueError(msg)
+            # Collect all lists of alternative ids belonging to each nest
+            list_elements = reduce(lambda x, y: x + y, 
+                                   [nest_spec[key] for key in nest_spec])
 
-            try:
-                assert len(set(list_elements)) == len(list_elements)
-            except AssertionError:
-                msg = "Each alternative id should only be in a single nest."
-                raise ValueError(msg)
+            ensure_alt_ids_in_nest_spec_are_ints(nest_spec, list_elements)
 
-            try:
-                unaccounted_alt_ids = []
-                for alt_id in all_ids:
-                    if alt_id not in list_elements:
-                        unaccounted_alt_ids.append(alt_id)
-                assert unaccounted_alt_ids == []
-            except AssertionError:
-                msg = "Associate the following alternative ids with a nest: {}"
-                raise ValueError(msg.format(unaccounted_alt_ids))
+            ensure_alt_ids_are_only_in_one_nest(nest_spec, list_elements)
 
-            try:
-                invalid_alt_ids = []
-                for x in list_elements:
-                    if x not in all_ids:
-                        invalid_alt_ids.append(x)
-                assert invalid_alt_ids == []
-            except AssertionError:
-                msg = "The following elements are not in df[alt_id_col]: {}"
-                raise ValueError(msg.format(invalid_alt_ids))
+            ensure_all_alt_ids_have_a_nest(nest_spec, list_elements, all_ids)
+
+            ensure_nest_alts_are_valid_alts(nest_spec, list_elements, all_ids)
 
         ##########
         # Add an intercept column to the data if necessary based on the model
         # specification.
         ##########
-        condition_1 = "intercept" in specification
-        condition_2 = "intercept" not in dataframe.columns
-
-        if condition_1 and condition_2:
-            dataframe["intercept"] = 1.0
+        add_intercept_to_dataframe(specification, dataframe)
 
         ##########
         # Make sure all the columns in the specification dict are all
         # in the dataframe
         ##########
-        problem_cols = []
-        dataframe_cols = dataframe.columns
-        for key in specification:
-            if key not in dataframe_cols:
-                problem_cols.append(key)
-        if problem_cols != []:
-            msg = "The following keys in the specification are not in 'data':"
-            print(msg)
-            print(problem_cols)
-            raise ValueError
+        ensure_specification_cols_are_in_dataframe(specification, dataframe)
 
         ##########
         # Make sure that the columns we are using in the specification are all
         # numeric and exclude positive or negative infinity variables.
         ##########
-        problem_cols = []
-        for col in specification:
-            # The condition below checks for positive or negative inifinity
-            # values.
-            if np.isinf(dataframe[col]).any():
-                problem_cols.append(col)
-            # The condition below checks for values that are not real numbers
-            # This will catch values that are strings.
-            elif not np.isreal(dataframe[col]).all():
-                problem_cols.append(col)
-
-        if problem_cols != []:
-            msg = "The following columns contain either +/- inifinity values "
-            msg_2 = "or values that are not real numbers (e.g. strings):"
-            print(msg + msg_2)
-            print(problem_cols)
-            raise ValueError
+        ensure_valid_nums_in_specification_cols(specification, dataframe)
 
         ##########
         # Create the design matrix for this model
@@ -701,7 +1057,7 @@ class MNDC_Model(object):
 
         return None
 
-    # Note this functionn is called when creating the statsmodels summary.
+    # Note this function is called when creating the statsmodels summary.
     def conf_int(self, alpha=0.05, coefs=None, return_df=False):
         """
         Parameters
@@ -1135,7 +1491,7 @@ class MNDC_Model(object):
         None. Saves the model object to the location specified by `filepath`.
         """
         assert isinstance(filepath, str)
-        if filepath[-4:] != ".pkl":
+        if not filepath.endswith(".pkl"):
             filepath = filepath + ".pkl"
         with open(filepath, "wb") as f:
             pickle.dump(self, f)
