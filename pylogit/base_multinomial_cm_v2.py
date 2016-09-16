@@ -247,8 +247,8 @@ def ensure_nest_spec_is_ordered_dict(nest_spec):
     Checks that the `nest_spec` is an OrderedDict. If not, raises ValueError.
     """
     if not isinstance(nest_spec, OrderedDict):
-        msg = "nest_spec must be an OrderedDict."
-        raise ValueError(msg)
+        msg = "nest_spec must be an OrderedDict. {} passed instead."
+        raise ValueError(msg.format(type(nest_spec)))
 
     return None
 

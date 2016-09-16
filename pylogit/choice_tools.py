@@ -131,99 +131,76 @@ def create_design_matrix(long_form,
     # Check that the arguments meet this functions assumptions.
     # Fail gracefully if the arguments do not meet the function's requirements.
     #########
-    try:
-        assert isinstance(long_form, pd.DataFrame)
-    except AssertionError as e:
+    if not isinstance(long_form, pd.DataFrame):
         msg = "long_form should be a pandas dataframe. It is a {}"
-        print(msg.format(type(long_form)))
-        raise e
+        raise ValueError(msg.format(type(long_form)))
 
-    try:
-        assert isinstance(specification_dict, OrderedDict)
-    except AssertionError as e:
+    if not isinstance(specification_dict, OrderedDict):
         msg = "specification_dict should be an OrderedDict. It is a {}"
-        print(msg.format(type(specification_dict)))
-        raise e
+        raise ValueError(msg.format(type(specification_dict)))
 
-    try:
-        assert alt_id_col in long_form.columns
-
-        # Find out what how many possible alternatives there are
-        unique_alternatives = np.sort(long_form[alt_id_col].unique())
-        num_alternatives = len(unique_alternatives)
-
-    except AssertionError as e:
+    if alt_id_col not in long_form.columns:
         msg = "alt_id_col == {} is not a column in long_form."
-        print(msg.format(alt_id_col))
-        raise e
+        raise ValueError(msg.format(alt_id_col))
+
+    # Find out what how many possible alternatives there are
+    unique_alternatives = np.sort(long_form[alt_id_col].unique())
+    num_alternatives = len(unique_alternatives)
 
     for key in specification_dict:
-        try:
-            assert key in long_form.columns
-        except AssertionError as e:
+        if key not in long_form.columns:
             msg = "{} from specification_dict.keys() is not a long_form column"
-            print(msg.format(key))
+            raise ValueError(msg.format(key))
 
         specification = specification_dict[key]
         if isinstance(specification, str):
-            try:
-                assert specification in ["all_same", "all_diff"]
-            except AssertionError as e:
+            if specification not in ["all_same", "all_diff"]:
                 msg = "specification_dict[{}] not in ['all_same', 'all_diff']"
-                print(msg.format(key))
-                raise e
+                raise ValueError(msg.format(key))
+
         elif isinstance(specification, list):
             for group in specification:
                 group_is_list = isinstance(group, list)
                 if group_is_list:
                     for group_item in group:
                         if not isinstance(group_item, list):
-                            try:
-                                assert group_item in unique_alternatives
-                            except AssertionError as e:
+                            if group_item not in unique_alternatives:
                                 msg_1 = "{} in {} in specification_dict[{}]"
                                 msg_2 = " is not in long_format[alt_id_col]"
-                                print(msg_1.format(group_item, group, key) +
-                                      msg_2)
-                                raise e
+                                raise ValueError(msg_1.format(group_item,
+                                                              group,
+                                                              key) + msg_2)
+
                         else:
                             for inner_item in group_item:
-                                try:
-                                    assert inner_item in unique_alternatives
-                                except AssertionError as e:
+                                if inner_item not in unique_alternatives:
                                     msg = "{} in {} in specification_dict[{}]"
                                     msg_2 = "is not in long_format[alt_id_col]"
-                                    print(msg.format(inner_item,
-                                                     group_item,
-                                                     key) + " " + msg_2)
-                                    raise e
+                                    raise ValueError(msg.format(inner_item,
+                                                                group_item,
+                                                                key) +
+                                                     " " + msg_2)
+
                 else:
-                    try:
-                        assert group in unique_alternatives
-                    except AssertionError as e:
+                    if group not in unique_alternatives:
                         msg_1 = "{} in specification_dict[{}]"
                         msg_2 = " is not in long_format[alt_id_col]"
-                        print(msg_1.format(group, key) + msg_2)
-                        raise e
+                        raise ValueError(msg_1.format(group, key) + msg_2)
+
         else:
             msg_1 = "specification_dict[{}]"
             msg_2 = " is not 'all_same', 'all_diff', or a list"
             raise Exception(msg_1.format(key) + msg_2)
 
-    # Check the user passed dictionary of names if the suer passed such a list
+    # Check the user passed dictionary of names if the user passed such a list
     if names is not None:
-        try:
-            assert isinstance(names, OrderedDict)
-        except AssertionError as e:
+        if not isinstance(names, OrderedDict):
             msg = "names must be an OrderedDict. {} passed instead"
-            print(msg.format(type(names)))
-            raise e
+            raise ValueError(msg.format(type(names)))
 
-        try:
-            assert names.keys() == specification_dict.keys()
-        except AssertionError as e:
-            print("names.keys() does not equal specification_dict.keys()")
-            raise e
+        if names.keys() != specification_dict.keys():
+            msg = "names.keys() does not equal specification_dict.keys()"
+            raise ValueError(msg)
 
         for key in names:
             specification = specification_dict[key]
@@ -233,28 +210,27 @@ def create_design_matrix(long_form,
                     assert isinstance(name_object, list)
                     assert len(name_object) == len(specification)
                     assert all([isinstance(x, str) for x in name_object])
-                except AssertionError as e:
+                except AssertionError:
                     msg = "names[{}] must be a list AND it must have the same"
                     msg_2 = " number of strings as there are elements of the"
                     msg_3 = " corresponding list in specification_dict"
-                    print(msg.format(key) + msg_2 + msg_3)
-                    raise e
+                    raise ValueError(msg.format(key) + msg_2 + msg_3)
+
             else:
                 if specification == "all_same":
-                    try:
-                        assert isinstance(name_object, str)
-                    except AssertionError as e:
-                        print("names[{}] should be a string".format(key))
-                        raise e
+                    if not isinstance(name_object, str):
+                        msg = "names[{}] should be a string".format(key)
+                        raise ValueError(msg)
+
                 else:    # This means speciffication == 'all_diff'
                     try:
                         assert isinstance(name_object, list)
                         assert len(name_object) == num_alternatives
-                    except AssertionError as e:
+                    except AssertionError:
                         msg_1 = "names[{}] should be a list with {} elements,"
                         msg_2 = " 1 element for each possible alternative"
-                        print(msg_1.format(key, num_alternatives) + msg_2)
-                        raise e
+                        msg = (msg_1.format(key, num_alternatives) + msg_2)
+                        raise ValueError(msg)
 
     ##########
     # Actually create the design matrix
