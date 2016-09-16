@@ -17,3 +17,6 @@ build
 
 # Mac OS binary file
 .DS_Store
+
+# Files produced when tracking statement coverage of code.
+.coverage
