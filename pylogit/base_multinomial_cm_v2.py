@@ -27,6 +27,7 @@ from choice_tools import create_design_matrix
 from choice_tools import create_long_form_mappings
 from choice_tools import convert_mixing_names_to_positions
 from choice_tools import get_dataframe_from_data
+from choice_tools import ensure_specification_cols_are_in_dataframe
 from choice_calcs import calc_probabilities, calc_asymptotic_covariance
 from nested_choice_calcs import calc_nested_probs
 import mixed_logit_calcs as mlc
@@ -55,53 +56,6 @@ def ensure_columns_are_in_dataframe(columns, dataframe):
     for column in columns:
         if column not in dataframe.columns:
             raise ValueError("{} not in data.columns".format(column))
-
-    return None
-
-
-def ensure_specification_cols_are_in_dataframe(specification, dataframe):
-    """
-    Checks whether each column in `specification` is in `dataframe`. Raises
-    ValueError if any of the columns are not in the dataframe.
-
-    Parameters
-    ----------
-    specification : OrderedDict.
-        Keys are a proper subset of the columns in `data`. Values are either a
-        list or a single string, "all_diff" or "all_same". If a list, the
-        elements should be:
-            - single objects that are in the alternative ID column of `data`
-            - lists of objects that are within the alternative ID column of
-              `data`. For each single object in the list, a unique column will
-              be created (i.e. there will be a unique coefficient for that
-              variable in the corresponding utility equation of the
-              corresponding alternative). For lists within the
-              `specification` values, a single column will be created for all
-              the alternatives within the iterable (i.e. there will be one
-              common coefficient for the variables in the iterable).
-    dataframe : pandas DataFrame.
-        Dataframe containing the data for the choice model to be estimated.
-
-    Returns
-    -------
-    None.
-    """
-    # Make sure specification is an OrderedDict
-    try:
-        assert isinstance(specification, OrderedDict)
-    except AssertionError:
-        raise ValueError("`specification` must be an OrderedDict.")
-    # Make sure dataframe is a pandas dataframe
-    assert isinstance(dataframe, pd.DataFrame)
-
-    problem_cols = []
-    dataframe_cols = dataframe.columns
-    for key in specification:
-        if key not in dataframe_cols:
-            problem_cols.append(key)
-    if problem_cols != []:
-        msg = "The following keys in the specification are not in 'data':\n{}"
-        raise ValueError(msg.format(problem_cols))
 
     return None
 
@@ -186,7 +140,7 @@ def ensure_ref_position_is_valid(ref_position, num_alts, param_title):
         assert ref_position is None or isinstance(ref_position, int)
     except AssertionError:
         msg = "ref_position for {} must be an int or None."
-        raise ValueError(msg.format(param_title))
+        raise TypeError(msg.format(param_title))
 
     if param_title == "intercept_names":
         try:
@@ -242,13 +196,13 @@ def check_length_of_shape_or_intercept_names(name_list,
     return None
 
 
-def ensure_nest_spec_is_ordered_dict(nest_spec):
+def ensure_object_is_ordered_dict(nest_spec, title):
     """
     Checks that the `nest_spec` is an OrderedDict. If not, raises ValueError.
     """
     if not isinstance(nest_spec, OrderedDict):
-        msg = "nest_spec must be an OrderedDict. {} passed instead."
-        raise ValueError(msg.format(type(nest_spec)))
+        msg = "{} must be an OrderedDict. {} passed instead."
+        raise TypeError(msg.format(title, type(nest_spec)))
 
     return None
 
@@ -276,7 +230,7 @@ def check_type_of_nest_spec_keys_and_values(nest_spec):
         assert all([isinstance(nest_spec[k], list) for k in nest_spec])
     except AssertionError:
         msg = "All nest_spec keys/values must be strings/lists."
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     return None
 
@@ -521,7 +475,7 @@ def check_type_of_param_list_elements(param_list):
         msg = "param_list[0] must be a numpy array."
         msg_2 = "All other elements must be numpy arrays or None."
         total_msg = msg + "\n" + msg_2
-        raise ValueError(total_msg)
+        raise TypeError(total_msg)
 
     return None
 
@@ -700,9 +654,7 @@ class MNDC_Model(object):
         all_ids = np.sort(dataframe[alt_id_col].unique())
 
         # Check for correct length of shape_names and intercept_names
-        name_and_ref_args = [(shape_names,
-                              shape_ref_pos,
-                              "shape_names"),
+        name_and_ref_args = [(shape_names, shape_ref_pos, "shape_names"),
                              (intercept_names,
                               intercept_ref_pos,
                               "intercept_names")]
@@ -725,7 +677,7 @@ class MNDC_Model(object):
         # Check for validity of the nest_spec argument if necessary
         ##########
         if nest_spec is not None:
-            ensure_nest_spec_is_ordered_dict(nest_spec)
+            ensure_object_is_ordered_dict(nest_spec, "nest_spec")
 
             check_type_of_nest_spec_keys_and_values(nest_spec)
 
@@ -750,7 +702,7 @@ class MNDC_Model(object):
         add_intercept_to_dataframe(specification, dataframe)
 
         ##########
-        # Make sure all the columns in the specification dict are all
+        # Make sure all the columns in the specification dict keys are all
         # in the dataframe
         ##########
         ensure_specification_cols_are_in_dataframe(specification, dataframe)

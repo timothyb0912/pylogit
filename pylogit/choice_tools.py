@@ -43,7 +43,7 @@ def get_dataframe_from_data(data):
     else:
         msg_1 = "type(data) = {} is an invalid type."
         msg_2 = " Please pass pandas dataframe or path to csv."
-        raise ValueError(msg_1.format(type(data)) + msg_2)
+        raise TypeError(msg_1.format(type(data)) + msg_2)
 
     return dataframe
 
@@ -75,6 +75,277 @@ def get_dataframe_from_data(data):
 #       format data, but that is a completely different and as of yet
 #       unwritten function.
 #########
+
+def ensure_object_is_ordered_dict(item, title):
+    """
+    Checks that the item is an OrderedDict. If not, raises ValueError.
+    """
+    if not isinstance(item, OrderedDict):
+        msg = "{} must be an OrderedDict. {} passed instead."
+        raise TypeError(msg.format(title, type(item)))
+
+    return None
+
+def check_argument_type(long_form, specification_dict):
+    """
+    Ensures that long_form is a pandas dataframe and that specification_dict
+    is an OrderedDict, raising a ValueError otherwise.
+
+    Parameters
+    ----------
+    long_form : pandas dataframe.
+        Contains one row for each available alternative, for each observation.
+    specification_dict : OrderedDict.
+        Keys are a proper subset of the columns in `long_form_df`. Values are
+        either a list or a single string, `"all_diff"` or `"all_same"`. If a
+        list, the elements should be:
+
+            - single objects that are within the alternative ID column of
+              `long_form_df`
+            - lists of objects that are within the alternative ID column of
+              `long_form_df`. For each single object in the list, a unique
+              column will be created (i.e. there will be a unique coefficient
+              for that variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification_dict` values, a single column will be created for
+              all the alternatives within iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+
+    Returns
+    -------
+    None.
+    """
+    if not isinstance(long_form, pd.DataFrame):
+        msg = "long_form should be a pandas dataframe. It is a {}"
+        raise TypeError(msg.format(type(long_form)))
+
+    ensure_object_is_ordered_dict(specification_dict, "specification_dict")
+
+    return None
+
+
+def ensure_alt_id_in_long_form(alt_id_col, long_form):
+    """
+    Ensures alt_id_col is in long_form, and raises a ValueError if not.
+
+    Parameters
+    ----------
+    alt_id_col : str.
+        Column name which denotes the column in `long_form` that contains the
+        alternative ID for each row in `long_form`.
+    long_form : pandas dataframe.
+        Contains one row for each available alternative, for each observation.
+
+    Returns
+    -------
+    None.
+    """
+    if alt_id_col not in long_form.columns:
+        msg = "alt_id_col == {} is not a column in long_form."
+        raise ValueError(msg.format(alt_id_col))
+
+    return None
+
+
+def ensure_specification_cols_are_in_dataframe(specification, dataframe):
+    """
+    Checks whether each column in `specification` is in `dataframe`. Raises
+    ValueError if any of the columns are not in the dataframe.
+
+    Parameters
+    ----------
+    specification : OrderedDict.
+        Keys are a proper subset of the columns in `data`. Values are either a
+        list or a single string, "all_diff" or "all_same". If a list, the
+        elements should be:
+            - single objects that are in the alternative ID column of `data`
+            - lists of objects that are within the alternative ID column of
+              `data`. For each single object in the list, a unique column will
+              be created (i.e. there will be a unique coefficient for that
+              variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification` values, a single column will be created for all
+              the alternatives within the iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    # Make sure specification is an OrderedDict
+    try:
+        assert isinstance(specification, OrderedDict)
+    except AssertionError:
+        raise TypeError("`specification` must be an OrderedDict.")
+    # Make sure dataframe is a pandas dataframe
+    assert isinstance(dataframe, pd.DataFrame)
+
+    problem_cols = []
+    dataframe_cols = dataframe.columns
+    for key in specification:
+        if key not in dataframe_cols:
+            problem_cols.append(key)
+    if problem_cols != []:
+        msg = "The following keys in the specification are not in 'data':\n{}"
+        raise ValueError(msg.format(problem_cols))
+
+    return None
+
+
+def check_type_and_values_of_specification_dict(specification_dict,
+                                                unique_alternatives):
+    """
+    Verifies that the values of specification_dict have the correct type, have
+    the correct structure, and have valid values (i.e. are actually in the set
+    of possible alternatives). Will raise various errors if / when appropriate.
+
+    Parameters
+    ----------
+    specification_dict : OrderedDict.
+        Keys are a proper subset of the columns in `long_form_df`. Values are
+        either a list or a single string, `"all_diff"` or `"all_same"`. If a
+        list, the elements should be:
+
+            - single objects that are within the alternative ID column of
+              `long_form_df`
+            - lists of objects that are within the alternative ID column of
+              `long_form_df`. For each single object in the list, a unique
+              column will be created (i.e. there will be a unique coefficient
+              for that variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification_dict` values, a single column will be created for
+              all the alternatives within iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    unique_alternatives : 1D ndarray.
+        Should contain the possible alternative id's for this dataset.
+
+    Returns
+    -------
+    None.
+    """
+    for key in specification_dict:
+        specification = specification_dict[key]
+        if isinstance(specification, str):
+            if specification not in ["all_same", "all_diff"]:
+                msg = "specification_dict[{}] not in ['all_same', 'all_diff']"
+                raise ValueError(msg.format(key))
+
+        elif isinstance(specification, list):
+            # Imagine that the specification is [[1, 2], 3]
+            # group would be [1, 2]
+            # group_item would be 1 or 2. group_item should never be a list.
+            for group in specification:
+                group_is_list = isinstance(group, list)
+                if group_is_list:
+                    for group_item in group:
+                        if isinstance(group_item, list):
+                            msg = "Wrong structure for specification_dict[{}]"
+                            msg_2 = " Values can be a list of lists of ints,"
+                            msg_3 = " not lists of lists of lists of ints."
+                            total_msg = msg.format(key) + msg_2 + msg_3
+                            raise ValueError(total_msg)
+
+                        if group_item not in unique_alternatives:
+                            msg_1 = "{} in {} in specification_dict[{}]"
+                            msg_2 = " is not in long_format[alt_id_col]"
+                            total_msg = (msg_1.format(group_item, group, key) +
+                                         msg_2)
+                            raise ValueError(total_msg)
+                else:
+                    if group not in unique_alternatives:
+                        msg_1 = "{} in specification_dict[{}]"
+                        msg_2 = " is not in long_format[alt_id_col]"
+                        raise ValueError(msg_1.format(group, key) + msg_2)
+
+        else:
+            msg = "specification_dict[{}] must be 'all_same', 'all_diff', or"
+            msg_2 = " a list."
+            raise TypeError(msg.format(key) + msg_2)
+
+    return None
+
+
+def check_keys_and_values_of_name_dictionary(names,
+                                             specification_dict,
+                                             num_alts):
+    """
+    Check the validity of the keys and values in the names dictionary.
+
+    Parameters
+    ----------
+    names : OrderedDict, optional.
+        Should have the same keys as `specification_dict`. For each key:
+
+            - if the corresponding value in `specification_dict` is "all_same",
+              then there should be a single string as the value in names.
+            - if the corresponding value in `specification_dict` is "all_diff",
+              then there should be a list of strings as the value in names.
+              There should be one string in the value in names for each
+              possible alternative.
+            - if the corresponding value in `specification_dict` is a list,
+              then there should be a list of strings as the value in names.
+              There should be one string the value in names per item in the
+              value in `specification_dict`.
+    specification_dict : OrderedDict.
+        Keys are a proper subset of the columns in `long_form_df`. Values are
+        either a list or a single string, `"all_diff"` or `"all_same"`. If a
+        list, the elements should be:
+
+            - single objects that are within the alternative ID column of
+              `long_form_df`
+            - lists of objects that are within the alternative ID column of
+              `long_form_df`. For each single object in the list, a unique
+              column will be created (i.e. there will be a unique coefficient
+              for that variable in the corresponding utility equation of the
+              corresponding alternative). For lists within the
+              `specification_dict` values, a single column will be created for
+              all the alternatives within iterable (i.e. there will be one
+              common coefficient for the variables in the iterable).
+    num_alts : int.
+        The number of alternatives in this dataset's universal choice set.
+
+    Returns
+    -------
+    None.
+    """
+    if names.keys() != specification_dict.keys():
+        msg = "names.keys() does not equal specification_dict.keys()"
+        raise ValueError(msg)
+
+    for key in names:
+        specification = specification_dict[key]
+        name_object = names[key]
+        if isinstance(specification, list):
+            try:
+                assert isinstance(name_object, list)
+                assert len(name_object) == len(specification)
+                assert all([isinstance(x, str) for x in name_object])
+            except AssertionError:
+                msg = "names[{}] must be a list AND it must have the same"
+                msg_2 = " number of strings as there are elements of the"
+                msg_3 = " corresponding list in specification_dict"
+                raise ValueError(msg.format(key) + msg_2 + msg_3)
+
+        else:
+            if specification == "all_same":
+                if not isinstance(name_object, str):
+                    msg = "names[{}] should be a string".format(key)
+                    raise ValueError(msg)
+
+            else:    # This means speciffication == 'all_diff'
+                try:
+                    assert isinstance(name_object, list)
+                    assert len(name_object) == num_alts
+                except AssertionError:
+                    msg_1 = "names[{}] should be a list with {} elements,"
+                    msg_2 = " 1 element for each possible alternative"
+                    msg = (msg_1.format(key, num_alts) + msg_2)
+                    raise ValueError(msg)
+
+    return None
+
 
 def create_design_matrix(long_form,
                          specification_dict,
@@ -131,106 +402,26 @@ def create_design_matrix(long_form,
     # Check that the arguments meet this functions assumptions.
     # Fail gracefully if the arguments do not meet the function's requirements.
     #########
-    if not isinstance(long_form, pd.DataFrame):
-        msg = "long_form should be a pandas dataframe. It is a {}"
-        raise ValueError(msg.format(type(long_form)))
+    check_argument_type(long_form, specification_dict)
 
-    if not isinstance(specification_dict, OrderedDict):
-        msg = "specification_dict should be an OrderedDict. It is a {}"
-        raise ValueError(msg.format(type(specification_dict)))
+    ensure_alt_id_in_long_form(alt_id_col, long_form)
 
-    if alt_id_col not in long_form.columns:
-        msg = "alt_id_col == {} is not a column in long_form."
-        raise ValueError(msg.format(alt_id_col))
+    ensure_specification_cols_are_in_dataframe(specification_dict, long_form)
 
-    # Find out what how many possible alternatives there are
+    # Find out what and how many possible alternatives there are
     unique_alternatives = np.sort(long_form[alt_id_col].unique())
     num_alternatives = len(unique_alternatives)
 
-    for key in specification_dict:
-        if key not in long_form.columns:
-            msg = "{} from specification_dict.keys() is not a long_form column"
-            raise ValueError(msg.format(key))
-
-        specification = specification_dict[key]
-        if isinstance(specification, str):
-            if specification not in ["all_same", "all_diff"]:
-                msg = "specification_dict[{}] not in ['all_same', 'all_diff']"
-                raise ValueError(msg.format(key))
-
-        elif isinstance(specification, list):
-            for group in specification:
-                group_is_list = isinstance(group, list)
-                if group_is_list:
-                    for group_item in group:
-                        if not isinstance(group_item, list):
-                            if group_item not in unique_alternatives:
-                                msg_1 = "{} in {} in specification_dict[{}]"
-                                msg_2 = " is not in long_format[alt_id_col]"
-                                raise ValueError(msg_1.format(group_item,
-                                                              group,
-                                                              key) + msg_2)
-
-                        else:
-                            for inner_item in group_item:
-                                if inner_item not in unique_alternatives:
-                                    msg = "{} in {} in specification_dict[{}]"
-                                    msg_2 = "is not in long_format[alt_id_col]"
-                                    raise ValueError(msg.format(inner_item,
-                                                                group_item,
-                                                                key) +
-                                                     " " + msg_2)
-
-                else:
-                    if group not in unique_alternatives:
-                        msg_1 = "{} in specification_dict[{}]"
-                        msg_2 = " is not in long_format[alt_id_col]"
-                        raise ValueError(msg_1.format(group, key) + msg_2)
-
-        else:
-            msg_1 = "specification_dict[{}]"
-            msg_2 = " is not 'all_same', 'all_diff', or a list"
-            raise Exception(msg_1.format(key) + msg_2)
+    check_type_and_values_of_specification_dict(specification_dict,
+                                                unique_alternatives)
 
     # Check the user passed dictionary of names if the user passed such a list
     if names is not None:
-        if not isinstance(names, OrderedDict):
-            msg = "names must be an OrderedDict. {} passed instead"
-            raise ValueError(msg.format(type(names)))
+        ensure_object_is_ordered_dict(names, "names")
 
-        if names.keys() != specification_dict.keys():
-            msg = "names.keys() does not equal specification_dict.keys()"
-            raise ValueError(msg)
-
-        for key in names:
-            specification = specification_dict[key]
-            name_object = names[key]
-            if isinstance(specification, list):
-                try:
-                    assert isinstance(name_object, list)
-                    assert len(name_object) == len(specification)
-                    assert all([isinstance(x, str) for x in name_object])
-                except AssertionError:
-                    msg = "names[{}] must be a list AND it must have the same"
-                    msg_2 = " number of strings as there are elements of the"
-                    msg_3 = " corresponding list in specification_dict"
-                    raise ValueError(msg.format(key) + msg_2 + msg_3)
-
-            else:
-                if specification == "all_same":
-                    if not isinstance(name_object, str):
-                        msg = "names[{}] should be a string".format(key)
-                        raise ValueError(msg)
-
-                else:    # This means speciffication == 'all_diff'
-                    try:
-                        assert isinstance(name_object, list)
-                        assert len(name_object) == num_alternatives
-                    except AssertionError:
-                        msg_1 = "names[{}] should be a list with {} elements,"
-                        msg_2 = " 1 element for each possible alternative"
-                        msg = (msg_1.format(key, num_alternatives) + msg_2)
-                        raise ValueError(msg)
+        check_keys_and_values_of_name_dictionary(names,
+                                                 specification_dict,
+                                                 num_alternatives)
 
     ##########
     # Actually create the design matrix
@@ -265,7 +456,7 @@ def create_design_matrix(long_form,
                     # Create the column name
                     var_names.append("{}_{}".format(variable, str(group)))
 
-                else:
+                else:  # the group is an integer
                     # Create the variable column
                     new_col_vals = ((long_form[alt_id_col] == group).values *
                                     long_form[variable].values)
