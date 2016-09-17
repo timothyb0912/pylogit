@@ -173,11 +173,12 @@ class InitializationTests(GenericTestCase):
         bad_spec_2 = dict.update(self.fake_specification)
 
         # Create the list of needed arguments
-        for bad_specification in [bad_spec_1, bad_spec_2]:
+        for bad_specification, error in [(bad_spec_1, ValueError),
+                                         (bad_spec_2, TypeError)]:
             args = [bad_specification, self.fake_df]
             func = base_cm.ensure_specification_cols_are_in_dataframe
 
-            self.assertRaises(ValueError, func, *args)
+            self.assertRaises(error, func, *args)
 
         return None
 
@@ -221,9 +222,12 @@ class InitializationTests(GenericTestCase):
         # Make ref_position None when estimating intercept!
         # Make ref_position something other than None or an int
         # Make ref_position an int outside [0, num_alts - 1]
-        for bad_ref in [None, 'turtle', -1, 3]:
+        for bad_ref, error in [(None, ValueError),
+                               ('turtle', TypeError),
+                               (-1, ValueError),
+                               (3, ValueError)]:
             args[0] = bad_ref
-            self.assertRaises(ValueError,
+            self.assertRaises(error,
                               base_cm.ensure_ref_position_is_valid,
                               *args)
 
@@ -259,22 +263,23 @@ class InitializationTests(GenericTestCase):
 
         return None
 
-    def test_ensure_nest_spec_is_ordered_dict(self):
+    def test_ensure_object_is_ordered_dict(self):
         """
-        Ensures that ValueError is raised if nest_spec is not an OrderedDict
+        Ensures that TypeError is raised if nest_spec is not an OrderedDict
         """
         new_nest_spec = {"Nest_1": [1, 2],
                          "Nest_2": [3]}
 
-        self.assertRaises(ValueError,
-                          base_cm.ensure_nest_spec_is_ordered_dict,
-                          new_nest_spec)
+        self.assertRaises(TypeError,
+                          base_cm.ensure_object_is_ordered_dict,
+                          new_nest_spec,
+                          "nest_spec")
 
         return None
 
     def test_check_type_of_nest_spec_keys_and_values(self):
         """
-        Ensures that ValueError is raised if the keys of nest_spec are not
+        Ensures that TypeError is raised if the keys of nest_spec are not
         strings and if the values of nest_spec are not lists.
         """
         new_nest_spec_1 = {1: [1, 2],
@@ -284,7 +289,7 @@ class InitializationTests(GenericTestCase):
                            "Nest_2": (3,)}
 
         for bad_spec in [new_nest_spec_1, new_nest_spec_2]:
-            self.assertRaises(ValueError,
+            self.assertRaises(TypeError,
                               base_cm.check_type_of_nest_spec_keys_and_values,
                               bad_spec)
 
@@ -455,7 +460,7 @@ class PredictHelperTests(GenericTestCase):
 
     def test_check_type_of_param_list_elements(self):
         """
-        Ensures a ValueError is raised if the first element of param_list is
+        Ensures a TypeError is raised if the first element of param_list is
         not an ndarray and if each of the subsequent elements are not None or
         ndarrays.
         """
@@ -465,7 +470,7 @@ class PredictHelperTests(GenericTestCase):
         good_param_list_2 = [np.zeros(2), None]
 
         for param_list in [bad_param_list_1, bad_param_list_2]:
-            self.assertRaises(ValueError,
+            self.assertRaises(TypeError,
                               base_cm.check_type_of_param_list_elements,
                               param_list)
 
