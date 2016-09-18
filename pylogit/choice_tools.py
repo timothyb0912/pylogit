@@ -8,6 +8,7 @@ Created on Mon Feb 22 08:32:48 2016
 @summary:   Contains functions that help prepare one's data for choice model
             estimation or helps speed the estimation process (the 'mappings').
 """
+import warnings
 from collections import OrderedDict
 
 import numpy as np
@@ -85,6 +86,44 @@ def ensure_object_is_ordered_dict(item, title):
         raise TypeError(msg.format(title, type(item)))
 
     return None
+
+
+def ensure_columns_are_in_dataframe(columns, dataframe, title=''):
+    """
+    Checks whether each column in `columns` is in `dataframe`. Raises
+    ValueError if any of the columns are not in the dataframe.
+
+    Parameters
+    ----------
+    columns : list of strings.
+        Each string should represent a column heading in dataframe.
+    dataframe : pandas DataFrame.
+        Dataframe containing the data for the choice model to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    # Make sure columns is an iterable
+    assert hasattr(columns, "__getitem__")
+    # Make sure dataframe is a pandas dataframe
+    assert isinstance(dataframe, pd.DataFrame)
+    # Make sure title is a string
+    assert isinstance(title, str)
+
+    problem_cols = [col for col in columns if col not in dataframe.columns]
+    if problem_cols != []:
+        if title == '':
+            msg = "{} not in data.columns"
+            final_msg = msg.format(problem_cols)
+        else:
+            msg = "The following columns in {} are not in data.columns: {}"
+            final_msg = msg.format(title, problem_cols)
+
+        raise ValueError(final_msg)
+
+    return None
+
 
 def check_argument_type(long_form, specification_dict):
     """
@@ -247,7 +286,7 @@ def check_type_and_values_of_specification_dict(specification_dict,
                             total_msg = msg.format(key) + msg_2 + msg_3
                             raise ValueError(total_msg)
 
-                        if group_item not in unique_alternatives:
+                        elif group_item not in unique_alternatives:
                             msg_1 = "{} in {} in specification_dict[{}]"
                             msg_2 = " is not in long_format[alt_id_col]"
                             total_msg = (msg_1.format(group_item, group, key) +
@@ -332,7 +371,7 @@ def check_keys_and_values_of_name_dictionary(names,
             if specification == "all_same":
                 if not isinstance(name_object, str):
                     msg = "names[{}] should be a string".format(key)
-                    raise ValueError(msg)
+                    raise TypeError(msg)
 
             else:    # This means speciffication == 'all_diff'
                 try:
@@ -603,8 +642,8 @@ def create_long_form_mappings(long_form,
         # rows as long_form but a 1 only if that row corresponds to an
         # alternative that a given observation (denoted by the columns)
         # chose.
-        chosen_row_to_obs = rows_to_obs *\
-                            long_form[choice_col].values[:, None]
+        chosen_row_to_obs = (rows_to_obs *
+                             long_form[choice_col].values[:, None])
     else:
         chosen_row_to_obs = None
 
@@ -657,6 +696,144 @@ def create_long_form_mappings(long_form,
         return mapping_dict
 
 
+def ensure_all_columns_are_used(num_vars_accounted_for, dataframe):
+    """
+    Ensure that all of the columns from dataframe are in the list of used_cols.
+    Will raise a helpful UserWarning if otherwise.
+
+    Parameters
+    ----------
+    num_vars_accounted_for : int.
+        Denotes the number of variables used in one's function.
+    dataframe : pandas dataframe.
+        Contains all of the data to be converted from one format to another.
+
+    Returns
+    -------
+    None.
+    """
+    dataframe_vars = set(dataframe.columns.tolist())
+    num_dataframe_vars = len(dataframe_vars)
+
+    if num_vars_accounted_for == num_dataframe_vars:
+        pass
+
+    elif num_vars_accounted_for < num_dataframe_vars:
+        msg = "Note, there are {:,} variables in long_data but the inputs"
+        msg_2 = " ind_vars, alt_specific_vars, and subset_specific_vars only"
+        msg_3 = " account for {:,} variables."
+
+        warnings.warn(msg.format(num_dataframe_vars) +
+                      msg_2 + msg_3.format(num_vars_accounted_for))
+
+    else:  # This means num_vars_accounted_for > num_dataframe_vars
+        msg = "There are more variable specified in ind_vars, "
+        msg_2 = "alt_specific_vars, and subset_specific_vars ({:,}) than there"
+        msg_3 = " are variables in long_data ({:,})"
+        warnings.warn(msg +
+                      msg_2.format(num_vars_accounted_for) +
+                      msg_3.format(num_dataframe_vars))
+
+    return None
+
+
+def check_dataframe_for_duplicate_records(obs_id_col, alt_id_col, df):
+    """
+    Checks a cross-sectional dataframe of long-format data for duplicate
+    observations. Duplicate observations are defined as rows with the same
+    observation id value and the same alternative id value.
+
+    Parameters
+    ----------
+    obs_id_col : str.
+        Denotes the column in `df` that contains the observation ID
+        values for each row.
+    alt_id_col : str.
+        Denotes the column in `df` that contains the alternative ID
+        values for each row.
+    df : pandas dataframe.
+        The dataframe of long format data that is to be checked for duplicates.
+
+    Returns
+    -------
+    None.
+    """
+    if df.duplicated(subset=[obs_id_col, alt_id_col]).any():
+        msg = "One or more observation-alternative_id pairs is not unique."
+        raise ValueError(msg)
+
+    return None
+
+
+def ensure_num_chosen_alts_equals_num_obs(obs_id_col, choice_col, df):
+    """
+    Checks that the total number of recorded choices equals the total number of
+    observations. If this is not the case, raise helpful ValueError messages.
+
+    Parameters
+    ----------
+    obs_id_col : str.
+        Denotes the column in `df` that contains the observation ID values for
+        each row.
+    choice_col : str.
+        Denotes the column in `long_data` that contains a one if the
+        alternative pertaining to the given row was the observed outcome for
+        the observation pertaining to the given row and a zero otherwise.
+    df : pandas dataframe.
+        The dataframe whose choices and observations will be checked.
+
+    Returns
+    -------
+    None.
+    """
+    num_obs = df[obs_id_col].unique().shape[0]
+    num_choices = df[choice_col].sum()
+
+    if num_choices < num_obs:
+        msg = "One or more observations have not chosen one "
+        msg_2 = "of the alternatives available to him/her"
+        raise ValueError(msg + msg_2)
+    if num_choices > num_obs:
+        msg = "One or more observations has chosen multiple alternatives"
+        raise ValueError(msg)
+
+    return None
+
+
+def check_type_and_values_of_alt_name_dict(alt_name_dict, alt_id_col, df):
+    """
+    Ensures that `alt_name_dict` is a dictionary and that its keys are in the
+    alternative id column of `df`. Raises helpful errors if either condition
+    is not met.
+
+    Parameters
+    ----------
+    alt_name_dict : dict.
+        A dictionary whose keys are the possible values in
+        `df[alt_id_col].unique()`. The values should be the name that one
+        wants to associate with each alternative id.
+    alt_id_col : str.
+        Denotes the column in `df` that contains the alternative ID values for
+        each row.
+    df : pandas dataframe.
+        The dataframe of long format data that contains the alternative IDs.
+
+    Returns
+    -------
+    None.
+    """
+    if not isinstance(alt_name_dict, dict):
+        msg = "alt_name_dict should be a dictionary. Passed value was a {}"
+        raise TypeError(msg.format(type(alt_name_dict)))
+
+    if not all([x in df[alt_id_col].values for x in alt_name_dict.keys()]):
+        msg = "One or more of alt_name_dict's keys are not "
+        msg_2 = "in long_data[alt_id_col]"
+        raise ValueError(msg + msg_2)
+
+    return None
+
+
 def convert_long_to_wide(long_data,
                          ind_vars,
                          alt_specific_vars,
@@ -667,6 +844,9 @@ def convert_long_to_wide(long_data,
                          alt_name_dict=None,
                          null_value=np.nan):
     """
+    Converts a 'long format' dataframe of cross-sectional discrete choice data
+    into a 'wide format' version of the same data.
+
     Parameters
     ----------
     long_data : pandas dataframe.
@@ -688,17 +868,17 @@ def convert_long_to_wide(long_data,
         alternatives.
     obs_id_col : str.
         Denotes the column in `long_data` that contains the observation ID
-        values for each row of `long_data`.
+        values for each row.
     alt_id_col : str.
         Denotes the column in `long_data` that contains the alternative ID
-        values for each row of `long_form`.
+        values for each row.
     choice_col : str.
         Denotes the column in `long_data` that contains a one if the
         alternative pertaining to the given row was the observed outcome for
         the observation pertaining to the given row and a zero otherwise.
     alt_name_dict : dict or None, optional
         If not None, should be a dictionary whose keys are the possible values
-        in `long_data[alt_id_col].uniuque()`. The values should be the name
+        in `long_data[alt_id_col].unique()`. The values should be the name
         that one wants to associate with each alternative id. Default == None.
     null_value : int, float, long, or `np.nan`, optional.
         The passed value will be used to fill cells in the wide format
@@ -721,115 +901,57 @@ def convert_long_to_wide(long_data,
         `subset_specific_vars`.
     """
     ##########
-    # Check that all columns of wide_data are being
-    # used in the conversion to long format
+    # Check that all columns of long_data are being
+    # used in the conversion to wide format
     ##########
-    vars_accounted_for = (ind_vars +
-                          alt_specific_vars +
-                          subset_specific_vars +
-                          [obs_id_col, alt_id_col, choice_col])
-    num_vars_accounted_for = len(vars_accounted_for)
+    num_vars_accounted_for = sum([len(x) for x in
+                                  [ind_vars, alt_specific_vars,
+                                   subset_specific_vars,
+                                   [obs_id_col, alt_id_col, choice_col]]])
 
-    dataframe_vars = set(long_data.columns.tolist())
-    num_dataframe_vars = len(dataframe_vars)
-
-    if num_vars_accounted_for < num_dataframe_vars:
-        msg = "Note, there are {:,} variables in long_data but the inputs"
-        msg_2 = " ind_vars, alt_specific_vars, and subset_specific_vars only"
-        msg_3 = " account for {:,} variables"
-
-        missing_vars = dataframe_vars.difference(vars_accounted_for)
-        msg_4 = "The variables that are unaccounted for are:\n{}.\n"
-
-        print(msg.format(num_dataframe_vars) +
-              msg_2 + msg_3.format(num_vars_accounted_for))
-        print("\n" + msg_4.format(missing_vars))
-    elif num_vars_accounted_for > num_dataframe_vars:
-        msg = "There are more variable specified in ind_vars, "
-        msg_2 = "alt_specific_vars, and subset_specific_vars ({:,}) than there"
-        msg_3 = " are variables in long_data ({:,})"
-        print(msg +
-              msg_2.format(num_vars_accounted_for) +
-              msg_3.format(num_dataframe_vars))
+    ensure_all_columns_are_used(num_vars_accounted_for, long_data)
 
     ##########
     # Check that all columns one wishes to use are actually in long_data
     ##########
-    long_columns = long_data.columns.tolist()
-    try:
-        problem_cols = [x for x in ind_vars if x not in long_columns]
-        problem_type = "ind_vars"
-        assert problem_cols == []
+    ensure_columns_are_in_dataframe(ind_vars,
+                                    long_data,
+                                    title="ind_vars")
 
-        problem_cols = [x for x in alt_specific_vars
-                        if x not in long_columns]
-        problem_type = "alt_specific_vars"
-        assert problem_cols == []
+    ensure_columns_are_in_dataframe(alt_specific_vars,
+                                    long_data,
+                                    title="alt_specific_vars")
 
-        problem_cols = [x for x in subset_specific_vars.keys()
-                        if x not in long_columns]
-        problem_type = "subset_specific_vars"
-        assert problem_cols == []
+    ensure_columns_are_in_dataframe(subset_specific_vars.keys(),
+                                    long_data,
+                                    title="subset_specific_vars")
 
-        problem_cols = [x for x in [choice_col, obs_id_col, alt_id_col]
-                        if x not in long_columns]
-        problem_type = ["choice_col, obs_id_col", "alt_id_col"]
-        assert problem_cols == []
-
-    except AssertionError as e:
-        msg = "The following columns in {} are not in long_data"
-        print(msg.format(problem_type))
-        print(problem_cols)
-        raise e
+    identifying_cols = [choice_col, obs_id_col, alt_id_col]
+    identifying_col_string = "[choice_col, obs_id_col, alt_id_col]"
+    ensure_columns_are_in_dataframe(identifying_cols,
+                                    long_data,
+                                    title=identifying_col_string)
 
     ##########
     # Make sure that each observation-alternative pair is unique
     ##########
-    try:
-        assert long_data.duplicated(subset=[obs_id_col,
-                                            alt_id_col]).any() == False
-    except AssertionError as e:
-        print("One or more observation-alternative_id pairs is not unique.")
-        raise e
+    check_dataframe_for_duplicate_records(obs_id_col, alt_id_col, long_data)
 
     ##########
     # Make sure each observation chose an alternative that's available.
     ##########
     # Make sure that the number of chosen alternatives equals the number of
     # individuals.
-    try:
-        num_obs = long_data[obs_id_col].unique().shape[0]
-        num_choices = long_data[choice_col].sum()
-        assert num_choices == num_obs
-    except AssertionError as e:
-        if num_choices < num_obs:
-            msg = "One or more observations have not chosen one "
-            msg_2 = "of the alternatives available to him/her"
-            print(msg + msg_2)
-        if num_choices > num_obs:
-            print("One or more observations has chosen multiple alternatives")
-        raise e
+    ensure_num_chosen_alts_equals_num_obs(obs_id_col, choice_col, long_data)
 
     ##########
     # Check that the alternative ids in the alt_name_dict are actually the
     # alternative ids used in the long_data alt_id column.
     ##########
     if alt_name_dict is not None:
-        try:
-            assert isinstance(alt_name_dict, dict)
-        except AssertionError as e:
-            msg = "alt_name_dict should be a dictionary. Passed value was a {}"
-            print(msg.format(type(alt_name_dict)))
-            raise e
-
-        try:
-            assert all([x in long_data[alt_id_col].values
-                        for x in alt_name_dict.keys()])
-        except AssertionError as e:
-            msg = "One or more of alt_name_dict's keys are not "
-            msg_2 = "in long_data[alt_id_col]"
-            print(msg + msg_2)
-            raise e
+        check_type_and_values_of_alt_name_dict(alt_name_dict,
+                                               alt_id_col,
+                                               long_data)
 
     ##########
     # Figure out how many rows/columns should be in the wide format dataframe
@@ -881,9 +1003,11 @@ def convert_long_to_wide(long_data,
     # Create the availability columns
     #####
     # Get the various long form mapping matrices
-    row_to_obs, row_to_alt = create_long_form_mappings(long_data,
-                                                       obs_id_col,
-                                                       alt_id_col)
+    mapping_res = create_long_form_mappings(long_data,
+                                            obs_id_col,
+                                            alt_id_col)
+    row_to_obs = mapping_res["rows_to_obs"]
+    row_to_alt = mapping_res["rows_to_alts"]
 
     # Get the matrix of observations (rows) to available alternatives (columns)
     obs_to_alt = row_to_obs.T.dot(row_to_alt).todense()
@@ -913,6 +1037,7 @@ def convert_long_to_wide(long_data,
     for col in alt_specific_vars + subset_specific_vars.keys():
         obs_to_var = row_to_obs.T.dot(row_to_alt.multiply(
                                               long_data[col].values[:, None]))
+        obs_to_var = obs_to_var.astype(float)
 
         # Place a null value in columns where the alternative is not available
         # to a given observation
@@ -967,14 +1092,13 @@ def convert_long_to_wide(long_data,
 
     # Make sure one has the correct number of rows and columns in
     # the final dataframe
-    try:
-        assert final_wide_df.shape == (num_obs, num_cols)
-    except AssertionError as e:
-        print("There is an error with the dataframe that will be returned")
-        print("The shape of the dataframe should be {}".format((num_obs,
-                                                                num_cols)))
-        msg = "Instead, the returned dataframe will have shape: {}"
-        print(msg.format(final_wide_df.shape))
+    if final_wide_df.shape != (num_obs, num_cols):
+        msg_1 = "There is an error with the dataframe that will be returned"
+        msg_2 = "The shape of the dataframe should be {}".format((num_obs,
+                                                                  num_cols))
+        msg_3 = "Instead, the returned dataframe will have shape: {}"
+        total_msg = msg_1 + msg_2 + msg_3.format(final_wide_df.shape)
+        warnings.warn(total_msg)
 
     # Return the wide format dataframe
     return final_wide_df

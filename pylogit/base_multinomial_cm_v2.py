@@ -13,7 +13,6 @@ Created on Tues Feb 22 09:30:44 2016
          be estimated, theta, as shape parameters, intercept parameters, and
          index coefficients.
 """
-
 import pickle
 from copy import deepcopy
 from collections import OrderedDict
@@ -28,36 +27,11 @@ from choice_tools import create_long_form_mappings
 from choice_tools import convert_mixing_names_to_positions
 from choice_tools import get_dataframe_from_data
 from choice_tools import ensure_specification_cols_are_in_dataframe
+from choice_tools import ensure_object_is_ordered_dict
+from choice_tools import ensure_columns_are_in_dataframe
 from choice_calcs import calc_probabilities, calc_asymptotic_covariance
 from nested_choice_calcs import calc_nested_probs
 import mixed_logit_calcs as mlc
-
-def ensure_columns_are_in_dataframe(columns, dataframe):
-    """
-    Checks whether each column in `columns` is in `dataframe`. Raises
-    ValueError if any of the columns are not in the dataframe.
-
-    Parameters
-    ----------
-    columns : list of strings.
-        Each string should represent a column heading in dataframe.
-    dataframe : pandas DataFrame.
-        Dataframe containing the data for the choice model to be estimated.
-
-    Returns
-    -------
-    None.
-    """
-    # Make sure columns is an iterable
-    assert hasattr(columns, "__getitem__")
-    # Make sure dataframe is a pandas dataframe
-    assert isinstance(dataframe, pd.DataFrame)
-
-    for column in columns:
-        if column not in dataframe.columns:
-            raise ValueError("{} not in data.columns".format(column))
-
-    return None
 
 
 def ensure_valid_nums_in_specification_cols(specification, dataframe):
@@ -194,18 +168,6 @@ def check_length_of_shape_or_intercept_names(name_list,
         raise ValueError(total_msg)
 
     return None
-
-
-def ensure_object_is_ordered_dict(nest_spec, title):
-    """
-    Checks that the `nest_spec` is an OrderedDict. If not, raises ValueError.
-    """
-    if not isinstance(nest_spec, OrderedDict):
-        msg = "{} must be an OrderedDict. {} passed instead."
-        raise TypeError(msg.format(title, type(nest_spec)))
-
-    return None
-
 
 
 def check_type_of_nest_spec_keys_and_values(nest_spec):
