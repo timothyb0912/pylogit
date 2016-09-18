@@ -3,9 +3,9 @@ Tests for the choice_tools.py file.
 """
 import unittest
 import os
+import warnings
 from collections import OrderedDict
 from copy import deepcopy
-from functools import partial
 
 import numpy as np
 import numpy.testing as npt
@@ -122,6 +122,11 @@ class GenericTestCase(unittest.TestCase):
 
 class ArgumentValidationTests(GenericTestCase):
     def test_get_dataframe_from_data(self):
+        """
+        Ensure that appropriate errors are raised when get_dataframe_from_data
+        receives incorrect arguments, and that the function returns the
+        expected results when correct arguments are passed.
+        """
         # Create a test csv file.
         self.fake_df.to_csv("test_csv.csv", index=False)
         # Ensure that the dataframe is recovered
@@ -146,6 +151,10 @@ class ArgumentValidationTests(GenericTestCase):
         return None
 
     def test_argument_type_check(self):
+        """
+        Ensure that the appropriate errors are raised when arguments of
+        incorrect type are passed to "check_argument_type".
+        """
         # Isolate arguments that are correct, and ensure the function being
         # tested returns None.
         good_args = [self.fake_df, self.fake_specification]
@@ -167,6 +176,11 @@ class ArgumentValidationTests(GenericTestCase):
         return None
 
     def test_alt_id_col_inclusion_check(self):
+        """"
+        Ensure that the function correctly returns None when the
+        alternative_id_col is in the long format dataframe and that ValueErrors
+        are raised when the column is not the long format dataframe.
+        """
         self.assertIsNone(ct.ensure_alt_id_in_long_form(self.alt_id_col,
                                                         self.fake_df))
         bad_cols = ["foo", 23, None]
@@ -177,6 +191,10 @@ class ArgumentValidationTests(GenericTestCase):
         return None
 
     def test_check_type_and_values_of_specification_dict(self):
+        """
+        Ensure that the various type and structure checks for the specification
+        dictionary are working.
+        """
         # Ensure that a correct specification dict raises no errors.
         test_func = ct.check_type_and_values_of_specification_dict
         unique_alternatives = np.arange(1, 4)
@@ -214,6 +232,10 @@ class ArgumentValidationTests(GenericTestCase):
         return None
 
     def test_check_keys_and_values_of_name_dictionary(self):
+        """
+        Ensure that the checks of the keys and values of the name dictionary
+        are working as expected.
+        """
         # Ensure that a correct name dict raises no errors.
         test_func = ct.check_keys_and_values_of_name_dictionary
         num_alts = 3
@@ -260,11 +282,300 @@ class ArgumentValidationTests(GenericTestCase):
         bad_names_7 = deepcopy(self.fake_names)
         bad_names_7["x"] = ["foo", "bar"]
 
-        for new_names, new_spec in [(bad_names_5, new_spec_1),
-                                    (bad_names_6, new_spec_2),
-                                    (bad_names_7, new_spec_2)]:
-            args[0], args[1] = new_names, new_spec
-            self.assertRaises(ValueError, test_func, *args)
+        for names, spec, error in [(bad_names_5, new_spec_1, TypeError),
+                                   (bad_names_6, new_spec_2, ValueError),
+                                   (bad_names_7, new_spec_2, ValueError)]:
+            args[0], args[1] = names, spec
+            self.assertRaises(error, test_func, *args)
+
+        return None
+
+    def test_create_design_matrix(self):
+        """
+        Ensure that create_design_matrix returns the correct numpy arrays for
+        model estimation.
+        """
+        # Create a long format dataframe with variables of all types (generic,
+        # alternative-specific, and subset specific)
+        self.fake_df["y"] = np.array([12, 9, 0.90, 16, 4])
+        self.fake_df["z"] = np.array([2, 6, 9, 10, 1])
+        self.fake_df["m"] = np.array([2, 2, 2, 6, 6])
+
+        # Amend the specification of 'x'
+        self.fake_specification["x"] = "all_same"
+        self.fake_names["x"] = "x (generic coefficient)"
+
+        # Add the new variables to the specification and name dictionaries
+        self.fake_specification["y"] = "all_diff"
+        self.fake_names["y"] = ["y_alt_1", "y_alt_2", "y_alt_3"]
+
+        self.fake_specification["z"] = [[1, 2], 3]
+        self.fake_names["z"] = ["z_alts_1_2", "z_alt_3"]
+
+        self.fake_specification["m"] = [1, 2]
+        self.fake_names["m"] = ["m_alt_1", "m_alt_2"]
+
+        # Create the numpy array that should be returned
+        expected = np.array([[1, 12, 0, 0, 2, 0, 2, 0],
+                             [2, 0, 9, 0, 6, 0, 0, 2],
+                             [3, 0, 0, 0.9, 0, 9, 0, 0],
+                             [1.5, 16, 0, 0, 10, 0, 6, 0],
+                             [3.5, 0, 0, 4, 0, 1, 0, 0]])
+
+        expected_names = ([self.fake_names["x"]] +
+                          self.fake_names["y"] +
+                          self.fake_names["z"] +
+                          self.fake_names["m"])
+
+        # Compare the expected array with the returned array
+        func_results = ct.create_design_matrix(self.fake_df,
+                                               self.fake_specification,
+                                               self.alt_id_col,
+                                               self.fake_names)
+        func_design, func_names = func_results
+
+        self.assertIsInstance(func_design, np.ndarray)
+        self.assertEqual(func_design.shape, (5, 8))
+        npt.assert_allclose(func_design, expected)
+        self.assertEqual(expected_names, func_names)
+
+        return None
+
+    def test_ensure_all_columns_are_used(self):
+        """
+        Ensure appropriate warnings are raised when there are more /less
+        variables in one's dataframe than are accounted for in one's function.
+        """
+        # Make sure that None is returned when there is no problem.
+        num_vars_used = self.fake_df.columns.size
+        self.assertIsNone(ct.ensure_all_columns_are_used(num_vars_used,
+                                                         self.fake_df))
+
+        # Test to ensure that a warning message is raised when using
+        # a number of colums different from the number in the dataframe.
+        with warnings.catch_warnings(record=True) as context:
+            # Use this filter to always trigger the  UserWarnings
+            warnings.simplefilter('always', UserWarning)
+
+            for pos, package in enumerate([(-1, "only"), (1, "more")]):
+                i, msg = package
+                num_vars_used = self.fake_df.columns.size + i
+                ct.ensure_all_columns_are_used(num_vars_used, self.fake_df)
+                # Check that the warning has been created.
+                self.assertEqual(len(context), pos + 1)
+                self.assertIsInstance(context[-1].category, type(UserWarning))
+                self.assertIn(msg, str(context[-1].message))
+
+        return None
+
+    def test_check_dataframe_for_duplicate_records(self):
+        """
+        Ensure that ValueError is raised only when the passed dataframe has
+        duplicate observation-id and alternative-id pairs.
+        """
+        # Alias the function that is to be tested
+        func = ct.check_dataframe_for_duplicate_records
+        # Ensure that the function returns None when given data that is okay.
+        good_args = [self.obs_id_col, self.alt_id_col, self.fake_df]
+        self.assertIsNone(func(*good_args))
+        # Make sure a ValueError is raised when one has repeat obs-id and
+        # alt-id pairs.
+        bad_df = self.fake_df.copy()
+        bad_df.loc[3, "obs_id"] = 1
+
+        bad_args = deepcopy(good_args)
+        bad_args[2] = bad_df
+
+        self.assertRaises(ValueError, func, *bad_args)
+
+        return None
+
+    def test_ensure_num_chosen_alts_equals_num_obs(self):
+        """
+        Ensure that ValueError is raised only when the passed dataframe's
+        number of choices does not equal the declared number of observations.
+        """
+        # Alias the function that is to be tested
+        func = ct.ensure_num_chosen_alts_equals_num_obs
+        # Ensure that the function returns None when given data that is okay.
+        args = [self.obs_id_col, self.choice_col, self.fake_df]
+        self.assertIsNone(func(*args))
+
+        # Make sure a ValueError is raised when one has more or less choices
+        # than observations
+        # Too many choice
+        bad_df_1 = self.fake_df.copy()
+        bad_df_1.loc[0, "choice"] = 1
+
+        # Too few choices
+        bad_df_2 = self.fake_df.copy()
+        bad_df_2.loc[1, "choice"] = 0
+
+        for bad_df in [bad_df_1, bad_df_2]:
+            args[2] = bad_df
+            self.assertRaises(ValueError, func, *args)
+
+        return None
+
+    def test_check_type_and_values_of_alt_name_dict(self):
+        """
+        Ensure that a TypeError is raised when alt_name_dict is not an instance
+        of a dictionary, and ensure that a ValueError is raised when the keys
+        of alt_name_dict are not actually in the alternative ID column of the
+        passed dataframe.
+        """
+        # Alias the function that is to be tested
+        func = ct.check_type_and_values_of_alt_name_dict
+        # Ensure that the function returns None when given data that is okay.
+        alt_name_dict = {1: "alternative 1",
+                         2: "alternative 2",
+                         3: "alternative 3"}
+        args = [alt_name_dict, self.alt_id_col, self.fake_df]
+        self.assertIsNone(func(*args))
+
+        # Test both ways that the function of interest can raise errors.
+        # Use a data structure that is not a dictionary.
+        bad_dict_1 = alt_name_dict.items()
+        # Use keys in the dictionary that are not valid alternative IDs.
+        # Our alternative IDs are ints, not strings.
+        bad_dict_2 = {'1': "alternative 1",
+                      '2': "alternative 2",
+                      '3': "alternative 3"}
+
+        for bad_dict, error in [(bad_dict_1, TypeError),
+                                (bad_dict_2, ValueError)]:
+            args[0] = bad_dict
+            self.assertRaises(error, func, *args)
+
+        return None
+
+    def test_convert_long_to_wide(self):
+        """
+        Test the basic functionality of convert_long_to_wide, ensuring correct
+        outputs when given correct inputs.
+        """
+        # Create a long format dataframe with variables of all types (generic,
+        # alternative-specific, and subset specific)
+
+        # Add the alternative specific variable
+        self.fake_df["y"] = np.array([12, 9, 0.90, 16, 4])
+        # Add the subset specific variable (it only exists for a subset of
+        # alternatives, 1 and 2)
+        self.fake_df["z"] = np.array([2, 6, 0, 10, 0])
+        # Add the individual specific variables
+        self.fake_df["m"] = np.array([2, 2, 2, 6, 6])
+
+        # Construct the wide format dataframe by hand
+        wide_data = OrderedDict()
+        wide_data["obs_id"] = [1, 2]
+        wide_data["choice"] = [2, 3]
+        wide_data["availability_1"] = [1, 1]
+        wide_data["availability_2"] = [1, 0]
+        wide_data["availability_3"] = [1, 1]
+        # Add the individual specific variables
+        wide_data["m"] = [2, 6]
+        # Add the alternataive specific variables
+        wide_data["y_1"] = [12.0, 16.0]
+        wide_data["y_2"] = [9.0, np.nan]
+        wide_data["y_3"] = [0.9, 4.0]
+        # Add the subset specific variables
+        wide_data["z_1"] = [2.0, 10.0]
+        wide_data["z_2"] = [6, np.nan]
+
+        expected = pd.DataFrame(wide_data)
+
+        # Ensure the function's result matches our expectations
+        ind_vars = ["m"]
+        alt_specific_vars = ["y"]
+        subset_specific_vars = {"z": [1, 2]}
+        args = [self.fake_df,
+                ind_vars,
+                alt_specific_vars,
+                subset_specific_vars,
+                self.obs_id_col,
+                self.alt_id_col,
+                self.choice_col]
+        alt_name_dict = {x: str(x) for x in range(1, 4)}
+        func_results = ct.convert_long_to_wide(*args)
+        func_results_2 = ct.convert_long_to_wide(*args,
+                                                 alt_name_dict=alt_name_dict)
+
+        npt.assert_allclose(func_results.values, expected.values)
+        npt.assert_allclose(func_results_2.values, expected.values)
+
+        return True
+
+    def test_convert_wide_to_long(self):
+        """
+        Test the basic functionality of convert_wide_to_long, ensuring correct
+        outputs when given correct inputs.
+        """
+        # Create a long format dataframe with variables of all types (generic,
+        # alternative-specific, and subset specific)
+
+        # Add another observation
+        new_x = (self.fake_df["x"].tolist() +
+                 self.fake_df["x"].iloc[-2:].tolist())
+        new_choice = (self.fake_df["choice"].tolist() + [1, 0])
+        new_alt_id = (self.fake_df["alt_id"].tolist() + [1, 3])
+        new_obs_id = (self.fake_df["obs_id"].tolist() + [3, 3])
+        new_intercept = [1 for x in range(7)]
+
+        new_df = pd.DataFrame({"x": new_x,
+                               "choice": new_choice,
+                               "alt_id": new_alt_id,
+                               "obs_id": new_obs_id,
+                               "intercept": new_intercept})
+
+        # Add the alternative specific variable
+        new_df["y"] = np.array([12, 9, 0.90, 16, 4, 16, 4])
+        # Add the subset specific variable (it only exists for a subset of
+        # alternatives, 1 and 2)
+        new_df["z"] = np.array([2, 6, 0, 10, 0, 10, 0])
+        # Add the individual specific variables
+        new_df["m"] = np.array([2, 2, 2, 6, 6, 6, 6])
+
+        # Construct the wide format dataframe by hand
+        wide_data = OrderedDict()
+        wide_data["obs_id"] = [1, 2, 3]
+        wide_data["choice"] = [2, 3, 1]
+        wide_data["availability_1"] = [1, 1, 1]
+        wide_data["availability_2"] = [1, 0, 0]
+        wide_data["availability_3"] = [1, 1, 1]
+        # Add the individual specific variables
+        wide_data["m"] = [2, 6, 6]
+        wide_data['intercept'] = [1, 1, 1]
+        # Add the alternataive specific variables
+        wide_data["x_1"] = new_df.loc[[0, 3, 5], "x"].tolist()
+        wide_data["x_2"] = [new_df.at[1, "x"], np.nan, np.nan]
+        wide_data["x_3"] = new_df.loc[[2, 4, 6], "x"].tolist()
+        wide_data["y_1"] = [12.0, 16.0, 16.0]
+        wide_data["y_2"] = [9.0, np.nan, np.nan]
+        wide_data["y_3"] = [0.9, 4.0, 4.0]
+        # Add the subset specific variables
+        wide_data["z_1"] = [2.0, 10.0, 10.0]
+        wide_data["z_2"] = [6, np.nan, np.nan]
+
+        wide_df = pd.DataFrame(wide_data)
+
+        # Ensure the function's result matches our expectations
+        ind_vars = ["m", 'intercept']
+        alt_specific_vars = {"x": {1: "x_1",
+                                   2: "x_2",
+                                   3: "x_3"},
+                             "y": {1: "y_1",
+                                   2: "y_2",
+                                   3: "y_3"},
+                             "z": {1: "z_1",
+                                   2: "z_2"}}
+        availability_vars = {1: "availability_1",
+                             2: "availability_2",
+                             3: "availability_3"}
+        args = [wide_df, ind_vars, alt_specific_vars, availability_vars,
+                self.obs_id_col, self.choice_col, self.alt_id_col]
+        func_results = ct.convert_wide_to_long(*args).loc[:, new_df.columns]
+
+        npt.assert_allclose(func_results.values, new_df.values)
 
         return None
 

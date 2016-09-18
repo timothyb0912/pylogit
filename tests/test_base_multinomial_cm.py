@@ -154,8 +154,18 @@ class InitializationTests(GenericTestCase):
                               base_cm.ensure_columns_are_in_dataframe,
                               *args)
 
+            if pos == 2:
+                self.assertRaises(ValueError,
+                                  base_cm.ensure_columns_are_in_dataframe,
+                                  *args,
+                                  title="test_columns")
+
+        # Make sure good columns don't trigger an error
+        good_results = base_cm.ensure_columns_are_in_dataframe(good_columns,
+                                                               self.fake_df)
+        self.assertIsNone(good_results)
+
         return None
-            
 
     def test_specification_column_presence_in_data(self):
         """
