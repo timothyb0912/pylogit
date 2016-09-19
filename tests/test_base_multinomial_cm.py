@@ -642,3 +642,38 @@ class BaseModelMethodTests(GenericTestCase):
         # try to get a statsmodels_summary, raise a NotImplementedError
         self.assertRaises(NotImplementedError,
                           self.model_obj.get_statsmodels_summary)
+
+        return None
+
+    def test_conf_int(self):
+        """
+        Ensure that the confidence interval function returns expected results.
+        """
+        model_obj = self.model_obj
+        model_obj.params = pd.Series([1.0, -1.0], index=["ASC", "x"])
+
+        # Calculate the z-critical corresponding to a 2-sided 95% confidence
+        # interval for a standardized variable.
+        z_crit = 1.959963984540054
+
+        # Specify a desired confidence interval
+        interval_array = np.array([[0.5, 1.5],
+                                   [-1.2, -0.8]])
+        interval_df = pd.DataFrame(interval_array,
+                                   index=model_obj.params.index,
+                                   columns=["lower", "upper"])
+        # Back out the needed standard errors
+        std_errs = (interval_array[:, 1] - model_obj.params.values) / z_crit
+        model_obj.standard_errors = pd.Series(std_errs, index=["ASC", "x"])
+
+        # Get the function results
+        df_func_results = model_obj.conf_int(return_df=True)
+        array_func_results = model_obj.conf_int(return_df=True)
+        subset_results = model_obj.conf_int(coefs=["ASC"])
+
+        # Compare the results with what they should equal
+        npt.assert_allclose(array_func_results, interval_array)
+        self.assertTrue((df_func_results == interval_df).all().all())
+        npt.assert_allclose(subset_results, interval_array[0, :][None, :])
+
+        return None

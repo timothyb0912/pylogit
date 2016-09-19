@@ -6,7 +6,10 @@ Created on Sun Jul 17 15:59:25 2016
 """
 
 import unittest
+import warnings
 from collections import OrderedDict
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
@@ -188,6 +191,64 @@ class MixedLogitCalculations(unittest.TestCase):
         # Actually perform the tests
         npt.assert_allclose(actual_3d_design[:, 0, :], self.fake_design_draw_1)
         npt.assert_allclose(actual_3d_design[:, 1, :], self.fake_design_draw_2)
+
+        return None
+
+    def test_shape_ignore_msg_in_constructor(self):
+        """
+        Ensures that a UserWarning is raised when the 'shape_ref_pos' or
+        'shape_names' keyword arguments are passed to the MNL model
+        constructor. This warns people against expecting the MNL to work with
+        shape parameters, and alerts them to the fact they are using an MNL
+        model when they might have been expecting to instantiate a different
+        choice model.
+        """
+        # Create a variable for the standard arguments to this function.
+        fake_specification = OrderedDict()
+        fake_specification["intercept"] = [1, 2]
+        fake_specification["x"] = [[1, 2, 3]]
+
+        fake_names = OrderedDict()
+        fake_names["intercept"] = ["ASC 1", "ASC 2"]
+        fake_names["x"] = ["Generic x"]
+
+        fake_df = pd.DataFrame({"x": self.fake_design[:, 2],
+                                "alt_id": self.alternative_ids,
+                                "situation_id": self.situation_ids,
+                                "obs_id": self.individual_ids,
+                                "choice": self.choice_array})
+        fake_df["intercept"] = 1
+
+        standard_args = [fake_df,
+                         "alt_id",
+                         "situation_id",
+                         "choice",
+                         fake_specification]
+        standard_kwargs = {"names": fake_names,
+                           "mixing_id_col": "obs_id",
+                           "mixing_vars": ["Generic x"]}
+
+        # Create a variable for the kwargs being passed to the constructor
+        kwarg_map_1 = deepcopy(standard_kwargs)
+        kwarg_map_1["shape_ref_pos"] = 2
+
+        kwarg_map_2 = deepcopy(standard_kwargs)
+        kwarg_map_2["shape_names"] = OrderedDict([("x", ["foo"])])
+
+        # Test to ensure that the shape ignore message is printed when using
+        # either of these two kwargs
+        with warnings.catch_warnings(record=True) as context:
+            # Use this filter to always trigger the  UserWarnings
+            warnings.simplefilter('always', UserWarning)
+
+            for pos, bad_kwargs in enumerate([kwarg_map_1, kwarg_map_2]):
+                # Create an MNL model object with the irrelevant kwargs.
+                # This should trigger a UserWarning
+                mixl_obj = mixed_logit.MixedLogit(*standard_args, **bad_kwargs)
+                # Check that the warning has been created.
+                self.assertEqual(len(context), pos + 1)
+                self.assertIsInstance(context[-1].category, type(UserWarning))
+                self.assertIn(mixed_logit._shape_ignore_msg, str(context[-1].message))
 
         return None
 
