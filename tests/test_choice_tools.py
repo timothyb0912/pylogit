@@ -579,3 +579,163 @@ class ArgumentValidationTests(GenericTestCase):
 
         return None
 
+    def test_check_wide_data_for_blank_choices(self):
+        """
+        Ensure that a ValueError is raised when and only when a dataframe has
+        null values in its choice column.
+        """
+        # Create the dataframes used for testing
+        good_df = self.fake_df
+        bad_df = self.fake_df.copy()
+        bad_df.loc[0, "choice"] = np.nan
+
+        # Alias the function that will be tested
+        func = ct.check_wide_data_for_blank_choices
+
+        self.assertIsNone(func("choice", good_df))
+        self.assertRaises(ValueError, func, "choice", bad_df)
+
+        return None
+
+    def test_ensure_unique_obs_ids_in_wide_data(self):
+        """
+        Ensure that a ValueError is raised when and only when a wide-format
+        dataframe has fewer unique observations than rows.
+        """
+        good_df = pd.DataFrame({"obs_id": [1, 2, 3],
+                                "choice": [1, 1, 2]})
+        bad_df = pd.DataFrame({"obs_id": [1, 2, 1],
+                               "choice": [1, 1, 2]})
+
+        func = ct.ensure_unique_obs_ids_in_wide_data
+
+        self.assertIsNone(func("obs_id", good_df))
+        self.assertRaises(ValueError, func, "obs_id", bad_df)
+
+        return None
+
+    def test_ensure_chosen_alternatives_are_in_user_alt_ids(self):
+        """
+        Ensure that a ValueError is raised when and only when a wide-format
+        dataframe has fewer unique observations than rows.
+        """
+        good_df = pd.DataFrame({"obs_id": [1, 2, 3],
+                                "choice": [1, 1, 2]})
+        bad_df = pd.DataFrame({"obs_id": [1, 2, 3],
+                               "choice": [1, 1, 4]})
+        availability_vars = {1: "availability_1",
+                             2: "availability_2",
+                             3: "availability_3"}
+
+        func = ct.ensure_chosen_alternatives_are_in_user_alt_ids
+
+        self.assertIsNone(func("choice", good_df, availability_vars))
+        self.assertRaises(ValueError,
+                          func,
+                          "choice",
+                          bad_df,
+                          availability_vars)
+
+        return None
+
+    def test_ensure_each_wide_obs_chose_an_available_alternative(self):
+        """
+        Ensure a ValueError is raised when an individual in a wide format
+        dataframe chooses an observation that was not available to him/her.
+        """
+        good_df = pd.DataFrame({"obs_id": [1, 2, 3],
+                                "choice": [1, 1, 2],
+                                "availability_1": [1, 1, 1],
+                                "availability_2": [1, 1, 1],
+                                "availability_3": [1, 1, 0]})
+
+        bad_df = pd.DataFrame({"obs_id": [1, 2, 3],
+                               "choice": [1, 1, 3],
+                               "availability_1": [1, 1, 1],
+                               "availability_2": [1, 1, 1],
+                               "availability_3": [1, 1, 0]})
+
+        availability_vars = {1: "availability_1",
+                             2: "availability_2",
+                             3: "availability_3"}
+
+        func = ct.ensure_each_wide_obs_chose_an_available_alternative
+
+        good_results = func("obs_id", "choice", availability_vars, good_df)
+        self.assertIsNone(good_results)
+        self.assertRaises(ValueError,
+                          func,
+                          "obs_id",
+                          "choice",
+                          availability_vars,
+                          bad_df)
+
+        return None
+
+    def test_ensure_all_wide_alt_ids_are_chosen(self):
+        """
+        Ensure that ValueError is raised when a user-specified alternative id
+        is not observed in the choices made by users.
+        """
+        # Construct the wide format dataframe by hand
+        wide_data = OrderedDict()
+        wide_data["obs_id"] = [1, 2, 3]
+        wide_data["choice"] = [2, 3, 1]
+        wide_data["availability_1"] = [1, 1, 1]
+        wide_data["availability_2"] = [1, 0, 0]
+        wide_data["availability_3"] = [1, 1, 1]
+        # Add the individual specific variables
+        wide_data["m"] = [2, 6, 6]
+        wide_data['intercept'] = [1, 1, 1]
+        # Add the alternataive specific variables
+        wide_data["x_1"] = [1.5, 2.5, 3.5]
+        wide_data["x_2"] = [0.4, np.nan, np.nan]
+        wide_data["x_3"] = [2, 0.6, 1.3]
+        wide_data["y_1"] = [12.0, 16.0, 16.0]
+        wide_data["y_2"] = [9.0, np.nan, np.nan]
+        wide_data["y_3"] = [0.9, 4.0, 4.0]
+        # Add the subset specific variables
+        wide_data["z_1"] = [2.0, 10.0, 10.0]
+        wide_data["z_2"] = [6, np.nan, np.nan]
+
+        wide_df = pd.DataFrame(wide_data)
+
+        # Create needed arguments
+        ind_vars = ["m", 'intercept']
+        alt_specific_vars = {"x": {1: "x_1",
+                                   2: "x_2",
+                                   3: "x_3"},
+                             "y": {1: "y_1",
+                                   2: "y_2",
+                                   3: "y_3"},
+                             "z": {1: "z_1",
+                                   2: "z_2"}}
+        bad_alt_specific_vars = {"x": {1: "x_1",
+                                       2: "x_2",
+                                       4: "x_3"},
+                                 "y": {1: "y_1",
+                                       2: "y_2",
+                                       3: "y_3"},
+                                 "z": {1: "z_1",
+                                       2: "z_2"}}
+        availability_vars = {1: "availability_1",
+                             2: "availability_2",
+                             3: "availability_3"}
+        bad_availability_vars = {1: "availability_1",
+                                 2: "availability_2",
+                                 4: "availability_3"}
+        good_args = ["choice", alt_specific_vars, availability_vars, wide_df]
+        bad_args_1 = ["choice", bad_alt_specific_vars,
+                      availability_vars, wide_df]
+        bad_args_2 = ["choice", alt_specific_vars,
+                      bad_availability_vars, wide_df]
+
+        # Alias the function being tested
+        func = ct.ensure_all_wide_alt_ids_are_chosen
+
+        self.assertIsNone(func(*good_args))
+
+        for args in [bad_args_1, bad_args_2]:
+            self.assertRaises(ValueError, func, *args)
+
+        return None

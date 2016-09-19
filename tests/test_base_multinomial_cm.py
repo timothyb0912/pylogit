@@ -158,7 +158,7 @@ class InitializationTests(GenericTestCase):
                 self.assertRaises(ValueError,
                                   base_cm.ensure_columns_are_in_dataframe,
                                   *args,
-                                  title="test_columns")
+                                  col_title="test_columns")
 
         # Make sure good columns don't trigger an error
         good_results = base_cm.ensure_columns_are_in_dataframe(good_columns,
