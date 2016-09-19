@@ -1106,6 +1106,9 @@ class MNDC_Model(object):
         # Calculate the lower and upper values for the confidence interval.
         lower = self.params - z_critical * self.standard_errors
         upper = self.params + z_critical * self.standard_errors
+        # Name the series of lower / upper values for the confidence interval.
+        lower.name = "lower"
+        upper.name = "upper"
 
         # Combine the various series.
         combined = pd.concat((lower, upper), axis=1)

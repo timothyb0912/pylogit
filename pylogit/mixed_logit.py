@@ -17,6 +17,7 @@ Train, K., 2009. Discrete Choice Models With Simulation. 2 ed., Cambridge
 
 import time
 import sys
+import warnings
 import numpy as np
 from scipy.optimize import minimize
 from scipy.sparse import csr_matrix
@@ -34,6 +35,10 @@ general_sequence_probs = mlc.calc_choice_sequence_probs
 general_log_likelihood = mlc.calc_mixed_log_likelihood
 general_gradient = mlc.calc_mixed_logit_gradient
 general_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit
+
+_msg_1 = "The Mixed MNL Model has no shape parameters. "
+_msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
+_shape_ignore_msg = _msg_1 + _msg_2
 
 
 def mnl_utility_transform(sys_utility_array, *args, **kwargs):
@@ -146,7 +151,6 @@ def _estimate(init_values,
         - "constrained_pos"
 
     """
-
     # Make sure we have the correct dimensions for the initial parameter values
     try:
         assert init_values.shape[0] == design_3d.shape[2]
@@ -406,13 +410,9 @@ class MixedLogit(base_mcm.MNDC_Model):
         # Print a helpful message for users who have included shape parameters
         # or shape names unneccessarily
         ##########
-        msg_1 = "The Mixed MNL Model has no shape parameters. "
-        msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
-        shape_ignore_msg = msg_1 + msg_2
-
         for keyword in ["shape_names", "shape_ref_pos"]:
             if keyword in kwargs and kwargs[keyword] is not None:
-                print(shape_ignore_msg)
+                warnings.warn(_shape_ignore_msg)
                 break
 
         if "intercept_ref_pos" in kwargs:
