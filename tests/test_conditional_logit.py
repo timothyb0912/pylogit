@@ -236,3 +236,40 @@ class ChoiceObjectTests(unittest.TestCase):
             self.assertIn(mnl._ridge_warning_msg, str(w[0].message))
 
         return None
+
+    def test_check_length_of_initial_values(self):
+        """
+        Ensure that a ValueError is raised when one passes an init_vals
+        argument of the wrong length.
+        """
+        # Create a variable for the standard arguments to the MNL constructor.
+        standard_args = [self.fake_df,
+                         self.alt_id_col,
+                         self.obs_id_col,
+                         self.choice_col,
+                         self.fake_specification]
+
+        # Create the mnl model object whose coefficients will be estimated.
+        base_mnl = mnl.MNL(*standard_args)
+
+        # Create the EstimationObj
+        mapping_res = base_mnl.get_mappings_for_fit()
+        ridge = None
+        zero_vector = np.zeros(1)
+        split_params = mnl.split_param_vec
+        mnl_estimator = mnl.MNLEstimator(base_mnl,
+                                        mapping_res,
+                                        ridge,
+                                        zero_vector,
+                                        split_params)
+
+        # Alias the function to be checked
+        func = mnl_estimator.check_length_of_initial_values
+
+        for i in [2, 3]:
+            init_vals = np.ones(i)
+            self.assertRaises(ValueError, func, init_vals)
+
+        self.assertIsNone(func(np.ones(1)))
+
+        return None
