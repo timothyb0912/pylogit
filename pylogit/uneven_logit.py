@@ -18,16 +18,15 @@ Created on Thu Feb 25 08:02:45 2016
 """
 
 from functools import partial
-import time
-import sys
 import warnings
-import math
 import numpy as np
-from scipy.optimize import minimize
 from scipy.sparse import diags
 
 import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
+from estimation import EstimationObj
+from estimation import estimate
+
 
 # Define the boundary values which are not to be exceeded during computation
 max_comp_value = 1e300
@@ -403,579 +402,153 @@ def _uneven_transform_deriv_alpha(systematic_utilities,
     return output_array
 
 
-def _calc_neg_log_likelihood_and_neg_gradient(beta,
-                                              design,
-                                              alt_IDs,
-                                              rows_to_obs,
-                                              rows_to_alts,
-                                              choice_vector,
-                                              utility_transform,
-                                              block_matrix_idxs,
-                                              ridge,
-                                              calc_dh_dv,
-                                              calc_dh_dc,
-                                              calc_dh_d_alpha,
-                                              *args):
+def create_calc_dh_dv(estimator):
     """
+    Return the function that can be used in the various gradient and hessian
+    calculations to calculate the derivative of the transformation with respect
+    to the index.
+
     Parameters
     ----------
-    beta : 1D ndarray.
-        All elements should by ints, floats, or longs. Should have 1 element
-        for each utility coefficient being estimated (i.e. num_features) and
-        for each shape parameter being estimated.
-    design : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated. All
-        elements should be ints, floats, or longs.
-    alt_IDs : 1D ndarray.
-        All elements should be ints. There should be one row per obervation per
-        available alternative for the given observation. Elements denote the
-        alternative corresponding to the given row of the design matrix.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_alts : 2D scipy sparse matrix.
-        There should be one row per observation per available alternative and
-        one column per possible alternative. This matrix maps the rows of the
-        design matrix to the possible alternatives for this dataset. All
-        elements should be zeros or ones.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
-    utility_transform : callable.
-        Should accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, and miscellaneous args and kwargs. Should return a 1D
-        array whose elements contain the appropriately transformed systematic
-        utility values, based on the current model being evaluated.
-    block_matrix_idxs : list of arrays.
-        There will be one array per column in `rows_to_obs`. The arrays will
-        note which rows correspond to which observations.
-    ridge : int, float, long, or None.
-        Determines whether or not ridge regression is performed. If an int,
-        float or long is passed, then that scalar determines the ridge penalty
-        for the optimization.
-    calc_dh_dv : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
+    estimator : an instance of the estimation.EstimationObj class.
+        Should contain a `design` attribute that is a 2D ndarray representing
+        the design matrix for this model and dataset.
+
+    Returns
+    -------
+    Callable.
+        Will accept a 1D array of systematic utility values, a 1D array of
         alternative IDs, (shape parameters if there are any) and miscellaneous
         args and kwargs. Should return a 2D array whose elements contain the
         derivative of the tranformed utility vector with respect to the vector
         of systematic utilities. The dimensions of the returned vector should
         be `(design.shape[0], design.shape[0])`.
-    calc_dh_dc : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, (shape parameters if there are any) and miscellaneous
-        args and kwargs. Should return a 2D array whose elements contain the
-        derivative of the tranformed utility vector with respect to the vector
-        of systematic utilities. The dimensions of the returned vector should
-        be `(design.shape[0], rows_to_alts.shape[1])`.
-    calc_dh_d_alpha : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, a 2D sparse scipy matrix mapping rows of the design
-        matrix to the alternatives, and a 1D array of intercept parameters, as
-        well as miscellaneous args and kwargs. If there are intercept
-        parameters, the callable should return a 2D array whose elements
-        contain the derivative of the tranformed utility vector with respect to
-        the vector of intercept parameters. The dimensions of the returned
-        vector should be `(design.shape[0], rows_to_alts.shape[1] - 1)`. If
-        there are no 'outside' intercept parameters, the callable should return
-        None.
-
-    Returns
-    -------
-    `(neg_log_likelihood, neg_gradient_vec)` : tuple.
-        The first element is a float. The second element is a 1D numpy array of
-        shape `== beta.shape`. The first element is the negative log-likelihood
-        of this model evaluated at the passed values of beta. The second
-        element is the gradient of the negative log-likelihood with respect to
-        the vector of shape parameters and utility coefficients.
     """
-    # Isolate the beta parameters from the shape parameters
-    shape_vec, intercept_vec, coefficient_vec = split_param_vec(beta,
-                                                                rows_to_alts,
-                                                                design)
-
-    # Calculate the needed quantities
-    neg_log_likelihood = -1 * general_log_likelihood(coefficient_vec,
-                                                     design,
-                                                     alt_IDs,
-                                                     rows_to_obs,
-                                                     rows_to_alts,
-                                                     choice_vector,
-                                                     utility_transform,
-                                             intercept_params=intercept_vec,
-                                                     shape_params=shape_vec,
-                                                     ridge=ridge)
-
-    neg_beta_gradient_vec = -1 * general_gradient(coefficient_vec,
-                                                  design,
-                                                  alt_IDs,
-                                                  rows_to_obs,
-                                                  rows_to_alts,
-                                                  choice_vector,
-                                                  utility_transform,
-                                                  calc_dh_dc,
-                                                  calc_dh_dv,
-                                                  calc_dh_d_alpha,
-                                                  intercept_vec,
-                                                  shape_vec,
-                                                  ridge)
-
-    return neg_log_likelihood, neg_beta_gradient_vec
+    dh_dv = diags(np.ones(estimator.design.shape[0]), 0, format='csr')
+    # Create a function that will take in the pre-formed matrix, replace its
+    # data in-place with the new data, and return the correct dh_dv on each
+    # iteration of the minimizer
+    calc_dh_dv = partial(_uneven_transform_deriv_v, output_array=dh_dv)
+    return calc_dh_dv
 
 
-def _calc_neg_hessian(beta,
-                      design,
-                      alt_IDs,
-                      rows_to_obs,
-                      rows_to_alts,
-                      choice_vector,
-                      utility_transform,
-                      block_matrix_idxs,
-                      ridge,
-                      calc_dh_dv,
-                      calc_dh_dc,
-                      calc_dh_d_alpha,
-                      *args):
+def create_calc_dh_d_shape(estimator):
     """
+    Return the function that can be used in the various gradient and hessian
+    calculations to calculate the derivative of the transformation with respect
+    to the shape parameters.
+
     Parameters
     ----------
-    beta : 1D ndarray.
-        All elements should by ints, floats, or longs. Should have 1 element
-        for each utility coefficient being estimated (i.e. num_features) and
-        for each shape parameter being estimated.
-    design : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated. All
-        elements should be ints, floats, or longs.
-    alt_IDs : 1D ndarray.
-        All elements should be ints. There should be one row per obervation per
-        available alternative for the given observation. Elements denote the
-        alternative corresponding to the given row of the design matrix.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_alts : 2D scipy sparse matrix.
-        There should be one row per observation per available alternative and
-        one column per possible alternative. This matrix maps the rows of the
-        design matrix to the possible alternatives for this dataset. All
-        elements should be zeros or ones.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
-    utility_transform : callable.
-        Should accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, and miscellaneous args and kwargs. Should return a 1D
-        array whose elements contain the appropriately transformed systematic
-        utility values, based on the current model being evaluated.
-    block_matrix_idxs : list of arrays.
-        There will be one array per column in `rows_to_obs`. The arrays will
-        note which rows correspond to which observations.
-    ridge : int, float, long, or None.
-        Determines whether or not ridge regression is performed. If an int,
-        float or long is passed, then that scalar determines the ridge penalty
-        for the optimization.
-    calc_dh_dv : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, (shape parameters if there are any) and miscellaneous
-        args and kwargs. Should return a 2D array whose elements contain the
-        derivative of the tranformed utility vector with respect to the vector
-        of systematic utilities. The dimensions of the returned vector should
-        be `(design.shape[0], design.shape[0])`.
-    calc_dh_dc : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, (shape parameters if there are any) and miscellaneous
-        args and kwargs. Should return a 2D array whose elements contain the
-        derivative of the tranformed utility vector with respect to the vector
-        of systematic utilities. The dimensions of the returned vector should
-        be `(design.shape[0], rows_to_alts.shape[1])`.
-    calc_dh_d_alpha : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, a 2D sparse scipy matrix mapping rows of the design
-        matrix to the alternatives, and a 1D array of intercept parameters, as
-        well as miscellaneous args and kwargs. If there are intercept
-        parameters, the callable should return a 2D array whose elements
-        contain the derivative of the tranformed utility vector with respect to
-        the vector of intercept parameters. The dimensions of the returned
-        vector should be `(design.shape[0], rows_to_alts.shape[1] - 1)`. If
-        there are no 'outside' intercept parameters, the callable should return
-        None.
+    estimator : an instance of the estimation.EstimationObj class.
+        Should contain a `rows_to_alts` attribute that is a 2D scipy sparse
+        matrix that maps the rows of the `design` matrix to the alternatives
+        available in this dataset.
 
     Returns
     -------
-    neg_hessian : 2D ndarray.
-        There will be as many rows (and columns) as there are transformed shape
-        parameters, intercept parameters, and index coefficients, combined. All
-        elements wil be ints, floats, or longs.
+    Callable.
+        Will accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, (shape parameters if there are any) and miscellaneous
+        args and kwargs. Should return a 2D array whose elements contain the
+        derivative of the tranformed utility vector with respect to the vector
+        of shape parameters. The dimensions of the returned vector should
+        be `(design.shape[0], num_alternatives)`.
     """
-    # Isolate the shape, intercept, and beta parameters
-    shape_vec, intercept_vec, coefficient_vec = split_param_vec(beta,
-                                                                rows_to_alts,
-                                                                design)
-
-    # Calculate the hessian
-    return -1 * general_hessian(coefficient_vec,
-                                design,
-                                alt_IDs,
-                                rows_to_obs,
-                                rows_to_alts,
-                                utility_transform,
-                                calc_dh_dc,
-                                calc_dh_dv,
-                                calc_dh_d_alpha,
-                                block_matrix_idxs,
-                                intercept_vec,
-                                shape_vec,
-                                ridge)
+    dh_d_shape = estimator.rows_to_alts.copy()
+    # Create a function that will take in the pre-formed matrix, replace its
+    # data in-place with the new data, and return the correct dh_dshape on each
+    # iteration of the minimizer
+    calc_dh_d_shape = partial(_uneven_transform_deriv_shape,
+                              output_array=dh_d_shape)
+    return calc_dh_d_shape
 
 
-def _estimate(init_values, design_matrix, alt_id_vector,
-              choice_vector, rows_to_obs, rows_to_alts,
-              chosen_row_to_obs, intercept_ref_pos,
-              print_results=True, method='bfgs', loss_tol=1e-06,
-              gradient_tol=1e-06, maxiter=1000, ridge=False, **kwargs):
+def create_calc_dh_d_alpha(estimator):
     """
+    Return the function that can be used in the various gradient and hessian
+    calculations to calculate the derivative of the transformation with respect
+    to the outside intercept parameters.
+
     Parameters
     ----------
-    init_values : 1D ndarray.
-        The initial values to start the optimizatin process with. There should
-        be one value for each index coefficient, outside intercept parameter,
-        and shape parameter being estimated.
-    design_matrix : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated. All
-        elements should be ints, floats, or longs.
-    alt_id_vector : 1D ndarray.
-        All elements should be ints. There should be one row per obervation per
-        available alternative for the given observation. Elements denote the
-        alternative corresponding to the given row of the design matrix.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_alts : 2D scipy sparse matrix.
-        There should be one row per observation per available alternative and
-        one column per possible alternative. This matrix maps the rows of the
-        design matrix to the possible alternatives for this dataset. All
-        elements should be zeros or ones.
-    chosen_row_to_obs :  2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix indicates, for each observation
-        (on the columns), which rows of the design matrix were the realized
-        outcome. Should have one and only one `1` in each column. No row should
-        have more than one `1` though it is okay if a row is all zeros.
-    intercept_ref_pos : int, or None.
-        Should only be an int when the intercepts being estimated are not part
-        of the index. Specifies the alternative in the ordered array of unique
-        alternative ids whose intercept or alternative-specific constant is not
-        estimated, to ensure model identifiability.
-    print_res : bool, optional.
-        Determines whether the timing and initial and final log likelihood
-        results will be printed as they they are determined. Default `== True`.
-    method : str, optional.
-        Should be a valid string that can be passed to scipy.optimize.minimize.
-        Determines the optimization algorithm which is used for this problem.
-        Default `== 'bfgs'`.
-    loss_tol : float, optional.
-        Determines the tolerance on the difference in objective function values
-        from one iteration to the next that is needed to determine convergence.
-        Default `== 1e-06`.
-    gradient_tol : float, optional.
-        Determines the tolerance on the difference in gradient values from one
-        iteration to the next which is needed to determine convergence.
-        Default `== 1e-06`.
-    maxiter : int, optional.
-        Determines the maximum number of iterations used by the optimizer.
-        Default `== 1000`.
-    ridge : int, float, long, or None, optional.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization. The scalar should be greater than or equal to zero.
-        Default `== None`.
-    kwargs : optional.
-        Other keyword arguments given to this function will be passed directly
-        to scipy.optimize.minimize().
+    estimator : an instance of the estimation.EstimationObj class.
+        Should contain a `rows_to_alts` attribute that is a 2D scipy sparse
+        matrix that maps the rows of the `design` matrix to the alternatives
+        available in this dataset. Should also contain an `intercept_ref_pos`
+        attribute that is either None or an int. This attribute should denote
+        which intercept is not being estimated (in the case of outside
+        intercept parameters) for identification purposes.
 
     Returns
     -------
-    results : dict.
-        Result dictionary returned by `scipy.optimize.minimize`. In addition to
-        the generic key-value pairs that are returned, `results` will have the
-        folowing keys:
-        - "final_log_likelihood"
-        - "long_probs"
-        - "residuals"
-        - "ind_chi_squareds"
-        - "simulated_sequence_probs"
-        - "expanded_sequence_probs"
-        - "utility_coefs"
-        - "shape_params"
-        - "intercept_params"
-        - "nest_params"
-        - "log_likelihood_null"
-        - "rho_squared"
-        - "rho_bar_squared"
-        - "final_gradient"
-        - "final_hessian"
-        - "fisher_info"
-        - "constrained_pos"
+    Callable.
+        Will accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, (shape parameters if there are any) and miscellaneous
+        args and kwargs. Should return a 2D array whose elements contain the
+        derivative of the tranformed utility vector with respect to the vector
+        of outside intercepts. The dimensions of the returned vector should
+        be `(design.shape[0], num_alternatives - 1)`.
     """
-    ##########
-    # Make sure we have the correct dimensions for the initial parameter values
-    ##########
-    # Figure out how many shape parameters we should have and how many index
-    # coefficients we should have
-    num_alts = rows_to_alts.shape[1]
-    num_index_coefs = design_matrix.shape[1]
+    if estimator.intercept_ref_pos is not None:
+        needed_idxs = range(estimator.rows_to_alts.shape[1])
+        needed_idxs.remove(estimator.intercept_ref_pos)
+        dh_d_alpha = (estimator.rows_to_alts
+                               .copy()
+                               .transpose()[needed_idxs, :]
+                               .transpose())
+    else:
+        dh_d_alpha = None
+    # Create a function that will take in the pre-formed matrix, replace its
+    # data in-place with the new data, and return the correct dh_dalpha on each
+    # iteration of the minimizer
+    calc_dh_d_alpha = partial(_uneven_transform_deriv_alpha,
+                              output_array=dh_d_alpha)
 
-    try:
-        if intercept_ref_pos is not None:
+    return calc_dh_d_alpha
+
+
+class UnevenEstimator(EstimationObj):
+    def set_derivatives(self):
+        self.calc_dh_dv = create_calc_dh_dv(self)
+        self.calc_dh_d_alpha = create_calc_dh_d_alpha(self)
+        self.calc_dh_d_shape = create_calc_dh_d_shape(self)
+
+    def check_length_of_initial_values(self, init_values):
+        """
+        Ensures that `init_values` is of the correct length. Raises a helpful
+        ValueError if otherwise.
+
+        Parameters
+        ----------
+        init_values : 1D ndarray.
+            The initial values to start the optimizatin process with. There
+            should be one value for each index coefficient, outside intercept
+            parameter, and shape parameter being estimated.
+
+        Returns
+        -------
+        None.
+        """
+        # Calculate the expected number of shape and index parameters
+        # Note the uneven logit model has one shape parameter per alternative.
+        num_alts = self.rows_to_alts.shape[1]
+        num_index_coefs = self.design.shape[1]
+
+        if self.intercept_ref_pos is not None:
             assumed_param_dimensions = num_index_coefs + 2 * num_alts - 1
         else:
             assumed_param_dimensions = num_index_coefs + num_alts
-        assert init_values.shape[0] == assumed_param_dimensions
-    except AssertionError as e:
-        print("The initial values are of the wrong dimension")
-        print("It should be of dimension {}".format(assumed_param_dimensions))
-        print("But instead it has dimension {}".format(init_values.shape[0]))
-        raise e
 
-    ##########
-    # Make sure the ridge regression parameter is None or a real scalar
-    ##########
-    try:
-        assert ridge is None or isinstance(ridge, (int, float, long))
-    except AssertionError as e:
-        print("ridge should be None or an int, float, or long.")
-        print("The passed value of ridge had type: {}".format(type(ridge)))
-        raise e
+        if init_values.shape[0] != assumed_param_dimensions:
+            msg_1 = "The initial values are of the wrong dimension."
+            msg_2 = "It should be of dimension {}"
+            msg_3 = "But instead it has dimension {}"
+            raise ValueError(msg_1 +
+                             msg_2.format(assumed_param_dimensions) +
+                             msg_3.format(init_values.shape[0]))
 
-    easy_utility_transform = lambda *args: _uneven_utility_transform(*args,
-                                           intercept_ref_pos=intercept_ref_pos)
-
-    ##########
-    # Begin the model estimation process.
-    ##########
-    # Isolate the initial shape, intercept, and beta parameters.
-    init_shapes, init_intercepts, init_betas = split_param_vec(init_values,
-                                                               rows_to_alts,
-                                                               design_matrix)
-
-    # Get the log-likelihood at zero and the initial log likelihood
-    # Note, we use intercept_params=None since this will cause the function
-    # to think there are no intercepts being added to the transformation
-    # vector, which is the same as adding zero to the transformation vector
-    log_likelihood_at_zero = general_log_likelihood(
-                                          np.zeros(design_matrix.shape[1]),
-                                                             design_matrix,
-                                                             alt_id_vector,
-                                                                rows_to_obs,
-                                                             rows_to_alts,
-                                                             choice_vector,
-                                                    easy_utility_transform,
-                                                     intercept_params=None,
-                                shape_params=np.ones(init_shapes.shape[0]),
-                                                               ridge=ridge)
-
-    initial_log_likelihood = general_log_likelihood(init_betas,
-                                                    design_matrix,
-                                                    alt_id_vector,
-                                                    rows_to_obs,
-                                                    rows_to_alts,
-                                                    choice_vector,
-                                                    easy_utility_transform,
-                                          intercept_params=init_intercepts,
-                                                  shape_params=init_shapes,
-                                                   ridge=ridge)
-    if print_results:
-        # Print the log-likelihood at zero
-        print("Log-likelihood at zero: {:,.4f}".format(log_likelihood_at_zero))
-
-        # Print the log-likelihood at the starting values
-        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
-        sys.stdout.flush()
-
-    # Get the block matrix indices for the hessian matrix. Do it outside the
-    # iterative minimization process in order to minimize unnecessary
-    # computations
-    block_matrix_indices = cc.create_matrix_block_indices(rows_to_obs)
-
-    # Pre-create the sparse matrix that will be used as the derivative of the
-    # transformation vector with respect to the systematic utilities
-    dh_dv = diags(np.ones(design_matrix.shape[0]), 0, format='csr')
-    # Create a function that will take in the pre-formed matrix, replace its
-    # data in-place with the new data, and return the correct dh_dv on each
-    # iteration of the minimizer
-    calc_dh_dv = lambda *args: _uneven_transform_deriv_v(*args,
-                                                         output_array=dh_dv)
-
-    # Pre-create the sparse matrix that will be used as the derivative of the
-    # transformation vector with respect to the shape_parameters
-    dh_dc = rows_to_alts.copy()
-    # Create a function that will take in the pre-formed matrix, replace its
-    # data in-place with the new data, and return the correct dh_dv on each
-    # iteration of the minimizer
-    calc_dh_dc = lambda *args: _uneven_transform_deriv_shape(*args,
-                                                           output_array=dh_dc)
-
-    # Pre-create the sparse matrix that will be used as the derivative of the
-    # transformation vector with respect to the intercept parameters
-    needed_idxs = range(rows_to_alts.shape[1])
-    if intercept_ref_pos is not None:
-        needed_idxs.remove(intercept_ref_pos)
-        dh_d_alpha = rows_to_alts.copy().transpose()[needed_idxs,
-                                                      :].transpose()
-    else:
-        dh_d_alpha = None
-    calc_dh_d_alpha = lambda *args: _uneven_transform_deriv_alpha(*args,
-                                                       output_array=dh_d_alpha)
-
-    # Start timing the iterative optimization process
-    start_time = time.time()
-
-    results = minimize(_calc_neg_log_likelihood_and_neg_gradient,
-                       init_values,
-                       args = (design_matrix,
-                               alt_id_vector,
-                               rows_to_obs,
-                               rows_to_alts,
-                               choice_vector,
-                               easy_utility_transform,
-                               block_matrix_indices,
-                               ridge,
-                               calc_dh_dv,
-                               calc_dh_dc,
-                               calc_dh_d_alpha),
-                       method = method,
-                       jac = True,
-                       hess = _calc_neg_hessian,
-                       tol = loss_tol,
-                       options = {'gtol': gradient_tol,
-                                  "maxiter": maxiter},
-                       **kwargs)
-
-    # Calculate the final log-likelihood. Note the '-1' is because we minimized
-    # the negative log-likelihood but we want the actual log-likelihood
-    final_log_likelihood = -1 * results["fun"]
-
-    # Stop timing the estimation process and report the timing results
-    end_time = time.time()
-    if print_results:
-        elapsed_sec = (end_time - start_time)
-        elapsed_min = elapsed_sec / 60.0
-        if elapsed_min > 1.0:
-            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
-        else:
-            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
-        print("Final log-likelihood: {:,.4f}".format(final_log_likelihood))
-        sys.stdout.flush()
-
-    # Separate the final shape, intercept, and beta parameters
-    split_res = split_param_vec(results.x, rows_to_alts, design_matrix)
-    final_shape_params, final_intercept_params, final_utility_coefs = split_res
-
-    # Store the separate values of the shape, intercept, and beta parameters
-    # in the estimation results dict
-    results["utility_coefs"] = final_utility_coefs
-    results["intercept_params"] = final_intercept_params
-    results["shape_params"] = final_shape_params
-    results["nest_params"] = None
-
-    # Calculate the predicted probabilities
-    probability_results = general_calc_probabilities(
-                                                        final_utility_coefs,
-                                                              design_matrix,
-                                                              alt_id_vector,
-                                                                 rows_to_obs,
-                                                              rows_to_alts,
-                                                     easy_utility_transform,
-                                    intercept_params=final_intercept_params,
-                                          shape_params = final_shape_params,
-                                        chosen_row_to_obs=chosen_row_to_obs,
-                                                     return_long_probs=True)
-
-    prob_of_chosen_alternatives, long_probs = probability_results
-
-    # Calculate the residual vector
-    residuals = choice_vector - long_probs
-
-    # Calculate the observation specific chi-squared components
-    chi_squared_terms = np.square(residuals) / long_probs
-    individual_chi_squareds = rows_to_obs.T.dot(chi_squared_terms)
-
-    # Store the log-likelihood at zero
-    results["log_likelihood_null"] = log_likelihood_at_zero
-
-    # Calculate and store the rho-squared and rho-bar-squared
-    results["rho_squared"] = 1.0 - (final_log_likelihood /
-                                    log_likelihood_at_zero)
-    results["rho_bar_squared"] = 1.0 - ((final_log_likelihood -
-                                         results.x.shape[0]) /
-                                        log_likelihood_at_zero)
-
-    # Calculate and store the final gradient
-    results["final_gradient"] = general_gradient(final_utility_coefs,
-                                                 design_matrix,
-                                                 alt_id_vector,
-                                                 rows_to_obs,
-                                                 rows_to_alts,
-                                                 choice_vector,
-                                         easy_utility_transform,
-                                                 calc_dh_dc,
-                                                 calc_dh_dv,
-                                                 calc_dh_d_alpha,
-                                                 final_intercept_params,
-                                                 final_shape_params,
-                                                 ridge)
-    # Calculate and store the final hessian
-    results["final_hessian"] = general_hessian(final_utility_coefs,
-                                               design_matrix,
-                                               alt_id_vector,
-                                               rows_to_obs,
-                                               rows_to_alts,
-                                               easy_utility_transform,
-                                               calc_dh_dc,
-                                               calc_dh_dv,
-                                               calc_dh_d_alpha,
-                                               block_matrix_indices,
-                                               final_intercept_params,
-                                               final_shape_params,
-                                               ridge)
-
-    # Calculate and store the final fisher information matrix
-    results["fisher_info"] = cc.calc_fisher_info_matrix(
-                                                           final_utility_coefs,
-                                                                 design_matrix,
-                                                                 alt_id_vector,
-                                                                    rows_to_obs,
-                                                                 rows_to_alts,
-                                                                 choice_vector,
-                                                        easy_utility_transform,
-                                                                    calc_dh_dc,
-                                                                    calc_dh_dv,
-                                                               calc_dh_d_alpha,
-                                                        final_intercept_params,
-                                                            final_shape_params,
-                                                                         ridge)
-
-    # Add all miscellaneous objects that we need to store to the results dict
-    results["final_log_likelihood"] = final_log_likelihood
-    results["chosen_probs"] = prob_of_chosen_alternatives
-    results["long_probs"] = long_probs
-    results["residuals"] = residuals
-    results["ind_chi_squareds"] = individual_chi_squareds
-
-    return results
+        return None
 
 
 class MNUL(base_mcm.MNDC_Model):
@@ -1164,9 +737,7 @@ class MNUL(base_mcm.MNDC_Model):
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
         mapping_res = self.get_mappings_for_fit()
-        rows_to_obs = mapping_res["rows_to_obs"]
         rows_to_alts = mapping_res["rows_to_alts"]
-        chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
         # Create init_vals from init_coefs, init_intercepts, and init_shapes if
         # those arguments are passed to the function and init_vals is None.
@@ -1225,22 +796,27 @@ class MNUL(base_mcm.MNDC_Model):
             msg_2 = "and init_shapes."
             raise ValueError(msg + msg_2)
 
+        # Create the estimation object
+        zero_vector = np.zeros(init_vals.shape)
+        uneven_estimator = UnevenEstimator(self,
+                                           mapping_res,
+                                           ridge,
+                                           zero_vector,
+                                           split_param_vec)
+        # Set the derivative functions for estimation
+        uneven_estimator.set_derivatives()
+
+        # Perform one final check on the length of the initial values
+        uneven_estimator.check_length_of_initial_values(init_vals)
+
         # Get the estimation results
-        estimation_res = _estimate(init_vals,
-                                   self.design,
-                                   self.alt_IDs,
-                                   self.choices,
-                                   rows_to_obs,
-                                   rows_to_alts,
-                                   chosen_row_to_obs,
-                                   self.intercept_ref_position,
-                                   print_results=print_res,
-                                   method=method,
-                                   loss_tol=loss_tol,
-                                   gradient_tol=gradient_tol,
-                                   maxiter=maxiter,
-                                   ridge=ridge,
-                                   **kwargs)
+        estimation_res = estimate(init_vals,
+                                  uneven_estimator,
+                                  method,
+                                  loss_tol,
+                                  gradient_tol,
+                                  maxiter,
+                                  print_res)
 
         # Store the estimation results
         self.store_fit_results(estimation_res)

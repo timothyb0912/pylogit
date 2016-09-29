@@ -538,6 +538,28 @@ def check_type_and_values_of_alt_name_dict(alt_name_dict, alt_id_col, df):
     return None
 
 
+def ensure_ridge_is_scalar_or_none(ridge):
+    """
+    Ensures that `ridge` is either None or a scalar value. Raises a helpful
+    TypeError otherwise.
+
+    Parameters
+    ----------
+    ridge : int, float, long, or None.
+        Scalar value or None, determining the L2-ridge regression penalty.
+
+    Returns
+    -------
+    None.
+    """
+    if (ridge is not None) and not isinstance(ridge, (int, float, long)):
+        msg_1 = "ridge should be None or an int, float, or long."
+        msg_2 = "The passed value of ridge had type: {}".format(type(ridge))
+        raise TypeError(msg_1 + msg_2)
+
+    return None
+
+
 def create_design_matrix(long_form,
                          specification_dict,
                          alt_id_col,

@@ -1,15 +1,15 @@
 """
-This module provides a general "estimate" function for the pylogit's logit-type
-discrete choice models.
-
-I'm thinking it may be best to have an estimation_obj class that is composed
-of attributes from the general model class but creates the various convenience
-functions needed for model estimation...
+This module provides a general "estimate" function and EstimationObj class for
+pylogit's logit-type discrete choice models.
 """
+import sys
+import time
 import numpy as np
+from scipy.optimize import minimize
 
 import choice_calcs as cc
 from choice_calcs import create_matrix_block_indices
+from choice_tools import ensure_ridge_is_scalar_or_none
 
 
 class EstimationObj(object):
@@ -19,14 +19,11 @@ class EstimationObj(object):
 
     Parameters
     ----------
-    alt_id_vector
-    choice_vector
+    model_obj
     mapping_res
-    intercept_ref_pos
-    shape_ref_pos
-    zero_vector
     ridge
-    constrained_pos
+    zero_vector
+    split_params
 
     Attributes
     ----------
@@ -38,7 +35,6 @@ class EstimationObj(object):
                  model_obj,
                  mapping_dict,
                  ridge,
-                 constrained_pos,
                  zero_vector,
                  split_params):
         # Store pointers to needed objects
@@ -48,17 +44,23 @@ class EstimationObj(object):
         self.intercept_ref_pos = model_obj.intercept_ref_position
         self.shape_ref_pos = model_obj.shape_ref_position
 
-        # Store pointers to the mapping matrices
-        for key in mapping_dict:
-            setattr(self, key, mapping_dict[key])
+        # Explicitly store pointers to the mapping matrices
+        self.rows_to_obs = mapping_dict["rows_to_obs"]
+        self.rows_to_alts = mapping_dict["rows_to_alts"]
+        self.chosen_row_to_obs = mapping_dict["chosen_row_to_obs"]
+
+        # Perform necessary checking of ridge parameter here!
+        ensure_ridge_is_scalar_or_none(ridge)
 
         # Store the ridge parameter
         self.ridge = ridge
 
         # Store the constrained parameters
-        self.constrained_pos = constrained_pos
+        # Commented out because this feature is not yet supported in logit-type
+        # models.
+        # self.constrained_pos = constrained_pos
 
-        # Store reference to what 'zero vector' for this model / dataset
+        # Store reference to what 'zero vector' is for this model / dataset
         self.zero_vector = zero_vector
 
         # Store the function that separates the various portions of the
@@ -81,14 +83,18 @@ class EstimationObj(object):
 
         return None
 
+    def convenience_split_params(self, params):
+        """
+        Splits parameter vector into shape, intercept, and index parameters.
+        """
+        return self.split_params(params, self.rows_to_alts, self.design)
+
     def convenience_calc_probs(self, params):
         """
         Calculates the probabilities of the chosen alternative, and the long
         format probabilities for this model and dataset.
         """
-        shapes, intercepts, betas = self.split_params(params,
-                                                      self.rows_to_alts,
-                                                      self.design)
+        shapes, intercepts, betas = self.convenience_split_params(params)
 
         prob_args = [betas,
                      self.design,
@@ -109,9 +115,7 @@ class EstimationObj(object):
         """
         Calculates the log-likelihood for this model and dataset.
         """
-        shapes, intercepts, betas = self.split_params(params,
-                                                      self.rows_to_alts,
-                                                      self.design)
+        shapes, intercepts, betas = self.convenience_split_params(params)
 
         args = [betas,
                 self.design,
@@ -132,9 +136,7 @@ class EstimationObj(object):
         """
         Calculates the gradient of the log-likelihood for this model / dataset.
         """
-        shapes, intercepts, betas = self.split_params(params,
-                                                      self.rows_to_alts,
-                                                      self.design)
+        shapes, intercepts, betas = self.convenience_split_params(params)
 
         args = [betas,
                 self.design,
@@ -156,16 +158,13 @@ class EstimationObj(object):
         """
         Calculates the hessian of the log-likelihood for this model / dataset.
         """
-        shapes, intercepts, betas = self.split_params(params,
-                                                      self.rows_to_alts,
-                                                      self.design)
+        shapes, intercepts, betas = self.convenience_split_params(params)
 
         args = [betas,
                 self.design,
                 self.alt_id_vector,
                 self.rows_to_obs,
                 self.rows_to_alts,
-                self.choice_vector,
                 self.utility_transform,
                 self.calc_dh_d_shape,
                 self.calc_dh_dv,
@@ -177,6 +176,46 @@ class EstimationObj(object):
 
         return cc.calc_hessian(*args)
 
+    def convenience_calc_fisher_approx(self, params):
+        """
+        Calculates the BHHH approximation of the Fisher Information Matrix for
+        this model / dataset.
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        args = [betas,
+                self.design,
+                self.alt_id_vector,
+                self.rows_to_obs,
+                self.rows_to_alts,
+                self.choice_vector,
+                self.utility_transform,
+                self.calc_dh_d_shape,
+                self.calc_dh_dv,
+                self.calc_dh_d_alpha,
+                intercepts,
+                shapes,
+                self.ridge]
+
+        return cc.calc_fisher_info_matrix(*args)
+
+    def calc_neg_log_likelihood_and_neg_gradient(self, params):
+        """
+        Calculates and returns the negative of the log-likelihood and the
+        negative of the gradient. This function is used as the objective
+        function in scipy.optimize.minimize.
+        """
+        neg_log_likelihood = -1 * self.convenience_calc_log_likelihood(params)
+        neg_gradient = -1 * self.convenience_calc_gradient(params)
+
+        return neg_log_likelihood, neg_gradient
+
+    def calc_neg_hessian(self, params):
+        """
+        Calculate and return the negative of the hessian for this model and
+        dataset.
+        """
+        return -1 * self.convenience_calc_hessian(params)
 
 
 def calc_individual_chi_squares(residuals,
@@ -233,17 +272,11 @@ def calc_rho_and_rho_bar_squared(final_log_likelihood,
 
 
 def calc_and_store_post_estimation_results(results_dict,
-                                           convenient_split_param_vec,
-                                           convenient_calc_probs,
-                                           convenient_calc_gradient,
-                                           convenient_calc_hessian,
-                                           convenient_calc_fisher,
-                                           rows_to_obs,
-                                           choice_vector):
+                                           estimator):
     """
     Calculates and stores post-estimation results that require the use of the
     systematic utility transformation functions or the various derivative
-    functions.
+    functions. Note that this function is only valid for logit-type models.
 
     Parameters
     ----------
@@ -251,32 +284,7 @@ def calc_and_store_post_estimation_results(results_dict,
         This dictionary should be the dictionary returned from
         scipy.optimize.minimize. In particular, it should have the following
         keys: `["fun", "x", "log_likelihood_null"]`.
-    convenient_split_param_vec : callable.
-        Should accept the final array of estimated parameters. Should return
-        a tuple of `(nest_params, shape_params, intercept_params,
-        utility_coefs)`.
-    convenient_calc_probs : callable.
-        Should accept the final array of estimated parameters. Should return
-        a tuple containing the probability of the chosen alternative and the
-        probability of each row of the current long-format dataframe.
-    convenient_calc_gradient : callable.
-        Should accept the final array of estimated parameters. Should return
-        the gradient of the log-likelihood, given the current dataset.
-    convenient_calc_hessian : callable.
-        Should accept the final array of estimated parameters. Should return
-        the hessian of the log-likelihood, given the current dataset.
-    convenient_calc_fisher : callable.
-        Should accept the final array of estimated parameters. Should return
-        the BHHH approximation to the Fisher Information Matrix.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
+    estimator
 
     Returns
     -------
@@ -306,28 +314,27 @@ def calc_and_store_post_estimation_results(results_dict,
     final_params = results_dict["x"]
 
     # Add the estimated parameters to the results dictionary
-    split_res = convenient_split_param_vec(final_params)
-    results_dict["nest_params"] = split_res[0]
-    results_dict["shape_params"] = split_res[1]
-    results_dict["intercept_params"] = split_res[2]
-    results_dict["utility_coefs"] = split_res[3]
+    split_res = estimator.convenience_split_params(final_params)
+    results_dict["nest_params"] = None
+    results_dict["shape_params"] = split_res[0]
+    results_dict["intercept_params"] = split_res[1]
+    results_dict["utility_coefs"] = split_res[2]
 
     # Get the probability of the chosen alternative and long_form probabilities
-    prob_of_chosen_alts, long_probs = convenient_calc_probs(final_params)
-    results_dict["chosen_probs"] = prob_of_chosen_alts
+    chosen_probs, long_probs = estimator.convenience_calc_probs(final_params)
+    results_dict["chosen_probs"] = chosen_probs
     results_dict["long_probs"] = long_probs
 
     #####
     # Calculate the residuals and individual chi-square values
     #####
     # Calculate the residual vector
-    residuals = choice_vector - long_probs
+    residuals = estimator.choice_vector - long_probs
     results_dict["residuals"] = residuals
 
     # Calculate the observation specific chi-squared components
-    results_dict["ind_chi_squareds"] = calc_individual_chi_squares(residuals,
-                                                                   long_probs,
-                                                                   rows_to_obs)
+    args = [residuals, long_probs, estimator.rows_to_obs]
+    results_dict["ind_chi_squareds"] = calc_individual_chi_squares(*args)
 
     # Calculate and store the rho-squared and rho-bar-squared
     log_likelihood_null = results_dict["log_likelihood_null"]
@@ -341,25 +348,68 @@ def calc_and_store_post_estimation_results(results_dict,
     # Calculate the gradient, hessian, and BHHH approximation to the fisher
     # info matrix
     #####
-    results_dict["final_gradient"] = convenient_calc_gradient(final_params)
-    results_dict["final_hessian"] = convenient_calc_hessian(final_params)
-    results_dict["fisher_info"] = convenient_calc_fisher(final_params)
+    results_dict["final_gradient"] =\
+        estimator.convenience_calc_gradient(final_params)
+    results_dict["final_hessian"] =\
+        estimator.convenience_calc_hessian(final_params)
+    results_dict["fisher_info"] =\
+        estimator.convenience_calc_fisher_approx(final_params)
 
     return results_dict
 
-def estimate():
-    # Check validity of the provided arguments
+
+def estimate(init_values,
+             estimator,
+             method,
+             loss_tol,
+             gradient_tol,
+             maxiter,
+             print_results,
+             **kwargs):
+    # Perform preliminary calculations
+    log_likelihood_at_zero =\
+        estimator.convenience_calc_log_likelihood(estimator.zero_vector)
+
+    initial_log_likelihood =\
+        estimator.convenience_calc_log_likelihood(init_values)
+
+    if print_results:
+        # Print the log-likelihood at zero
+        print("Log-likelihood at zero: {:,.4f}".format(log_likelihood_at_zero))
+
+        # Print the log-likelihood at the starting values
+        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
+        sys.stdout.flush()
 
     # Estimate the actual parameters of the model
+    start_time = time.time()
+
+    results = minimize(estimator.calc_neg_log_likelihood_and_neg_gradient,
+                       init_values,
+                       method=method,
+                       jac=True,
+                       hess=estimator.calc_neg_hessian,
+                       tol=loss_tol,
+                       options={'gtol': gradient_tol,
+                                "maxiter": maxiter},
+                       **kwargs)
+
+    # Stop timing the estimation process and report the timing results
+    end_time = time.time()
+    if print_results:
+        elapsed_sec = (end_time - start_time)
+        elapsed_min = elapsed_sec / 60.0
+        if elapsed_min > 1.0:
+            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
+        else:
+            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
+        print("Final log-likelihood: {:,.4f}".format(-1 * results["fun"]))
+        sys.stdout.flush()
+
+    # Store the log-likelihood at zero
+    results["log_likelihood_null"] = log_likelihood_at_zero
 
     # Calculate and store the post-estimation results
-    calc_and_store_post_estimation_results(results,
-                                           convenient_split_param_vec,
-                                           convenient_calc_probs,
-                                           convenient_calc_gradient,
-                                           convenient_calc_hessian,
-                                           convenient_calc_fisher,
-                                           rows_to_obs,
-                                           choice_vector)
+    results = calc_and_store_post_estimation_results(results, estimator)
 
     return results
