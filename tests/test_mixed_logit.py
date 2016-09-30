@@ -179,6 +179,26 @@ class MixedLogitCalculations(unittest.TestCase):
 
         return None
 
+    def test_mnl_utility_transform(self):
+        """
+        Ensure that the mnl_utility_transform works as expected, returning the
+        input systematic utilities in a form with 2D arrays.
+        """
+        array_1 = np.arange(3)
+        array_2 = np.arange(6).reshape((3, 2))
+
+        for array in [array_1, array_2]:
+            results = mixed_logit.mnl_utility_transform(array)
+            self.assertEqual(len(results.shape), 2)
+            self.assertEqual(results.shape,
+                             (array.shape[0], min(len(array.shape), 2)))
+            if len(array.shape) == 1:
+                npt.assert_allclose(array, results[:, 0])
+            else:
+                npt.assert_allclose(array, results)
+
+        return None
+
     def test_create_expanded_design_for_mixing(self):
         # Create the 3d design matrix using the mixed logit functions
         # Note the [2] denotes the fact that the column at position 2 of the
