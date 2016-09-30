@@ -51,9 +51,9 @@ def mnl_utility_transform(sys_utility_array, *args, **kwargs):
 
     Returns
     -------
-        systematic_utilities : ndarray
-            2D numpy array of systematic utilities. If `sys_utility_array` is
-            2D, then `sys_utility_array` is returned. Else, returns
+        systematic_utilities : 2D ndarray.
+            The input systematic utilities. If `sys_utility_array` is 2D, then
+            `sys_utility_array` is returned. Else, returns
             `sys_utility_array[:, None]`.
     """
     # Return a 2D array of systematic utility values
