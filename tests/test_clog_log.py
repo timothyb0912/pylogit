@@ -15,6 +15,10 @@ from scipy.sparse import diags
 
 import pylogit.clog_log as clog
 
+# Use the following to always show the warnings
+np.seterr(all='warn')
+warnings.simplefilter("always")
+
 
 class GenericTestCase(unittest.TestCase):
     """
@@ -102,7 +106,7 @@ class HelperFuncTests(GenericTestCase):
     """
     Defines tests for the 'helper' functions for estimating the Clog-log model.
     """
-    def test_split_param_vec(self):
+    def test_split_param_vec_with_intercepts(self):
         """
         Ensures that split_param_vec returns (None, intercepts, index_coefs)
         when called from within clog_log.py.
@@ -118,6 +122,24 @@ class HelperFuncTests(GenericTestCase):
             self.assertEqual(len(item.shape), 1)
         npt.assert_allclose(split_results[1], self.fake_intercepts)
         npt.assert_allclose(split_results[2], self.fake_betas)
+
+        return None
+
+    def test_split_param_vec_without_intercepts(self):
+        """
+        Ensures that split_param_vec returns (None, intercepts, index_coefs)
+        when called from within clog_log.py.
+        """
+        # Store the results of split_param_vec()
+        split_results = clog.split_param_vec(self.fake_betas,
+                                             self.fake_rows_to_alts,
+                                             self.fake_design)
+        # Check for expected results.
+        self.assertIsInstance(split_results[2], np.ndarray)
+        self.assertEqual(len(split_results[2].shape), 1)
+        npt.assert_allclose(split_results[2], self.fake_betas)
+        self.assertIsNone(split_results[0])
+        self.assertIsNone(split_results[1])
 
         return None
 
@@ -160,6 +182,58 @@ class HelperFuncTests(GenericTestCase):
         self.assertIsInstance(transform_results, np.ndarray)
         self.assertEqual(transform_results.shape, (test_index.shape[0], 1))
         npt.assert_allclose(transform_results, correct_results)
+
+        return None
+
+    def test_clog_utility_transform_2d(self):
+        """
+        Ensures that `_clog_utility_transform()` returns correct results
+        """
+        # Note that this test index will test the function at values that
+        # lead to underflow, standard calculations, and overflow. Note
+        # overflow basically happens when the index is >= 3.7
+        test_index = np.array([0, 4, -200, -1, 10])
+        test_index_2d = np.concatenate([test_index[:, None],
+                                        test_index[:, None]],
+                                       axis=1)
+
+        # Calculate the results "by hand", excluding the outside intercepts
+        correct_results = np.array([np.log(np.exp(1) - 1),
+                                    np.exp(4),
+                                    -1 * clog.max_comp_value,
+                                    np.log(np.exp(np.exp(-1)) - 1),
+                                    np.exp(10)])[:, None]
+
+        # Account for the outside intercepts
+        correct_results += np.array([self.fake_intercepts[0],
+                                     self.fake_intercepts[1],
+                                     0,
+                                     self.fake_intercepts[0],
+                                     0])[:, None]
+
+        # Create 2d array of intercepts
+        intercepts_2d = np.concatenate([self.fake_intercepts[:, None],
+                                        self.fake_intercepts[:, None]],
+                                       axis=1)
+
+        # Bundle the remaining args and kwargs
+        args = [self.fake_df[self.alt_id_col].values,
+                self.fake_rows_to_alts,
+                None,
+                intercepts_2d]
+        kwargs = {"intercept_ref_pos": self.fake_intercept_ref_pos}
+
+        # Get the results of _clog_utiilty_transform()
+        transform_results = clog._cloglog_utility_transform(test_index_2d,
+                                                            *args,
+                                                            **kwargs)
+
+        # Check to make sure the results are as expected
+        self.assertIsInstance(transform_results, np.ndarray)
+        self.assertEqual(transform_results.shape, (test_index.shape[0], 2))
+        for col in [0, 1]:
+            npt.assert_allclose(correct_results,
+                                transform_results[:, col][:, None])
 
         return None
 
@@ -391,5 +465,88 @@ class ChoiceObjectTests(GenericTestCase):
             # kwarg with an incorrect number of parameters
             self.assertRaises(ValueError, self.base_clog.fit_mle,
                               *fit_args, **kwargs)
+
+        return None
+
+    def test_keyword_argument_constructor_in_fit_mle(self):
+        """
+        Ensures that the init_vals object can be successfully created from the
+        various init_shapes, init_intercepts, and init_coefs arguments.
+        """
+        # Create a variable for the arguments to the fit_mle function.
+        # Note `None` is the argument passed when using the init_shapes,
+        # init_intercepts and init_coefs keyword arguments.
+        fit_args = [None]
+
+        # Create base set of incorrect kwargs for fit_mle function (note the
+        # ridge is the thing that is incorrect)
+        kwargs_1 = {"init_intercepts": self.fake_intercepts,
+                    "init_coefs": self.fake_betas,
+                    "ridge": "foo",
+                    "print_res": False}
+
+        kwargs_2 = {"init_coefs": self.fake_betas,
+                    "ridge": "foo",
+                    "print_res": False}
+
+        # Test to ensure that the raised Value Err is printed when using
+        # either of these two kwargs
+        for kwargs in [kwargs_1, kwargs_2]:
+            self.assertRaisesRegexp(TypeError,
+                                    "ridge",
+                                    self.base_clog.fit_mle,
+                                    *fit_args,
+                                    **kwargs)
+
+        return None
+
+    def test_insufficient_initial_values_in_fit_mle(self):
+        """
+        Ensure that value errors are raised if neither init_vals OR
+        init_coefs are passed.
+        """
+        # Create a variable for the arguments to the fit_mle function.
+        # Note `None` is the argument passed when using the init_shapes,
+        # init_intercepts and init_coefs keyword arguments.
+        fit_args = [None]
+
+        # Create base set of incorrect kwargs for fit_mle function
+        kwargs = {"init_intercepts": self.fake_intercepts,
+                  "init_coefs": None,
+                  "print_res": False}
+
+        kwargs_2 = {"init_intercepts": None,
+                    "init_coefs": None,
+                    "print_res": False}
+
+        for bad_kwargs in [kwargs, kwargs_2]:
+            # Test to ensure that the ValueError when not passing
+            # kwarg with an incorrect number of parameters
+            self.assertRaisesRegexp(ValueError,
+                                    "must pass init_coefs",
+                                    self.base_clog.fit_mle,
+                                    *fit_args, **bad_kwargs)
+
+        return None
+
+    def test_init_vals_length_error_in_fit_mle(self):
+        """
+        Ensures that ValueError is raised if init_vals has wrong length.
+        """
+        # Note there is only one beta, so we can't go lower than zero betas.
+        original_intercept_ref_position = self.fake_intercept_ref_pos
+        for intercept_ref_position in [None, original_intercept_ref_position]:
+            self.base_clog.intercept_ref_position = intercept_ref_position
+            for i in [1, -1]:
+                # This will ensure we have too many or too few intercepts
+                num_coefs = self.fake_betas.shape[0] + i
+
+                # Test to ensure that the ValueError when using an
+                # init_intercepts kwarg with an incorrect number of parameters
+                self.assertRaisesRegexp(ValueError,
+                                        "dimension",
+                                        self.base_clog.fit_mle,
+                                        np.arange(num_coefs),
+                                        print_res=False)
 
         return None

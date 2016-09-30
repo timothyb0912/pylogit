@@ -284,6 +284,64 @@ class ChoiceObjectTests(GenericTestCase):
 
         return None
 
+    def test_keyword_argument_constructor_in_fit_mle(self):
+        """
+        Ensures that the init_vals object can be successfully created from the
+        various init_shapes, init_intercepts, and init_coefs arguments.
+        """
+        # Create a variable for the arguments to the fit_mle function.
+        # Note `None` is the argument passed when using the init_shapes,
+        # init_intercepts and init_coefs keyword arguments.
+        fit_args = [None]
+
+        # Create base set of incorrect kwargs for fit_mle function (note the
+        # ridge is the thing that is incorrect)
+        kwargs_1 = {"init_shapes": self.fake_shapes,
+                    "init_intercepts": self.fake_intercepts,
+                    "init_coefs": self.fake_betas,
+                    "ridge": "foo",
+                    "print_res": False}
+
+        kwargs_2 = {"init_shapes": self.fake_shapes,
+                    "init_coefs": self.fake_betas,
+                    "ridge": "foo",
+                    "print_res": False}
+
+        # Test to ensure that the raised ValueError is printed when using
+        # either of these two kwargs. This ensures that we were able to
+        # create the init_vals object since the ridge error check is after
+        # the creation of this argurment.
+        for kwargs in [kwargs_1, kwargs_2]:
+            self.assertRaisesRegexp(TypeError,
+                                    "ridge",
+                                    self.model_obj.fit_mle,
+                                    *fit_args,
+                                    **kwargs)
+
+        return None
+
+    def test_init_vals_length_error_in_fit_mle(self):
+        """
+        Ensures that ValueError is raised if init_vals has wrong length.
+        """
+        # Note there is only one beta, so we can't go lower than zero betas.
+        original_intercept_ref_position = self.fake_intercept_ref_pos
+        for intercept_ref_position in [None, original_intercept_ref_position]:
+            self.model_obj.intercept_ref_position = intercept_ref_position
+            for i in [1, -1]:
+                # This will ensure we have too many or too few intercepts
+                num_coefs = self.fake_betas.shape[0] + i
+
+                # Test to ensure that the ValueError when using an
+                # init_intercepts kwarg with an incorrect number of parameters
+                self.assertRaisesRegexp(ValueError,
+                                        "dimension",
+                                        self.model_obj.fit_mle,
+                                        np.arange(num_coefs),
+                                        print_res=False)
+
+        return None
+
 
 # As before, inheritance is used to share the setUp method.
 class HelperFuncTests(GenericTestCase):
@@ -291,7 +349,7 @@ class HelperFuncTests(GenericTestCase):
     Defines tests for the 'helper' functions for estimating the Asymmetric
     Logit model.
     """
-    def test_split_param_vec(self):
+    def test_split_param_vec_with_intercepts(self):
         """
         Ensures that split_param_vec returns (shapes, intercepts, index_coefs)
         when called from within asym_logit.py.
@@ -306,6 +364,27 @@ class HelperFuncTests(GenericTestCase):
             self.assertEqual(len(item.shape), 1)
         npt.assert_allclose(split_results[0], self.fake_shapes)
         npt.assert_allclose(split_results[1], self.fake_intercepts)
+        npt.assert_allclose(split_results[2], self.fake_betas)
+
+        return None
+
+    def test_split_param_vec_without_intercepts(self):
+        """
+        Ensures that split_param_vec returns (shapes, intercepts, index_coefs)
+        when called from within asym_logit.py.
+        """
+        # Store the results of split_param_vec()
+        shapes_and_betas = np.concatenate([self.fake_shapes,
+                                           self.fake_betas])
+        split_results = asym.split_param_vec(shapes_and_betas,
+                                             self.fake_rows_to_alts,
+                                             self.fake_design)
+        # Check for expected results.
+        for idx in [0, 2]:
+            self.assertIsInstance(split_results[idx], np.ndarray)
+            self.assertEqual(len(split_results[idx].shape), 1)
+        npt.assert_allclose(split_results[0], self.fake_shapes)
+        self.assertIsNone(split_results[1])
         npt.assert_allclose(split_results[2], self.fake_betas)
 
         return None
@@ -486,6 +565,146 @@ class HelperFuncTests(GenericTestCase):
             self.assertEqual(test_results.shape[1], correct_results.shape[1])
             self.assertEqual(test_results.shape[0], correct_results.shape[0])
             npt.assert_allclose(test_results, correct_results)
+
+        return None
+
+    def test_asym_utility_transform_2d(self):
+        """
+        Ensures that `_asym_utility_transform()` returns correct results when
+        called with 2 dimensional systematic utility arrays and 
+        """
+        # Create a set of systematic utilities that will test the function for
+        # correct calculations, for proper dealing with overflow, and for
+        # proper dealing with underflow.
+
+        # The first and third elements tests general calculation.
+        # The second element of index_array should lead to the transformation
+        # equaling the 'natural' shape parameter for alternative 2.
+        # The fourth element should test what happens with underflow and should
+        # lead to max_comp_value.
+        # The fifth element should test what happens with overflow and should
+        # lead to -1.0 * max_comp_value
+        index_array = np.array([1, 0, -1, 1e400, -1e400])
+        index_array_2d = np.concatenate([index_array[:, None],
+                                         index_array[:, None]],
+                                        axis=1)
+
+        # Create 2d array of shapes
+        shapes_2d = np.concatenate([self.fake_shapes[:, None],
+                                    self.fake_shapes[:, None]],
+                                   axis=1)
+
+        # Create 2d array of intercepts
+        intercepts_2d = np.concatenate([self.fake_intercepts[:, None],
+                                        self.fake_intercepts[:, None]],
+                                       axis=1)
+
+        # We can use a the following array of the shape parameters to test
+        # the underflow capabilities with respect to the shape
+        # parameters.
+        test_shapes_2 = np.array([-800, 0])
+        test_shapes_2_2d = np.concatenate([test_shapes_2[:, None],
+                                           test_shapes_2[:, None]],
+                                          axis=1)
+
+        test_shapes_3 = np.array([800, 0])
+        test_shapes_3_2d = np.concatenate([test_shapes_3[:, None],
+                                           test_shapes_3[:, None]],
+                                          axis=1)
+
+        # Figure out the value of the 'natural' shape parameters
+        natural_shapes_2 = asym._convert_eta_to_c(test_shapes_2,
+                                                  self.fake_shape_ref_pos)
+        natural_shapes_3 = asym._convert_eta_to_c(test_shapes_3,
+                                                  self.fake_shape_ref_pos)
+
+        # Crerate the array of expected results when using shape parameters
+        # of 'normal' magnitudes.
+        intercept_1 = self.fake_intercepts[0]
+        intercept_2 = self.fake_intercepts[1]
+        intercept_3 = 0
+
+        result_1 = (intercept_1 +
+                    np.log(self.natural_shapes[0]) * (1 - index_array[0]))
+
+        result_2 = intercept_2 + np.log(self.natural_shapes[1])
+
+        # Note the division by 2 is due to the 'J - 1' term. See the original
+        # definition of the transformation.
+        result_3 = (intercept_3 +
+                    np.log(self.natural_shapes[2]) -
+                    np.log((1 - self.natural_shapes[2]) / 2) * index_array[2])
+
+        expected_results = np.array([result_1,
+                                     result_2,
+                                     result_3,
+                                     asym.max_comp_value + intercept_1,
+                                     - asym.max_comp_value])[:, None]
+
+        # Crerate the array of expected results when using shape parameters
+        # of 'abnormally' small magnitudes.
+        # Note the division by 2 is due to the 'J - 1' term. See the original
+        # definition of the transformation.
+        result_2_2 = intercept_2 + np.log(natural_shapes_2[1])
+        result_3_2 = (intercept_3 +
+                      np.log(natural_shapes_2[2]) -
+                      np.log((1 - natural_shapes_2[2]) / 2) * index_array[2])
+
+        # Note the '0' comes from (1-1) * ln(shape)
+        expected_results_2 = np.array([0 + intercept_1,
+                                       result_2_2,
+                                       result_3_2,
+                                       asym.max_comp_value + intercept_1,
+                                       -asym.max_comp_value])[:, None]
+
+        # Create the array of expected results when using shape parameters
+        # of 'abnormally' large magnitudes.
+        result_2_3 = intercept_2 + np.log(natural_shapes_3[1])
+        result_3_3 = (intercept_3 +
+                      np.log(natural_shapes_3[2]) -
+                      np.log((1 - natural_shapes_3[2]) / 2) * index_array[2])
+
+        expected_results_3 = np.array([0 + intercept_1,
+                                       result_2_3,
+                                       result_3_3,
+                                       0 + intercept_1,
+                                       -asym.max_comp_value])[:, None]
+
+        #####
+        # Perform various rounds of checking
+        #####
+        # Use the utility transformation function, round_1
+        alt_id_vals = self.fake_df[self.alt_id_col].values
+        args = [index_array_2d,
+                alt_id_vals,
+                self.fake_rows_to_alts,
+                shapes_2d,
+                intercepts_2d]
+        kwargs = {"intercept_ref_pos": self.fake_intercept_ref_pos,
+                  "shape_ref_position": self.fake_shape_ref_pos}
+        func_results = asym._asym_utility_transform(*args, **kwargs)
+
+        # Use the utility transformation function, round_2
+        args[3] = test_shapes_2_2d
+        func_results_2 = asym._asym_utility_transform(*args, **kwargs)
+
+        # Use the utility transformation function, round_3
+        args[3] = test_shapes_3_2d
+        func_results_3 = asym._asym_utility_transform(*args, **kwargs)
+
+        # Check the correctness of the results
+        all_results = [(func_results, expected_results),
+                       (func_results_2, expected_results_2),
+                       (func_results_3, expected_results_3)]
+
+        for pos, (test_results, correct_results) in enumerate(all_results):
+            self.assertIsInstance(test_results, np.ndarray)
+            self.assertEqual(len(test_results.shape), 2)
+            self.assertEqual(test_results.shape[1], 2)
+            self.assertEqual(test_results.shape[0], correct_results.shape[0])
+            for col in [0, 1]:
+                npt.assert_allclose(test_results[:, col][:, None],
+                                    correct_results)
 
         return None
 
