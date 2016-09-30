@@ -393,6 +393,43 @@ def create_calc_dh_d_alpha(estimator):
 
 
 class ClogEstimator(EstimationObj):
+    """
+    Estimation Object used to enforce uniformity in the estimation process
+    across the various logit-type models.
+
+    Parameters
+    ----------
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
+
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
+    ridge : int, float, long, or None.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    """
     def set_derivatives(self):
         self.calc_dh_dv = create_calc_dh_dv(self)
         self.calc_dh_d_alpha = create_calc_dh_d_alpha(self)
@@ -621,31 +658,31 @@ class MNCL(base_mcm.MNDC_Model):
 
         # Create init_vals from init_coefs and init_intercepts if those
         # arguments are passed to the function and init_vals is None.
-        if init_vals is None and any([x is not None for x in [init_intercepts,
-                                                              init_coefs]]):
+        if init_vals is None and init_coefs is not None:
             ##########
             # Check the integrity of the parameter kwargs
             ##########
             num_alternatives = rows_to_alts.shape[1]
-            try:
-                assert init_intercepts.shape[0] == (num_alternatives - 1)
-            except AssertionError:
-                msg = "init_intercepts has length {} but should have length {}"
-                raise ValueError(msg.format(init_intercepts.shape,
-                                            num_alternatives - 1))
-
             try:
                 assert init_coefs.shape[0] == self.design.shape[1]
             except AssertionError:
                 msg = "init_coefs has length {} but should have length {}."
                 raise ValueError(msg.format(init_coefs.shape,
                                             self.design.shape[1]))
-
             if init_intercepts is not None:
+                if init_intercepts.shape[0] != (num_alternatives - 1):
+                    msg = "init_intercepts has length {} "
+                    msg_2 = "but it should have length {}"
+                    raise ValueError(msg.format(init_intercepts.shape) +
+                                     msg_2.format(num_alternatives - 1))
+
                 init_vals = np.concatenate((init_intercepts,
                                             init_coefs), axis=0)
             else:
                 init_vals = init_coefs
+        elif init_vals is None and init_coefs is None:
+            msg = "If init_vals is None, then users must pass init_coefs "
+            raise ValueError(msg)
 
         # Create the estimation object
         zero_vector = np.zeros(init_vals.shape)

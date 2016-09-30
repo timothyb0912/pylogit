@@ -35,12 +35,6 @@ min_comp_value = 1e-300
 max_exp = 700
 min_exp = -700
 
-# Alias necessary functions from the base multinomial choice model module
-general_log_likelihood = cc.calc_log_likelihood
-general_gradient = cc.calc_gradient
-general_calc_probabilities = cc.calc_probabilities
-general_hessian = cc.calc_hessian
-
 # Create a warning string that will be issued if ridge regression is performed.
 _msg = "NOTE: An L2-penalized regression is being performed. The "
 _msg_2 = "reported standard errors and robust standard errors "
@@ -509,6 +503,43 @@ def create_calc_dh_d_alpha(estimator):
 
 
 class UnevenEstimator(EstimationObj):
+    """
+    Estimation Object used to enforce uniformity in the estimation process
+    across the various logit-type models.
+
+    Parameters
+    ----------
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
+
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
+    ridge : int, float, long, or None.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    """
     def set_derivatives(self):
         self.calc_dh_dv = create_calc_dh_dv(self)
         self.calc_dh_d_alpha = create_calc_dh_d_alpha(self)
@@ -789,8 +820,8 @@ class MNUL(base_mcm.MNDC_Model):
                                             init_intercepts,
                                             init_coefs), axis=0)
             else:
-                init_vals = np.concatenate((init_shapes,
-                                            init_coefs), axis=0)
+                init_vals = np.concatenate((init_shapes, init_coefs), axis=0)
+
         elif init_vals is None:
             msg = "If init_vals is None, then users must pass both init_coefs "
             msg_2 = "and init_shapes."

@@ -16,7 +16,6 @@ from scipy.sparse import diags
 
 import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
-import choice_model_em
 from estimation import EstimationObj
 from estimation import estimate
 
@@ -100,6 +99,43 @@ def _mnl_transform_deriv_alpha(*args, **kwargs):
 
 
 class MNLEstimator(EstimationObj):
+    """
+    Estimation Object used to enforce uniformity in the estimation process
+    across the various logit-type models.
+
+    Parameters
+    ----------
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
+
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
+    ridge : int, float, long, or None.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    """
     def set_derivatives(self):
         # Pre-calculate the derivative of the transformation vector with
         # respect to the vector of systematic utilities
