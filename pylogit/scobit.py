@@ -20,6 +20,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import EstimationObj
 from estimation import estimate
+from display_names import model_type_to_display_name
 
 # Define the boundary values which are not to be exceeded during computation
 max_comp_value = 1e300
@@ -684,7 +685,7 @@ class MNSL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type="Multinomial Scobit Model")
+                                   model_type=model_type_to_display_name["Scobit"])
 
         ##########
         # Store the utility transform function

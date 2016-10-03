@@ -110,7 +110,8 @@ def create_expanded_design_for_mixing(design,
     draw_list : list of 2D ndarrays.
         All numpy arrays should have the same number of columns (`num_draws`)
         and the same number of rows (`num_mixers`). All elements of the numpy
-        arrays should be ints, floats, or longs.
+        arrays should be ints, floats, or longs. Should have as many elements
+        as there are lements in `mixing_pos`.
     mixing_pos : list of ints.
         Each element should denote a column in design whose associated index
         coefficient is being treated as a random variable.
@@ -206,6 +207,9 @@ def calc_choice_sequence_probs(prob_array,
     -------
     See `return_type` kwarg.
     """
+    if return_type not in [None, 'all']:
+        raise ValueError("return_type must be None or 'all'.")
+
     log_chosen_prob_array = choice_vec[:, None] * np.log(prob_array)
     # Create a 2D array with shape (num_mixing_units, num_random_draws)
     # Each element will be the log of the probability of the sequence of
@@ -225,8 +229,6 @@ def calc_choice_sequence_probs(prob_array,
         return sequence_probs
     elif return_type == 'all':
         return sequence_probs, expanded_sequence_probs
-    else:
-        raise ValueError("return_type must be None or 'all'.")
 
 
 def calc_mixed_log_likelihood(params,
@@ -321,8 +323,6 @@ def calc_mixed_log_likelihood(params,
         return log_likelihood
     else:
         return log_likelihood - ridge * np.square(params).sum()
-
-    return log_likelihood
 
 
 def calc_mixed_logit_gradient(params,

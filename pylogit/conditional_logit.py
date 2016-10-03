@@ -18,6 +18,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import EstimationObj
 from estimation import estimate
+from display_names import model_type_to_display_name
 
 # Create a variable that will be printed if there is a non-fatal error
 # in the MNL class construction
@@ -255,7 +256,7 @@ class MNL(base_mcm.MNDC_Model):
                                   choice_col,
                                   specification,
                                   names=names,
-                                  model_type="Multinomial Logit Model")
+                                  model_type=model_type_to_display_name["MNL"])
 
         # Store the utility transform function
         self.utility_transform = _mnl_utility_transform

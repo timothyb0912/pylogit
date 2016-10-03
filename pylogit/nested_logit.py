@@ -17,6 +17,7 @@ from scipy.optimize import minimize
 import nested_choice_calcs as nc
 import base_multinomial_cm_v2 as base_mcm
 from choice_tools import ensure_ridge_is_scalar_or_none
+from display_names import model_type_to_display_name
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = nc.calc_nested_log_likelihood
@@ -619,6 +620,7 @@ class NestedLogit(base_mcm.MNDC_Model):
         ##########
         # Carry out the common instantiation process for all choice models
         ##########
+        model_name = model_type_to_display_name["Nested Logit"]
         super(NestedLogit, self).__init__(data,
                                           alt_id_col,
                                           obs_id_col,
@@ -626,7 +628,7 @@ class NestedLogit(base_mcm.MNDC_Model):
                                           specification,
                                           names=names,
                                           nest_spec=nest_spec,
-                                          model_type="Nested Logit Model")
+                                          model_type=model_name)
 
         ##########
         # Store the utility transform function

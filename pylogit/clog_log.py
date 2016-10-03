@@ -20,6 +20,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import EstimationObj
 from estimation import estimate
+from display_names import model_type_to_display_name
 
 # Define the boundary values which are not to be exceeded ducing computation
 max_comp_value = 1e300
@@ -566,7 +567,7 @@ class MNCL(base_mcm.MNDC_Model):
                                    intercept_ref_pos=intercept_ref_pos,
                                    names=names,
                                    intercept_names=intercept_names,
-                                   model_type="Multinomial Clog-log Model")
+                                   model_type=model_type_to_display_name["Cloglog"])
 
         # Store the utility transform function
         self.utility_transform = partial(_cloglog_utility_transform,

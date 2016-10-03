@@ -29,6 +29,7 @@ from choice_tools import get_dataframe_from_data
 from choice_tools import create_design_matrix
 from choice_tools import create_long_form_mappings
 from choice_tools import ensure_ridge_is_scalar_or_none
+from display_names import model_type_to_display_name
 
 # Alias necessary functions for model estimation
 general_calc_probabilities = cc.calc_probabilities
@@ -417,13 +418,14 @@ class MixedLogit(base_mcm.MNDC_Model):
                 raise ValueError(msg)
 
         # Carry out the common instantiation process for all choice models
+        model_name = model_type_to_display_name["Mixed Logit"]
         super(MixedLogit, self).__init__(data,
                                          alt_id_col,
                                          obs_id_col,
                                          choice_col,
                                          specification,
                                          names=names,
-                                         model_type="Mixed Logit Model",
+                                         model_type=model_name,
                                          mixing_id_col=mixing_id_col,
                                          mixing_vars=mixing_vars)
 

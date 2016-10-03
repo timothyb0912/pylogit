@@ -24,6 +24,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import EstimationObj
 from estimation import estimate
+from display_names import model_type_to_display_name
 
 # Define the boundary values which are not to be exceeded ducing computation
 max_comp_value = 1e300
@@ -859,7 +860,6 @@ class MNAL(base_mcm.MNDC_Model):
             raise ValueError(_shape_ref_msg)
 
         # Carry out the common instantiation process for all choice models
-        model_title = "Multinomial Asymmetric Logit Model"
         super(MNAL, self).__init__(data,
                                    alt_id_col,
                                    obs_id_col,
@@ -870,7 +870,7 @@ class MNAL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type=model_title)
+                                   model_type=model_type_to_display_name["Asym"])
 
         # Store the utility transform function
         self.utility_transform = partial(_asym_utility_transform,

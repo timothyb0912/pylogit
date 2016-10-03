@@ -26,6 +26,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import EstimationObj
 from estimation import estimate
+from display_names import model_type_to_display_name
 
 
 # Define the boundary values which are not to be exceeded during computation
@@ -681,7 +682,7 @@ class MNUL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type="Multinomial Uneven Logit Model")
+                                   model_type=model_type_to_display_name["Uneven"])
 
         # Store the utility transform function
         self.utility_transform = partial(_uneven_utility_transform,
