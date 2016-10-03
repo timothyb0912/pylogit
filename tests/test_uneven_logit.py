@@ -159,8 +159,10 @@ class ChoiceObjectTests(GenericTestCase):
         # Create a variable for the fit_mle function's kwargs.
         # The print_res = False arguments are to make sure strings aren't
         # printed to the console unnecessarily.
+        # The method kwarg is so we test the use of the hessian
         kwargs = {"ridge": 0.5,
-                  "print_res": False}
+                  "print_res": True,
+                  "method": "newton-cg"}
 
         # Test to make sure that the ridge warning message is printed when
         # using the ridge keyword argument
