@@ -203,14 +203,22 @@ class MixedLogitCalculations(unittest.TestCase):
         # Create the 3d design matrix using the mixed logit functions
         # Note the [2] denotes the fact that the column at position 2 of the
         # fake design matrix is being treated as having random coefficients
-        args = (self.fake_design,
+        args = [self.fake_design,
                 [self.fake_draws],
                 [2],
-                self.fake_rows_to_mixers)
+                self.fake_rows_to_mixers]
         actual_3d_design = mlc.create_expanded_design_for_mixing(*args)
         # Actually perform the tests
         npt.assert_allclose(actual_3d_design[:, 0, :], self.fake_design_draw_1)
         npt.assert_allclose(actual_3d_design[:, 1, :], self.fake_design_draw_2)
+
+        # Ensre that a ValueError is raised if we execute
+        # mlc.create_expanded_design_for_mixing with the wrong arguments.
+        args[2] = [2, 3, 4]
+        self.assertRaisesRegexp(ValueError,
+                                "mixing_pos",
+                                mlc.create_expanded_design_for_mixing,
+                                *args)
 
         return None
 
@@ -288,10 +296,10 @@ class MixedLogitCalculations(unittest.TestCase):
                                         ind_2_sequence_probs])
 
         # Calculate the actual, simulated sequence probabilities
-        args = (fake_prob_array,
+        args = [fake_prob_array,
                 self.choice_array,
                 self.fake_rows_to_mixers,
-                "all")
+                "all"]
         prob_results = mlc.calc_choice_sequence_probs(*args)
         actual_sequence_probs = prob_results[0]
         sequence_probs_given_draws = prob_results[1]
@@ -304,6 +312,14 @@ class MixedLogitCalculations(unittest.TestCase):
         self.assertEqual(len(sequence_probs_given_draws.shape), 2)
         npt.assert_allclose(actual_sequence_probs, fake_sequence_probs)
 
+        # Ensure that the approrpriate error is raised if we execute
+        # calc_choice_sequence_probs() with incorrect arguments.
+        args[-1] = "foo"
+        self.assertRaisesRegexp(ValueError,
+                                "return_type",
+                                mlc.calc_choice_sequence_probs,
+                                *args)
+
         return None
 
     def test_calc_mixed_log_likelihood(self):
@@ -313,20 +329,29 @@ class MixedLogitCalculations(unittest.TestCase):
         true_log_likelihood = np.log(func_sequence_probs).sum()
 
         # Calculate the log-likelihood according to the function being tested
-        args_2 = (self.fake_betas_ext,
+        args_2 = [self.fake_betas_ext,
                   self.fake_design_3d,
                   self.alternative_ids,
                   self.fake_rows_to_obs,
                   self.fake_rows_to_alts,
                   self.fake_rows_to_mixers,
                   self.choice_array,
-                  temp_utility_transform)
+                  temp_utility_transform]
 
         function_log_likelihood = mlc.calc_mixed_log_likelihood(*args_2)
 
         # Perform the required test. AmostEqual used to avoid any issues with
         # floating point representations of numbers.
         self.assertAlmostEqual(true_log_likelihood, function_log_likelihood)
+
+        # Test the function with the ridge penalty
+        ridge = 0.5
+        args_2.append(ridge)
+        true_log_like_w_ridge = (true_log_likelihood -
+                                 ridge * (self.fake_betas_ext**2).sum())
+        new_func_log_like = mlc.calc_mixed_log_likelihood(*args_2)
+        self.assertAlmostEqual(true_log_like_w_ridge, new_func_log_like)
+
         return None
 
     def test_calc_mixed_logit_gradient(self):
@@ -358,14 +383,14 @@ class MixedLogitCalculations(unittest.TestCase):
         gradient *= 1.0 / self.prob_array.shape[1]
 
         # Get the gradient from the function being tested
-        args = (self.fake_betas_ext,
+        args = [self.fake_betas_ext,
                 self.fake_design_3d,
                 self.alternative_ids,
                 self.fake_rows_to_obs,
                 self.fake_rows_to_alts,
                 self.fake_rows_to_mixers,
                 self.choice_array,
-                temp_utility_transform)
+                temp_utility_transform]
         function_gradient = mlc.calc_mixed_logit_gradient(*args)
 
         # Perform the test.
@@ -374,6 +399,14 @@ class MixedLogitCalculations(unittest.TestCase):
         self.assertEqual(function_gradient.shape[0],
                          self.fake_design_3d.shape[2])
         npt.assert_allclose(gradient, function_gradient)
+
+        # Test the function with a ridge penalty
+        ridge = 0.5
+        ridge_penalty = 2 * ridge * self.fake_betas_ext
+        new_gradient = gradient - ridge_penalty
+        args.append(ridge)
+        new_func_gradient = mlc.calc_mixed_logit_gradient(*args)
+        npt.assert_allclose(new_gradient, new_func_gradient)
 
         return None
 
@@ -416,14 +449,14 @@ class MixedLogitCalculations(unittest.TestCase):
         bhhh_matrix *= -1
 
         # Get the bhhh matrix from the function being tested
-        args = (self.fake_betas_ext,
+        args = [self.fake_betas_ext,
                 self.fake_design_3d,
                 self.alternative_ids,
                 self.fake_rows_to_obs,
                 self.fake_rows_to_alts,
                 self.fake_rows_to_mixers,
                 self.choice_array,
-                temp_utility_transform)
+                temp_utility_transform]
         function_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
 
         # Perform the test.
@@ -434,6 +467,14 @@ class MixedLogitCalculations(unittest.TestCase):
         self.assertEqual(function_bhhh.shape[1],
                          self.fake_design_3d.shape[2])
         npt.assert_allclose(bhhh_matrix, function_bhhh)
+
+        # Perform the test with the ridge coefficient
+        ridge = 0.5
+        args.append(ridge)
+        func_res2 = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
+        new_neg_bhhh = bhhh_matrix + 2 * ridge
+
+        npt.assert_allclose(new_neg_bhhh, func_res2)
 
         return None
 
@@ -670,5 +711,42 @@ class MixedLogitCalculations(unittest.TestCase):
                          new_design.shape[0])
         assert not np.allclose(wrong_pred_probs, function_pred_probs)
         npt.assert_allclose(true_pred_probs, function_pred_probs)
+
+        return None
+
+    def test_calc_neg_log_likelihood_and_neg_gradient(self):
+        """
+        Ensure that the constrained_pos arguement works, and that we can
+        correctly calculate the negative log-likelihood and negative gradient.
+        """
+        # Get the gradient from the function being tested
+        args = [self.fake_betas_ext,
+                self.fake_design_3d,
+                self.alternative_ids,
+                self.fake_rows_to_obs,
+                self.fake_rows_to_alts,
+                self.fake_rows_to_mixers,
+                self.choice_array,
+                temp_utility_transform]
+
+        # Specify a constrained position argument
+        constrained_pos = [0]
+
+        # Get the actual gradient and actual log-likelihood
+        original_gradient = mlc.calc_mixed_logit_gradient(*args)
+        for idx in constrained_pos:
+            original_gradient[idx] = 0
+        actual_log_likelihood = mlc.calc_mixed_log_likelihood(*args)
+
+        expected_neg_gradient = -1 * original_gradient
+        expected_log_likelihood = -1 * actual_log_likelihood
+
+        # Get the results from the function of interest
+        args_2 = [x for x in args]
+        args_2.append(constrained_pos)
+        func_results = mlc.calc_neg_log_likelihood_and_neg_gradient(*args_2)
+        func_neg_log_like, func_neg_gradient = func_results
+        self.assertAlmostEqual(func_neg_log_like, expected_log_likelihood)
+        npt.assert_allclose(func_neg_gradient, expected_neg_gradient)
 
         return None
