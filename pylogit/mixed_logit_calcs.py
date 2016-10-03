@@ -127,13 +127,11 @@ def create_expanded_design_for_mixing(design,
         matrix corresponding to a given draw of the random variables being
         mixed over.
     """
-    try:
-        assert len(mixing_pos) == len(draw_list)
-    except AssertionError as e:
-        print("mixing_pos ==")
-        print(mixing_pos)
-        print("len(draw_list) == {}".format(len(draw_list)))
-        raise e
+    if len(mixing_pos) != len(draw_list):
+        msg = "mixing_pos == {}".format(mixing_pos)
+        msg_2 = "len(draw_list) == {}".format(len(draw_list))
+        raise ValueError(msg + "\n" + msg_2)
+
     # Determine the number of draws being used. Note the next line assumes an
     # equal number of draws from each random coefficient's mixing distribution.
     num_draws = draw_list[0].shape[1]

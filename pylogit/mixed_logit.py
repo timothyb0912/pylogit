@@ -28,6 +28,7 @@ import mixed_logit_calcs as mlc
 from choice_tools import get_dataframe_from_data
 from choice_tools import create_design_matrix
 from choice_tools import create_long_form_mappings
+from choice_tools import ensure_ridge_is_scalar_or_none
 
 # Alias necessary functions for model estimation
 general_calc_probabilities = cc.calc_probabilities
@@ -160,12 +161,7 @@ def _estimate(init_values,
         raise e
 
     # Make sure the ridge regression parameter is None or a real scalar
-    try:
-        assert ridge is None or isinstance(ridge, (int, float, long))
-    except AssertionError as e:
-        print("ridge should be None or an int, float, or long.")
-        print("The passed value of ridge had type: {}".format(type(ridge)))
-        raise e
+    ensure_ridge_is_scalar_or_none(ridge)
 
     # Get the required mapping matrices for estimation and prediction
     rows_to_obs = mapping_matrices["rows_to_obs"]

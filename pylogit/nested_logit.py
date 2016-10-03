@@ -16,6 +16,7 @@ from scipy.optimize import minimize
 
 import nested_choice_calcs as nc
 import base_multinomial_cm_v2 as base_mcm
+from choice_tools import ensure_ridge_is_scalar_or_none
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = nc.calc_nested_log_likelihood
@@ -325,25 +326,18 @@ def _estimate(init_values,
     num_nests = rows_to_nests.shape[1]
     num_index_coefs = design_matrix.shape[1]
 
-    try:
-        assumed_param_dimensions = num_index_coefs + num_nests
-        assert init_values.shape[0] == assumed_param_dimensions
-    except AssertionError as e:
-        print("The initial values are of the wrong dimension")
-        print("It should be of dimension {}".format(assumed_param_dimensions))
-        print("But instead it has dimension {}".format(init_values.shape[0]))
-        raise e
+    assumed_param_dimensions = num_index_coefs + num_nests
+    if init_values.shape[0] != assumed_param_dimensions:
+        msg = "The initial values are of the wrong dimension"
+        msg_1 = "It should be of dimension {}".format(assumed_param_dimensions)
+        msg_2 = "But instead it has dimension {}".format(init_values.shape[0])
+        raise ValueError(msg + msg_1 + msg_2)
 
     ##########
     # Check other function arguments for 'correctness'
     ##########
     # Make sure the ridge regression parameter is None or a real scalar
-    try:
-        assert ridge is None or isinstance(ridge, (int, float, long))
-    except AssertionError as e:
-        print("ridge should be None or an int, float, or long.")
-        print("The passed value of ridge had type: {}".format(type(ridge)))
-        raise e
+    ensure_ridge_is_scalar_or_none(ridge)
 
     ##########
     # Begin the model estimation process.
