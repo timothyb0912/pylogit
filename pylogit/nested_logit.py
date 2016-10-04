@@ -32,6 +32,32 @@ _msg_5 = "***WILL BE INCORRECT***."
 _ridge_warning_msg = _msg_3 + _msg_4 + _msg_5
 
 
+# Create a function that will identify degenerate nests
+def identify_degenerate_nests(nest_spec):
+    """
+    Identify the nests within nest_spec that are degenerate, i.e. those nests
+    with only a single alternative within the nest.
+
+    Parameters
+    ----------
+    nest_spec : OrderedDict.
+        Keys are strings that define the name of the nests. Values are lists
+        of alternative ids, denoting which alternatives belong to which nests.
+        Each alternative id must only be associated with a single nest!
+
+    Returns
+    -------
+    list.
+        Will contain the positions in the list of keys from `nest_spec` that
+        are degenerate.
+    """
+    degenerate_positions = []
+    for pos, key in enumerate(nest_spec):
+        if len(nest_spec[key]) == 1:
+            degenerate_positions.append(pos)
+    return degenerate_positions
+
+
 # Define a functionto split the combined parameter array into nest coefficients
 # and index coefficients.
 def split_params(all_params, rows_to_nests):
@@ -709,11 +735,10 @@ class NestedLogit(base_mcm.MNDC_Model):
         chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
         # Determine the degenerate nests whose nesting parameters are to be
-        # constrained to one
-        fixed_params = []
-        for pos, key in enumerate(self.nest_spec):
-            if len(self.nest_spec[key]) == 1:
-                fixed_params.append(pos)
+        # constrained to one. Note the following functions assume that the nest
+        # parameters are placed before the index coefficients.
+        fixed_params = identify_degenerate_nests(self.nest_spec)
+
         # Include the user specified parameters that are to be constrained to
         # their initial values
         if constrained_pos is not None:
