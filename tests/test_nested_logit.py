@@ -37,6 +37,15 @@ class NestedLogitTests(unittest.TestCase):
                                                        [1, 0],
                                                        [0, 1],
                                                        [1, 0]]))
+
+        # Create a sparse matrix that maps the rows of the design matrix to the
+        # observatins
+        self.fake_rows_to_obs = csr_matrix(np.array([[1, 0],
+                                                     [1, 0],
+                                                     [1, 0],
+                                                     [0, 1],
+                                                     [0, 1]]))
+
         # Create the fake design matrix with columns denoting ASC_1, ASC_2, X
         self.fake_design = np.array([[1, 0, 1],
                                      [0, 1, 2],
@@ -55,6 +64,14 @@ class NestedLogitTests(unittest.TestCase):
         self.alt_id_col = "alt_id"
         self.obs_id_col = "obs_id"
         self.choice_col = "choice"
+
+        # Create a sparse matrix that maps the chosen rows of the design
+        # matrix to the observatins
+        self.fake_chosen_rows_to_obs = csr_matrix(np.array([[0, 0],
+                                                            [1, 0],
+                                                            [0, 0],
+                                                            [0, 0],
+                                                            [0, 1]]))
 
         # Create the index specification  and name dictionaryfor the model
         self.fake_specification = OrderedDict()
@@ -188,3 +205,53 @@ class NestedLogitTests(unittest.TestCase):
                               *fit_args, **kwargs)
 
         return None
+
+    def test_invalid_init_vals_length_in_estimate(self):
+        """
+        Ensure that when _estimate() is called, with an init_values argument
+        that is of an incorrect length, a ValueError is raised.
+        """
+        # Specify the arguments that are needed for the _estimate() function
+        estimate_args = [None,
+                         self.fake_design,
+                         self.fake_df[self.choice_col].values,
+                         self.fake_rows_to_obs,
+                         self.fake_rows_to_nests,
+                         self.fake_chosen_rows_to_obs,
+                         None]
+
+        # Test that the desired error is raised
+        for i in [-1, 1]:
+            init_values = np.arange(self.fake_betas.shape[0] + i)
+            estimate_args[0] = init_values
+
+            self.assertRaisesRegexp(ValueError,
+                                    "values are of the wrong dimension",
+                                    nl._estimate,
+                                    *estimate_args)
+
+        return None
+
+    def test_identify_degenerate_nests(self):
+        """
+        Ensure that `identify_degenerate_nests` returns the correct list when
+        using nest specifications that do and do not contain degenerate nests.
+        """
+        good_spec = OrderedDict()
+        good_spec["Nest 1"] = [1, 2]
+        good_spec["Nest 2"] = [3, 4]
+
+        bad_spec = OrderedDict()
+        bad_spec["Nest 1"] = [1]
+        bad_spec["Nest 2"] = [2, 3]
+        bad_spec["Nest 3"] = [4]
+
+        # Alias the function being tested
+        func = nl.identify_degenerate_nests
+
+        # Test the function
+        self.assertEqual([], func(good_spec))
+        self.assertEqual([0, 2], func(bad_spec))
+
+        return None
+
