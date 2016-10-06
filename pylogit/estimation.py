@@ -15,6 +15,177 @@ from choice_tools import ensure_ridge_is_scalar_or_none
 class EstimationObj(object):
     """
     Generic class for storing pointers to data and methods needed in the
+    estimation process. Defines the basic Estimation Object and the various
+    methods and attributes that such an object should have. Will be subclassed
+    in order to serve the needs of the various types of estimated models.
+
+    Parameters
+    ----------
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
+
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
+    ridge : int, float, long, or None.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    constrained_pos : list or None, optional.
+        Denotes the positions of the array of estimated parameters that are
+        not to change from their initial values. If a list is passed, the
+        elements are to be integers where no such integer is greater than
+        `init_values.size.` Default == None.
+    """
+    def __init__(self,
+                 model_obj,
+                 mapping_dict,
+                 ridge,
+                 zero_vector,
+                 split_params,
+                 constrained_pos=None):
+        # Store pointers to needed objects
+        self.alt_id_vector = model_obj.alt_IDs
+        self.choice_vector = model_obj.choices
+        self.design = model_obj.design
+        self.intercept_ref_pos = model_obj.intercept_ref_position
+        self.shape_ref_pos = model_obj.shape_ref_position
+
+        # Explicitly store pointers to the mapping matrices
+        self.rows_to_obs = mapping_dict["rows_to_obs"]
+        self.rows_to_alts = mapping_dict["rows_to_alts"]
+        self.chosen_row_to_obs = mapping_dict["chosen_row_to_obs"]
+        self.rows_to_nests = mapping_dict["rows_to_nests"]
+        self.rows_to_mixers = mapping_dict["rows_to_mixers"]
+
+        # Perform necessary checking of ridge parameter here!
+        ensure_ridge_is_scalar_or_none(ridge)
+
+        # Store the ridge parameter
+        self.ridge = ridge
+
+        # Store the constrained parameters
+        # Commented out because this feature is not yet supported in logit-type
+        # models.
+        self.constrained_pos = constrained_pos
+
+        # Store reference to what 'zero vector' is for this model / dataset
+        self.zero_vector = zero_vector
+
+        # Store the function that separates the various portions of the
+        # parameters being estimated (shape parameters, outside intercepts,
+        # utility coefficients)
+        self.split_params = split_params
+
+        # Store the function that calculates the transformation of the index
+        self.utility_transform = model_obj.utility_transform
+
+        # Get the block matrix indices for the hessian matrix.
+        self.block_matrix_idxs = create_matrix_block_indices(self.rows_to_obs)
+
+        # Note the following attributes should be set to actual callables that
+        # calculate the necessary derivatives in the classes that inherit from
+        # EstimationObj
+        self.calc_dh_dv = lambda *args: None
+        self.calc_dh_d_alpha = lambda *args: None
+        self.calc_dh_d_shape = lambda *args: None
+
+        return None
+
+    def convenience_split_params(self, params):
+        """
+        Splits parameter vector into shape, intercept, and index parameters.
+        """
+        return self.split_params(params, self.rows_to_alts, self.design)
+
+    def convenience_calc_probs(self, params):
+        """
+        Calculates the probabilities of the chosen alternative, and the long
+        format probabilities for this model and dataset.
+        """
+        msg = "Method should be defined by descendant classes"
+        raise NotImplementedError(msg)
+
+        return None
+
+    def convenience_calc_log_likelihood(self, params):
+        """
+        Calculates the log-likelihood for this model and dataset.
+        """
+        msg = "Method should be defined by descendant classes"
+        raise NotImplementedError(msg)
+
+        return None
+
+    def convenience_calc_gradient(self, params):
+        """
+        Calculates the gradient of the log-likelihood for this model / dataset.
+        """
+        msg = "Method should be defined by descendant classes"
+        raise NotImplementedError(msg)
+
+        return None
+
+    def convenience_calc_hessian(self, params):
+        """
+        Calculates the hessian of the log-likelihood for this model / dataset.
+        """
+        msg = "Method should be defined by descendant classes"
+        raise NotImplementedError(msg)
+
+        return None
+
+    def convenience_calc_fisher_approx(self, params):
+        """
+        Calculates the BHHH approximation of the Fisher Information Matrix for
+        this model / dataset.
+        """
+        msg = "Method should be defined by descendant classes"
+        raise NotImplementedError(msg)
+
+        return None
+
+    def calc_neg_log_likelihood_and_neg_gradient(self, params):
+        """
+        Calculates and returns the negative of the log-likelihood and the
+        negative of the gradient. This function is used as the objective
+        function in scipy.optimize.minimize.
+        """
+        neg_log_likelihood = -1 * self.convenience_calc_log_likelihood(params)
+        neg_gradient = -1 * self.convenience_calc_gradient(params)
+
+        return neg_log_likelihood, neg_gradient
+
+    def calc_neg_hessian(self, params):
+        """
+        Calculate and return the negative of the hessian for this model and
+        dataset.
+        """
+        return -1 * self.convenience_calc_hessian(params)
+
+class LogitTypeEstimator(EstimationObj):
+    """
+    Generic class for storing pointers to data and methods needed in the
     estimation process.
 
     Parameters
@@ -62,57 +233,14 @@ class EstimationObj(object):
                  ridge,
                  zero_vector,
                  split_params):
-        # Store pointers to needed objects
-        self.alt_id_vector = model_obj.alt_IDs
-        self.choice_vector = model_obj.choices
-        self.design = model_obj.design
-        self.intercept_ref_pos = model_obj.intercept_ref_position
-        self.shape_ref_pos = model_obj.shape_ref_position
 
-        # Explicitly store pointers to the mapping matrices
-        self.rows_to_obs = mapping_dict["rows_to_obs"]
-        self.rows_to_alts = mapping_dict["rows_to_alts"]
-        self.chosen_row_to_obs = mapping_dict["chosen_row_to_obs"]
-
-        # Perform necessary checking of ridge parameter here!
-        ensure_ridge_is_scalar_or_none(ridge)
-
-        # Store the ridge parameter
-        self.ridge = ridge
-
-        # Store the constrained parameters
-        # Commented out because this feature is not yet supported in logit-type
-        # models.
-        # self.constrained_pos = constrained_pos
-
-        # Store reference to what 'zero vector' is for this model / dataset
-        self.zero_vector = zero_vector
-
-        # Store the function that separates the various portions of the
-        # parameters being estimated (shape parameters, outside intercepts,
-        # utility coefficients)
-        self.split_params = split_params
-
-        # Store the function that calculates the transformation of the index
-        self.utility_transform = model_obj.utility_transform
-
-        # Get the block matrix indices for the hessian matrix.
-        self.block_matrix_idxs = create_matrix_block_indices(self.rows_to_obs)
-
-        # Note the following attributes should be set to actual callables that
-        # calculate the necessary derivatives in the classes that inherit from
-        # EstimationObj
-        self.calc_dh_dv = lambda *args: None
-        self.calc_dh_d_alpha = lambda *args: None
-        self.calc_dh_d_shape = lambda *args: None
+        super(LogitTypeEstimator, self).__init__(model_obj,
+                                                 mapping_dict,
+                                                 ridge,
+                                                 zero_vector,
+                                                 split_params)
 
         return None
-
-    def convenience_split_params(self, params):
-        """
-        Splits parameter vector into shape, intercept, and index parameters.
-        """
-        return self.split_params(params, self.rows_to_alts, self.design)
 
     def convenience_calc_probs(self, params):
         """
@@ -309,7 +437,16 @@ def calc_and_store_post_estimation_results(results_dict,
         This dictionary should be the dictionary returned from
         scipy.optimize.minimize. In particular, it should have the following
         keys: `["fun", "x", "log_likelihood_null"]`.
-    estimator
+    estimator : an instance of the EstimationObj class.
+        Should contain the following attributes or methods:
+          
+          - convenience_split_params
+          - convenience_calc_probs
+          - convenience_calc_gradient
+          - convenience_calc_hessian
+          - convenience_calc_fisher_approx
+          - choice_vector
+          - rows_to_obs
 
     Returns
     -------
