@@ -419,8 +419,9 @@ class MixedLogit(base_mcm.MNDC_Model):
 
         if "intercept_ref_pos" in kwargs:
             if kwargs["intercept_ref_pos"] is not None:
-                msg = "All Mixed Logit intercepts should be in the index."
-                raise ValueError(msg)
+                msg = "All Mixed Logit intercepts should be in the index. "
+                msg_2 = "intercept_ref_pos should be None."
+                raise ValueError(msg + msg_2)
 
         # Carry out the common instantiation process for all choice models
         model_name = model_type_to_display_name["Mixed Logit"]
