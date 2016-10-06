@@ -174,6 +174,9 @@ class EstimationObj(object):
         neg_log_likelihood = -1 * self.convenience_calc_log_likelihood(params)
         neg_gradient = -1 * self.convenience_calc_gradient(params)
 
+        if self.constrained_pos is not None:
+            neg_gradient[self.constrained_pos] = 0
+
         return neg_log_likelihood, neg_gradient
 
     def calc_neg_hessian(self, params):
