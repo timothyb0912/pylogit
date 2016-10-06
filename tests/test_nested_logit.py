@@ -254,4 +254,3 @@ class NestedLogitTests(unittest.TestCase):
         self.assertEqual([0, 2], func(bad_spec))
 
         return None
-
