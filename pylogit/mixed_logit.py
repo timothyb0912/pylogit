@@ -30,6 +30,8 @@ from choice_tools import create_design_matrix
 from choice_tools import create_long_form_mappings
 from choice_tools import ensure_ridge_is_scalar_or_none
 from display_names import model_type_to_display_name
+from estimation import EstimationObj
+from estimation import estimate
 
 # Alias necessary functions for model estimation
 general_calc_probabilities = cc.calc_probabilities
@@ -41,6 +43,23 @@ general_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit
 _msg_1 = "The Mixed MNL Model has no shape parameters. "
 _msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
 _shape_ignore_msg = _msg_1 + _msg_2
+
+
+def split_param_vec(beta, *args, **kwargs):
+    """
+    Parameters
+    ----------
+    beta:       1D numpy array. All elements should by ints, floats, or
+                longs. Should have 1 element for each utility
+                coefficient being estimated (i.e. num_features).
+
+    Returns
+    -------
+    tuple.
+        `(None, None, beta)`. This function is merely for compatibility with
+        the other choice model files.
+    """
+    return None, None, beta
 
 
 def mnl_utility_transform(sys_utility_array, *args, **kwargs):
@@ -67,23 +86,15 @@ def mnl_utility_transform(sys_utility_array, *args, **kwargs):
     return systematic_utilities
 
 
-def _estimate(init_values,
-              design_3d,
-              alt_id_vector,
-              choice_vector,
-              mapping_matrices,
-              constrained_pos=None,
-              print_results=True,
-              method='newton-cg',
-              loss_tol=1e-06,
-              gradient_tol=1e-06,
-              maxiter=1000,
-              ridge=None,
-              **kwargs):
+def check_length_of_init_values(design_3d, init_values):
     """
+    Ensures that the initial values are of the correct length, given the design
+    matrix that they will be dot-producted with. Raises a ValueError if that is
+    not the case, and provides a useful error message to users.
+
     Parameters
     ----------
-    init_vals : 1D ndarray.
+    init_values : 1D ndarray.
         1D numpy array of the initial values to start the optimizatin process
         with. There should be one value for each index coefficient being
         estimated.
@@ -91,235 +102,229 @@ def _estimate(init_values,
         2D numpy array with one row per observation per available alternative.
         There should be one column per index coefficient being estimated. All
         elements should be ints, floats, or longs.
-    alt_id_vector : 1D ndarray.
-        All elements should be ints. There should be one row per observation
-        per available alternative for the given observation. Elements denote
-        the alternative corresponding to the given row of the design matrix.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
-    constrained_pos : list or None, optional.
-        Denotes the positions of the array of estimated parameters that are not
-        to change from their initial values. If a list is passed, the elements
-        are to be integers where no such integer is is greater than
-        init_values.size.
-    print_res : bool, optional.
-        Determines whether the timing and initial and final log likelihood
-        results will be printed as they they are determined. Default = True.
-    method : str, optional.
-        Should be a valid string which can be passed to
-        scipy.optimize.minimize. Determines the optimization algorithm which is
-        used for this problem. Default = 'newton-cg'.
-    loss_tol : float, optional.
-        Determines the tolerance on the difference in objective function values
-        from one iteration to the next which is needed to determine
-        convergence. Default = 1e-06.
-    gradient_tol : float, optional.
-        Determines the tolerance on the difference in gradient values from one
-        iteration to the next which is needed to determine convergence.
-        Default = 1e-06.
-    maxiter : int, optional.
-        Determines the maximum number of iterations used by the optimizer.
-        Default = 1000.
-    ridge : int, float, long, or None. OPTIONAl.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization. Default = None.
 
     Returns
     -------
-    results : dict.
-        Result dictionary returned by `scipy.optimize.minimize`. In addition to
-        the generic key-value pairs that are returned, `results` will have the
-        folowing keys:
-        - "final_log_likelihood"
-        - "long_probs"
-        - "residuals"
-        - "ind_chi_squareds"
-        - "simulated_sequence_probs"
-        - "expanded_sequence_probs"
-        - "utility_coefs"
-        - "shape_params"
-        - "intercept_params"
-        - "nest_params"
-        - "log_likelihood_null"
-        - "rho_squared"
-        - "rho_bar_squared"
-        - "final_gradient"
-        - "final_hessian"
-        - "fisher_info"
-        - "constrained_pos"
-
+    None.
     """
-    # Make sure we have the correct dimensions for the initial parameter values
-    try:
-        assert init_values.shape[0] == design_3d.shape[2]
-    except AssertionError as e:
-        print("The initial values are of the wrong dimension")
-        print("They should be of dimension {}".format(design_3d.shape[2]))
-        raise e
+    if init_values.shape[0] != design_3d.shape[2]:
+        msg_1 = "The initial values are of the wrong dimension. "
+        msg_2 = "They should be of dimension {}".format(design_3d.shape[2])
+        raise ValueError(msg_1 + msg_2)
 
-    # Make sure the ridge regression parameter is None or a real scalar
-    ensure_ridge_is_scalar_or_none(ridge)
+    return None
 
-    # Get the required mapping matrices for estimation and prediction
-    rows_to_obs = mapping_matrices["rows_to_obs"]
-    rows_to_alts = mapping_matrices["rows_to_alts"]
-    rows_to_mixers = mapping_matrices["rows_to_mixers"]
-    chosen_row_to_obs = mapping_matrices["chosen_row_to_obs"]
 
-    # Calculate the null-log-likelihood
-    log_like_args = (np.zeros(design_3d.shape[2]),
-                     design_3d,
-                     alt_id_vector,
-                     rows_to_obs,
-                     rows_to_alts,
-                     rows_to_mixers,
-                     choice_vector,
-                     mnl_utility_transform)
-    log_likelihood_at_zero = general_log_likelihood(*log_like_args,
-                                                    ridge=ridge)
+def add_mixl_specific_results_to_estimation_res(estimator, results_dict):
+    """
+    Stores particular items in the results dictionary that are unique to mixed
+    logit-type models. In particular, this function calculates and adds
+    `sequence_probs` and `expanded_sequence_probs` to the results dictionary.
+    The `constrained_pos` object is also stored to the results_dict.
 
-    # Calculate the initial log-likelihood
-    log_like_args = (init_values,
-                     design_3d,
-                     alt_id_vector,
-                     rows_to_obs,
-                     rows_to_alts,
-                     rows_to_mixers,
-                     choice_vector,
-                     mnl_utility_transform)
-    initial_log_likelihood = general_log_likelihood(*log_like_args,
-                                                    ridge=ridge)
-    if print_results:
-        # Print the log-likelihood at zero
-        msg = "Log-likelihood at zero: {:,.4f}"
-        print(msg.format(log_likelihood_at_zero))
+    Parameters
+    ----------
+    estimator : an instance of the MixedEstimator class.
+        Should contain a `choice_vector` attribute that is a 1D ndarray
+        representing the choices made for this model's dataset. Should also
+        contain a `rows_to_mixers` attribute that maps each row of the long
+        format data to a unit of observation that the mixing is being performed
+        over.
+    results_dict : dict.
+        This dictionary should be the dictionary returned from
+        scipy.optimize.minimize. In particular, it should have the following
+        `long_probs` key.
 
-        # Print the log-likelihood at the starting values
-        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
-        sys.stdout.flush()
-
-    # Start timing the estimation process
-    start_time = time.time()
-
-    results = minimize(mlc.calc_neg_log_likelihood_and_neg_gradient,
-                       init_values,
-                       args=(design_3d,
-                             alt_id_vector,
-                             rows_to_obs,
-                             rows_to_alts,
-                             rows_to_mixers,
-                             choice_vector,
-                             mnl_utility_transform,
-                             constrained_pos,
-                             ridge),
-                       method=method,
-                       jac=True,
-                       hess=general_bhhh,
-                       tol=loss_tol,
-                       options={'gtol': gradient_tol,
-                                "maxiter": maxiter})
-
-    # Calculate the final log-likelihood. Note the '-1' is because we minimized
-    # the negative log-likelihood but we want the actual log-likelihood
-    final_log_likelihood = -1 * results["fun"]
-    results["final_log_likelihood"] = final_log_likelihood
-
-    # Stop timing the estimation process and report the timing results
-    end_time = time.time()
-    if print_results:
-        elapsed_sec = (end_time - start_time)
-        elapsed_min = elapsed_sec / 60.0
-        if elapsed_min > 1.0:
-            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
-        else:
-            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
-        print("Final log-likelihood: {:,.4f}".format(final_log_likelihood))
-        sys.stdout.flush()
-
-    # Calculate the predicted probabilities
-    prob_args = (results.x,
-                 design_3d,
-                 alt_id_vector,
-                 rows_to_obs,
-                 rows_to_alts,
-                 mnl_utility_transform)
-    prob_kwargs = {"chosen_row_to_obs": chosen_row_to_obs,
-                   "return_long_probs": True}
-    probability_results = general_calc_probabilities(*prob_args, **prob_kwargs)
-    prob_of_chosen_alternatives, long_probs = probability_results
-    results["long_probs"] = long_probs
-    results["chosen_probs"] = prob_of_chosen_alternatives
-
-    # Calculate the model residuals
-    residuals = choice_vector[:, None] - long_probs
-    results["residuals"] = residuals
-
-    # Calculate the observation specific chi-squared components
-    chi_squared_terms = np.square(residuals) / long_probs
-    results["ind_chi_squareds"] = rows_to_obs.T.dot(chi_squared_terms)
-
+    Returns
+    -------
+    results_dict.
+    """
     # Get the probability of each sequence of choices, given the draws
-    prob_res = mlc.calc_choice_sequence_probs(long_probs,
-                                              choice_vector,
-                                              rows_to_mixers,
+    prob_res = mlc.calc_choice_sequence_probs(results_dict["long_probs"],
+                                              estimator.choice_vector,
+                                              estimator.rows_to_mixers,
                                               return_type='all')
-    results["simulated_sequence_probs"] = prob_res[0]
-    results["expanded_sequence_probs"] = prob_res[1]
+    # Add the various items to the results_dict.
+    results_dict["simulated_sequence_probs"] = prob_res[0]
+    results_dict["expanded_sequence_probs"] = prob_res[1]
+    results_dict["constrained_pos"] = estimator.constrained_pos
 
-    # Store supplementary objects in the estimation results dict
-    results["utility_coefs"] = results.x
-    results["shape_params"] = None
-    results["intercept_params"] = None
-    results["nest_params"] = None
+    return results_dict
 
-    # Store the log-likelihood at zero
-    results["log_likelihood_null"] = log_likelihood_at_zero
 
-    # Calculate and store the rho-squared and rho-bar-squared
-    results["rho_squared"] = 1.0 - (final_log_likelihood /
-                                    log_likelihood_at_zero)
-    results["rho_bar_squared"] = 1.0 - ((final_log_likelihood -
-                                         results.x.shape[0]) /
-                                        log_likelihood_at_zero)
+class MixedEstimator(EstimationObj):
+    """
+    Estimation object for the Mixed Logit Model.
 
-    # Calculate and store the final gradient
-    grad_args = (results.x,
-                 design_3d,
-                 alt_id_vector,
-                 rows_to_obs,
-                 rows_to_alts,
-                 rows_to_mixers,
-                 choice_vector,
-                 mnl_utility_transform)
-    results["final_gradient"] = general_gradient(*grad_args, ridge=ridge)
-    # Calculate and store the final hessian
-    # Note this is somewhat of a hack since we're using the BHHH approximation
-    # to the hessian as the actual hessian, instead of simply using it to
-    # approximate the Huber-White 'robust' asymptotic covariance matrix
-    results["final_hessian"] = general_bhhh(*grad_args, ridge=ridge)
+    Parameters
+    ----------
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
 
-    # Account for the 'constrained' parameters when presenting hessian results
-    if constrained_pos is not None:
-        for idx_val in constrained_pos:
-            results["final_hessian"][idx_val, :] = 0
-            results["final_hessian"][:, idx_val] = 0
-            results["final_hessian"][idx_val, idx_val] = -1
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+          - design_3d
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
+    ridge : int, float, long, or None.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    constrained_pos : list or None, optional.
+        Denotes the positions of the array of estimated parameters that are
+        not to change from their initial values. If a list is passed, the
+        elements are to be integers where no such integer is greater than
+        `init_values.size.` Default == None.
+    """
+    def __init__(self,
+                 model_obj,
+                 mapping_dict,
+                 ridge,
+                 zero_vector,
+                 split_params,
+                 constrained_pos=None):
+        super(MixedEstimator, self).__init__(model_obj,
+                                             mapping_dict,
+                                             ridge,
+                                             zero_vector,
+                                             split_params,
+                                             constrained_pos=constrained_pos)
 
-    # Calculate and store the final fisher information matrix
-    # Use a placeholder value for now, especially since what I was using as
-    # the fisher information matrix I'm now calling the bhhh_approximation
-    # and I'm directly using it to approximate the hessian, as opposed to
-    # simply using this to compute the sandwhich estimator
-    results["fisher_info"] = np.diag(-1 * np.ones(results.x.shape[0]))
+        # Add the 3d design matrix to the object
+        self.design_3d = model_obj.design_3d
 
-    # Record which parameters were constrained during estimation
-    results["constrained_pos"] = constrained_pos
+        return None
 
-    return results
+    def check_length_of_initial_values(self, init_values):
+        """
+        Ensures that the initial values are of the correct length.
+        """
+        return check_length_of_init_values(self.design_3d, init_values)
+
+    def convenience_calc_probs(self, params):
+        """
+        Calculates the probabilities of the chosen alternative, and the long
+        format probabilities for this model and dataset.
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        prob_args = (betas,
+                     self.design_3d,
+                     self.alt_id_vector,
+                     self.rows_to_obs,
+                     self.rows_to_alts,
+                     self.utility_transform)
+        prob_kwargs = {"chosen_row_to_obs": self.chosen_row_to_obs,
+                       "return_long_probs": True}
+        probability_results = general_calc_probabilities(*prob_args,
+                                                         **prob_kwargs)
+
+        return probability_results
+
+    def convenience_calc_log_likelihood(self, params):
+        """
+        Calculates the log-likelihood for this model and dataset.
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        args = [betas,
+                self.design_3d,
+                self.alt_id_vector,
+                self.rows_to_obs,
+                self.rows_to_alts,
+                self.rows_to_mixers,
+                self.choice_vector,
+                self.utility_transform]
+
+        kwargs = {"ridge": self.ridge}
+        log_likelihood = general_log_likelihood(*args, **kwargs)
+
+        return log_likelihood
+
+    def convenience_calc_gradient(self, params):
+        """
+        Calculates the gradient of the log-likelihood for this model / dataset.
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        args = [betas,
+                self.design_3d,
+                self.alt_id_vector,
+                self.rows_to_obs,
+                self.rows_to_alts,
+                self.rows_to_mixers,
+                self.choice_vector,
+                self.utility_transform]
+
+        return general_gradient(*args, ridge=self.ridge)
+
+    def convenience_calc_hessian(self, params):
+        """
+        Calculates the hessian of the log-likelihood for this model / dataset.
+        Note that this function name is INCORRECT with regard to the actual
+        actions performed. The Mixed Logit model uses the BHHH approximation
+        to the Fisher Information Matrix in place of the actual hessian.
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        args = [betas,
+                self.design_3d,
+                self.alt_id_vector,
+                self.rows_to_obs,
+                self.rows_to_alts,
+                self.rows_to_mixers,
+                self.choice_vector,
+                self.utility_transform]
+
+        approx_hess = general_bhhh(*args, ridge=self.ridge)
+
+        # Account for the contrained position when presenting the results of
+        # the approximate hessian.
+        if self.constrained_pos is not None:
+            for idx_val in self.constrained_pos:
+                approx_hess[idx_val, :] = 0
+                approx_hess[:, idx_val] = 0
+                approx_hess[idx_val, idx_val] = -1
+
+        return approx_hess
+
+    def convenience_calc_fisher_approx(self, params):
+        """
+        Calculates the BHHH approximation of the Fisher Information Matrix for
+        this model / dataset. Note that this function name is INCORRECT with
+        regard to the actual actions performed. The Mixed Logit model uses a
+        placeholder for the BHHH approximation of the Fisher Information Matrix
+        because the BHHH approximation is already being used to approximate the
+        hessian.
+
+        This placeholder allows calculation of a value for the 'robust'
+        standard errors, even though such a value is not useful since it is not
+        correct...
+        """
+        shapes, intercepts, betas = self.convenience_split_params(params)
+
+        placeholder_bhhh = np.diag(-1 * np.ones(betas.shape[0]))
+
+        return placeholder_bhhh
 
 
 class MixedLogit(base_mcm.MNDC_Model):
@@ -534,22 +539,33 @@ class MixedLogit(base_mcm.MNDC_Model):
                                                                self.mixing_pos,
                                                                rows_to_mixers)
 
+        # Create the estimation object
+        zero_vector = np.zeros(init_vals.shape)
+        mixl_estimator = MixedEstimator(self,
+                                        mapping_res,
+                                        ridge,
+                                        zero_vector,
+                                        split_param_vec,
+                                        constrained_pos=constrained_pos)
+
+        # Perform one final check on the length of the initial values
+        mixl_estimator.check_length_of_initial_values(init_vals)
+
         # Get the estimation results
-        estimation_res = _estimate(init_vals,
-                                   self.design_3d,
-                                   self.alt_IDs,
-                                   self.choices,
-                                   mapping_res,
-                                   constrained_pos=constrained_pos,
-                                   print_results=print_res,
-                                   method=method,
-                                   loss_tol=loss_tol,
-                                   gradient_tol=gradient_tol,
-                                   maxiter=maxiter,
-                                   ridge=ridge)
+        estimation_res = estimate(init_vals,
+                                  mixl_estimator,
+                                  method,
+                                  loss_tol,
+                                  gradient_tol,
+                                  maxiter,
+                                  print_res)
 
         # Store the estimation results
         self.store_fit_results(estimation_res)
+
+        # Store the mixed logit specific estimation results
+        args = [mixl_estimator, estimation_res]
+        estimation_res = add_mixl_specific_results_to_estimation_res(*args)
 
         return None
 
