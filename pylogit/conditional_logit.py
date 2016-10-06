@@ -16,7 +16,7 @@ from scipy.sparse import diags
 
 import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
-from estimation import EstimationObj
+from estimation import LogitTypeEstimator
 from estimation import estimate
 from display_names import model_type_to_display_name
 
@@ -51,8 +51,7 @@ def split_param_vec(beta, *args, **kwargs):
     -------
     tuple.
         `(None, None, beta)`. This function is merely for compatibility with
-        the other choice model files. It is also needed for the em-algorithm
-        optimizer to work.
+        the other choice model files.
     """
     return None, None, beta
 
@@ -99,7 +98,7 @@ def _mnl_transform_deriv_alpha(*args, **kwargs):
     return None
 
 
-class MNLEstimator(EstimationObj):
+class MNLEstimator(LogitTypeEstimator):
     """
     Estimation Object used to enforce uniformity in the estimation process
     across the various logit-type models.

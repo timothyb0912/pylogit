@@ -22,7 +22,7 @@ from scipy.sparse import diags
 
 import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
-from estimation import EstimationObj
+from estimation import LogitTypeEstimator
 from estimation import estimate
 from display_names import model_type_to_display_name
 
@@ -570,7 +570,7 @@ def create_calc_dh_dv(estimator):
 
     Parameters
     ----------
-    estimator : an instance of the estimation.EstimationObj class.
+    estimator : an instance of the estimation.LogitTypeEstimator class.
         Should contain a `design` attribute that is a 2D ndarray representing
         the design matrix for this model and dataset.
 
@@ -602,7 +602,7 @@ def create_calc_dh_d_shape(estimator):
 
     Parameters
     ----------
-    estimator : an instance of the estimation.EstimationObj class.
+    estimator : an instance of the estimation.LogitTypeEstimator class.
         Should contain a `rows_to_alts` attribute that is a 2D scipy sparse
         matrix that maps the rows of the `design` matrix to the alternatives
         available in this dataset.
@@ -647,7 +647,7 @@ def create_calc_dh_d_alpha(estimator):
 
     Parameters
     ----------
-    estimator : an instance of the estimation.EstimationObj class.
+    estimator : an instance of the estimation.LogitTypeEstimator class.
         Should contain a `rows_to_alts` attribute that is a 2D scipy sparse
         matrix that maps the rows of the `design` matrix to the alternatives
         available in this dataset. Should also contain an `intercept_ref_pos`
@@ -683,7 +683,7 @@ def create_calc_dh_d_alpha(estimator):
     return calc_dh_d_alpha
 
 
-class AsymEstimator(EstimationObj):
+class AsymEstimator(LogitTypeEstimator):
     """
     Estimation Object used to enforce uniformity in the estimation process
     across the various logit-type models.
