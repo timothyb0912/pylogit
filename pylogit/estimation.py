@@ -112,11 +112,29 @@ class EstimationObj(object):
 
         return None
 
-    def convenience_split_params(self, params):
+    def convenience_split_params(self, params, return_all_types=False):
         """
         Splits parameter vector into shape, intercept, and index parameters.
+        
+        Parameters
+        ----------
+        params : 1D ndarray.
+            The array of parameters being estimated or used in calculations.
+        return_all_types : bool, optional.
+            Determines whether or not a tuple of 4 elements will be returned
+            (with one element for the nest, shape, intercept, and index
+            parameters for this model). If False, a tuple of 3 elements will
+            be returned with one element for the shape, intercept, and index
+            parameters.
+
+        Returns
+        -------
+        tuple. Will have 4 or 3 elements based on `return_all_types`.
         """
-        return self.split_params(params, self.rows_to_alts, self.design)
+        return self.split_params(params,
+                                 self.rows_to_alts,
+                                 self.design,
+                                 return_all_types=return_all_types)
 
     def convenience_calc_probs(self, params):
         """
@@ -479,11 +497,12 @@ def calc_and_store_post_estimation_results(results_dict,
     final_params = results_dict["x"]
 
     # Add the estimated parameters to the results dictionary
-    split_res = estimator.convenience_split_params(final_params)
-    results_dict["nest_params"] = None
-    results_dict["shape_params"] = split_res[0]
-    results_dict["intercept_params"] = split_res[1]
-    results_dict["utility_coefs"] = split_res[2]
+    split_res = estimator.convenience_split_params(final_params,
+                                                   return_all_types=True)
+    results_dict["nest_params"] = split_res[0]
+    results_dict["shape_params"] = split_res[1]
+    results_dict["intercept_params"] = split_res[2]
+    results_dict["utility_coefs"] = split_res[3]
 
     # Get the probability of the chosen alternative and long_form probabilities
     chosen_probs, long_probs = estimator.convenience_calc_probs(final_params)
@@ -520,6 +539,9 @@ def calc_and_store_post_estimation_results(results_dict,
     results_dict["fisher_info"] =\
         estimator.convenience_calc_fisher_approx(final_params)
 
+    # Store the constrained positions that was used in this estimation process
+    results_dict["constrained_pos"] = estimator.constrained_pos
+
     return results_dict
 
 
@@ -530,7 +552,66 @@ def estimate(init_values,
              gradient_tol,
              maxiter,
              print_results,
+             use_hessian=True,
              **kwargs):
+    """
+    Estimate the given choice model that is defined by `estimator`.
+
+    Parameters
+    ----------
+    init_vals : 1D ndarray.
+        Should contain the initial values to start the optimization process
+        with.
+    estimator : an instance of the EstimationObj class.
+    method : str, optional.
+        Should be a valid string for scipy.optimize.minimize. Determines
+        the optimization algorithm that is used for this problem.
+        Default `== 'bfgs'`.
+    loss_tol : float, optional.
+        Determines the tolerance on the difference in objective function
+        values from one iteration to the next that is needed to determine
+        convergence. Default `== 1e-06`.
+    gradient_tol : float, optional.
+        Determines the tolerance on the difference in gradient values from
+        one iteration to the next which is needed to determine convergence.
+        Default `== 1e-06`.
+    maxiter : int, optional.
+        Determines the maximum number of iterations used by the optimizer.
+        Default `== 1000`.
+    print_res : bool, optional.
+        Determines whether the timing and initial and final log likelihood
+        results will be printed as they they are determined.
+        Default `== True`.
+    use_hessian : bool, optional.
+        Determines whether the `calc_neg_hessian` method of the `estimator`
+        object will be used as the hessian function during the estimation. This
+        kwarg is used since some models (such as the Mixed Logit and Nested
+        Logit) use a rather crude (i.e. the BHHH) approximation to the Fisher
+        Information Matrix, and users may prefer to not use this approximation
+        for the hessian during estimation.
+
+    Return
+    ------
+    results : dict.
+        The dictionary of estimation results that is returned by
+        scipy.optimize.minimize. It will also have (at minimum) the following
+        keys:
+          - "log-likelihood_null"
+          - "final_log_likelihood"
+          - "utility_coefs"
+          - "intercept_params"
+          - "shape_params"
+          - "nest_params"
+          - "chosen_probs"
+          - "long_probs"
+          - "residuals"
+          - "ind_chi_squareds"
+          - "rho_squared"
+          - "rho_bar_squared"
+          - "final_gradient"
+          - "final_hessian"
+          - "fisher_info"
+    """
     # Perform preliminary calculations
     log_likelihood_at_zero =\
         estimator.convenience_calc_log_likelihood(estimator.zero_vector)
@@ -546,6 +627,9 @@ def estimate(init_values,
         print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
         sys.stdout.flush()
 
+    # Get the hessian fucntion for this estimation process
+    hess_func = estimator.calc_neg_hessian if use_hessian else None
+
     # Estimate the actual parameters of the model
     start_time = time.time()
 
@@ -553,7 +637,7 @@ def estimate(init_values,
                        init_values,
                        method=method,
                        jac=True,
-                       hess=estimator.calc_neg_hessian,
+                       hess=hess_func,
                        tol=loss_tol,
                        options={'gtol': gradient_tol,
                                 "maxiter": maxiter},
