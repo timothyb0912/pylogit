@@ -8,16 +8,14 @@ Created on Sun Jul  3 11:26:33 2016
 @summary:   Contains functions necessary for estimating nested logit models
             (with the help of the "base_multinomial_cm.py" file).
 """
-import time
-import sys
 import warnings
 import numpy as np
-from scipy.optimize import minimize
 
 import nested_choice_calcs as nc
 import base_multinomial_cm_v2 as base_mcm
-from choice_tools import ensure_ridge_is_scalar_or_none
 from display_names import model_type_to_display_name
+from estimation import EstimationObj
+from estimation import estimate
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = nc.calc_nested_log_likelihood
@@ -60,7 +58,7 @@ def identify_degenerate_nests(nest_spec):
 
 # Define a functionto split the combined parameter array into nest coefficients
 # and index coefficients.
-def split_params(all_params, rows_to_nests):
+def split_param_vec(all_params, rows_to_nests, return_all_types=False):
     """
     Parameters
     ----------
@@ -72,6 +70,12 @@ def split_params(all_params, rows_to_nests):
         There should be one row per observation per available alternative and
         one column per nest. This matrix maps the rows of the design matrix to
         the unique nests (on the columns).
+    return_all_types : bool, optional.
+        Determines whether or not a tuple of 4 elements will be returned (with
+        one element for the nest, shape, intercept, and index parameters for
+        this model). If False, a tuple of 2 elements will be returned, as
+        described below. The tuple will contain the nest parameters and the
+        index coefficients.
 
     Returns
     -------
@@ -81,485 +85,243 @@ def split_params(all_params, rows_to_nests):
         level nest.
     index_coefs : 1D ndarray.
         The coefficients of the index being used for this nested logit model.
+
+    Note
+    ----
+    If `return_all_types == True` then the function will return a tuple of four
+    objects. In order, these objects will either be None or the arrays
+    representing the arrays corresponding to the nest, shape, intercept, and
+    index parameters.
     """
     # Split the array of all coefficients
     num_nests = rows_to_nests.shape[1]
     orig_nest_coefs = all_params[:num_nests]
     index_coefs = all_params[num_nests:]
-    return orig_nest_coefs, index_coefs
+
+    if return_all_types:
+        return orig_nest_coefs, None, None, index_coefs
+    else:
+        return orig_nest_coefs, index_coefs
 
 
-# Define function for calculating the log likelihood
-def convenient_nested_log_likelihood(all_coefs,
-                                     design,
-                                     rows_to_obs,
-                                     rows_to_nests,
-                                     choice_vec,
-                                     ridge=None):
+class NestedEstimator(EstimationObj):
     """
+    Estimation object for the 2-level Nested Logit Model.
+
     Parameters
     ----------
-    all_coefs : 1D ndarray.
-        Should contain all of the parameters being estimated (i.e. all the
-        nest coefficients and all of the index coefficients). All elements
-        should be ints, floats, or longs.
-    design : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated.
-        All elements should be ints, floats, or longs.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_nests : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per nest. This matrix maps the rows of the design matrix to
-        the unique nests (on the columns).
-    choice_vec : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a `1` and a zero otherwise.
-    ridge : int, float, long, or None, optional.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization. Default `== None`.
+    model_obj : a pylogit.base_multinomial_cm_v2.MNDC_Model instance.
+        Should contain the following attributes:
 
-    Returns
-    -------
-    float. The log-likelihood of the nested logit model.
-    """
-    # Split the array of all coefficients
-    orig_nest_coefs, index_coefs = split_params(all_coefs, rows_to_nests)
-    # Get the
-    nest_coefs = nc.naturalize_nest_coefs(orig_nest_coefs)
-
-    return general_log_likelihood(nest_coefs,
-                                  index_coefs,
-                                  design,
-                                  rows_to_obs,
-                                  rows_to_nests,
-                                  choice_vec,
-                                  ridge=ridge)
-
-
-# Create a function for calculating the gradient within a
-# scipy.optimize.minimize estimation routine
-def convenient_nested_gradient(all_coefs,
-                               design,
-                               choice_vec,
-                               rows_to_obs,
-                               rows_to_nests,
-                               ridge=None):
-    """
-    Parameters
-    ----------
-    all_coefs : 1D ndarray.
-        Should contain all of the parameters being estimated (i.e. all the
-        nest coefficients and all of the index coefficients). All elements
-        should be ints, floats, or longs.
-    design : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated.
-        All elements should be ints, floats, or longs.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_nests : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per nest. This matrix maps the rows of the design matrix to
-        the unique nests (on the columns).
-    ridge : int, float, long, or None, optional.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization. Default `== None`.
-
-    Returns
-    -------
-    1D ndarray. The gradient of the nested logit's log-likelihood with respect
-    to `all_coefs`.
-    """
-    # Split the array of all coefficients
-    orig_nest_coefs, index_coefs = split_params(all_coefs, rows_to_nests)
-
-    return general_gradient(orig_nest_coefs,
-                            index_coefs,
-                            design,
-                            choice_vec,
-                            rows_to_obs,
-                            rows_to_nests,
-                            ridge=ridge)
-
-
-# Create an objective function for a
-# scipy.optimize.minimize estimation routine
-def calc_neg_nested_log_likelihood_and_gradient(all_coefs,
-                                                design,
-                                                choice_vec,
-                                                rows_to_obs,
-                                                rows_to_nests,
-                                                constrained_pos,
-                                                ridge):
-    """
-    Parameters
-    ----------
-    all_coefs : 1D ndarray.
-        Should contain all of the parameters being estimated (i.e. all the
-        nest coefficients and all of the index coefficients). All elements
-        should be ints, floats, or longs.
-    design : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated.
-        All elements should be ints, floats, or longs.
-    choice_vec : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a `1` and a zero otherwise.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_nests : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per nest. This matrix maps the rows of the design matrix to
-        the unique nests (on the columns).
-    constrained_pos : list, or None.
-        Denotes the positions of the array of estimated parameters that are not
-        to change from their initial values. If a list is passed, the elements
-        are to be integers where no such integer is is greater than
-        `init_values.size`.
+          - alt_IDs
+          - choices
+          - design
+          - intercept_ref_position
+          - shape_ref_position
+          - utility_transform
+    mapping_res : dict.
+        Should contain the scipy sparse matrices that map the rows of the long
+        format dataframe to various other objects such as the available
+        alternatives, the unique observations, etc. The keys that it must have
+        are `['rows_to_obs', 'rows_to_alts', 'chosen_row_to_obs']`
     ridge : int, float, long, or None.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization.
-
-    Returns
-    -------
-    neg_log_likelihood : float.
-        The negative of the log-likelihood for the nested logit model given
-        the passed arguments.
-    neg_gradient : 1D ndarray.
-        The negative of the gradient of the log-likelilhood of the nested logit
-        model given the passed arguments.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero..
+    zero_vector : 1D ndarray.
+        Determines what is viewed as a "null" set of parameters. It is
+        explicitly passed because some parameters (e.g. parameters that must be
+        greater than zero) have their null values at values other than zero.
+    split_params : callable.
+        Should take a vector of parameters, `mapping_res['rows_to_alts']`, and
+        model_obj.design as arguments. Should return a tuple containing
+        separate arrays for the model's shape, outside intercept, and index
+        coefficients. For each of these arrays, if this model does not contain
+        the particular type of parameter, the callable should place a `None` in
+        its place in the tuple.
+    constrained_pos : list or None, optional.
+        Denotes the positions of the array of estimated parameters that are
+        not to change from their initial values. If a list is passed, the
+        elements are to be integers where no such integer is greater than
+        `init_values.size.` Default == None.
     """
-    log_likelihood = convenient_nested_log_likelihood(all_coefs,
-                                                      design,
-                                                      rows_to_obs,
-                                                      rows_to_nests,
-                                                      choice_vec,
-                                                      ridge=ridge)
+    def __init__(self,
+                 model_obj,
+                 mapping_dict,
+                 ridge,
+                 zero_vector,
+                 split_params,
+                 constrained_pos=None):
+        super(NestedEstimator, self).__init__(model_obj,
+                                              mapping_dict,
+                                              ridge,
+                                              zero_vector,
+                                              split_params,
+                                              constrained_pos=constrained_pos)
 
-    gradient = convenient_nested_gradient(all_coefs,
-                                          design,
-                                          choice_vec,
-                                          rows_to_obs,
-                                          rows_to_nests,
-                                          ridge=ridge)
-    if constrained_pos is not None:
-        gradient[constrained_pos] = 0
+        return None
 
-    return -1 * log_likelihood, -1 * gradient
+    def check_length_of_initial_values(self, init_values):
+        """
+        Ensures that the initial values are of the correct length.
+        """
+        # Figure out how many shape parameters we should have and how many
+        # index coefficients we should have
+        num_nests = self.rows_to_nests.shape[1]
+        num_index_coefs = self.design.shape[1]
 
+        assumed_param_dimensions = num_index_coefs + num_nests
+        if init_values.shape[0] != assumed_param_dimensions:
+            msg = "The initial values are of the wrong dimension"
+            msg_1 = "It should be of dimension {}"
+            msg_2 = "But instead it has dimension {}"
+            raise ValueError(msg +
+                             msg_1.format(assumed_param_dimensions) +
+                             msg_2.format(init_values.shape[0]))
 
-def _estimate(init_values,
-              design_matrix,
-              choice_vector,
-              rows_to_obs,
-              rows_to_nests,
-              chosen_row_to_obs,
-              constrained_pos,
-              print_results=True,
-              method='BFGS',
-              loss_tol=1e-06,
-              gradient_tol=1e-06,
-              maxiter=1000,
-              ridge=False,
-              **kwargs):
-    """
-    Parameters
-    ----------
-    init_values : 1D ndarray.
-        Should contain the initial values to start the optimizatin process
-        with. There should be one value for each nest parameter and utility
-        coefficient in the model.
-    design_matrix : 2D ndarray.
-        There should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated.
-        All elements should be ints, floats, or longs.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a `1` and a zero otherwise.
-    rows_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    rows_to_nests : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per nest. This matrix maps the rows of the design matrix to
-        the unique nests (on the columns).
-    chosen_row_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix indicates, for each observation
-        (on the columns), which rows of the design matrix were the realized
-        outcome.
-    constrained_pos : list, or None, optional.
-        Denotes the positions of the array of estimated parameters that are not
-        to change from their initial values. If a list is passed, the elements
-        are to be integers where no such integer is is greater than
-        `init_values.size`.
-    print_res : bool, optional.
-        Determines whether the timing and initial and final log likelihood
-        results will be printed as they they are determined. Default = True.
-    method : string, optional.
-        Should be a valid string which can be passed to
-        `scipy.optimize.minimize`. Determines the optimization algorithm which
-        is used for this problem. Default == 'BFGS'.
-    loss_tol : float, optional.
-        Determines the tolerance on the difference in objective function values
-        from one iteration to the next that is needed to determine convergence.
-        Default `== 1e-06`.
-    gradient_tol : float, optional.
-        Determines the tolerance on the difference in gradient values from one
-        iteration to the next which is needed to determine convergence.
-        Default `== 1e-06`.
-    maxiter : int, optional.
-        Determines the maximum number of iterations used by the optimizer.
-        Default `== 1000`.
-    ridge : int, float, long, or None, optional.
-        Determines whether or not ridge regression is performed. If a scalar is
-        passed, then that scalar determines the ridge penalty for the
-        optimization. Default `== None`.
+        return None
 
-    Returns
-    -------
-    results : dict.
-        Contains the estimation results dictionary from scipy.optimize.minimize
-        as well as various calculated quantities. Custom added keys will be:
-        `["utility_coefs", "intercept_params", "shape_params", "nest_params",
-          "log_likelihood_null", "rho_squared", "rho_bar_squared",
-          "final_gradient", "final_hessian", "fisher_info", "constrained_pos",
-          "final_log_likelihood", "chosen_probs", "long_probs, "residuals",
-          "ind_chi_squareds"]`
-    """
-    ##########
-    # Make sure we have the correct dimensions for the initial parameter values
-    ##########
-    # Figure out how many shape parameters we should have and how many index
-    # coefficients we should have
-    num_nests = rows_to_nests.shape[1]
-    num_index_coefs = design_matrix.shape[1]
+    def convenience_split_params(self, params, return_all_types=False):
+        """
+        Splits parameter vector into nest parameters and index parameters.
 
-    assumed_param_dimensions = num_index_coefs + num_nests
-    if init_values.shape[0] != assumed_param_dimensions:
-        msg = "The initial values are of the wrong dimension"
-        msg_1 = "It should be of dimension {}".format(assumed_param_dimensions)
-        msg_2 = "But instead it has dimension {}".format(init_values.shape[0])
-        raise ValueError(msg + msg_1 + msg_2)
+        Parameters
+        ----------
+        all_params : 1D ndarray.
+            Should contain all of the parameters being estimated (i.e. all the
+            nest coefficients and all of the index coefficients). All elements
+            should be ints, floats, or longs.
+        rows_to_nests : 2D scipy sparse array.
+            There should be one row per observation per available alternative
+            and one column per nest. This matrix maps the rows of the design
+            matrix to the unique nests (on the columns).
+        return_all_types : bool, optional.
+            Determines whether or not a tuple of 4 elements will be returned
+            (with one element for the nest, shape, intercept, and index
+            parameters for this model). If False, a tuple of 2 elements will
+            be returned, as described below. The tuple will contain the nest
+            parameters and the index coefficients.
 
-    ##########
-    # Check other function arguments for 'correctness'
-    ##########
-    # Make sure the ridge regression parameter is None or a real scalar
-    ensure_ridge_is_scalar_or_none(ridge)
+        Returns
+        -------
+        orig_nest_coefs : 1D ndarray.
+            The nest coefficients being used for estimation. Note that these
+            values are the logit of the inverse of the scale parameters for
+            each lower level nest.
+        index_coefs : 1D ndarray.
+            The index coefficients of this nested logit model.
 
-    ##########
-    # Begin the model estimation process.
-    ##########
-    # Isolate the initial shape, intercept, and beta parameters.
-    init_nest_params, init_betas = split_params(init_values, rows_to_nests)
+        Note
+        ----
+        If `return_all_types == True` then the function will return a tuple of
+        four objects. In order, these objects will either be None or the arrays
+        representing the arrays corresponding to the nest, shape, intercept,
+        and index parameters.
+        """
+        return split_param_vec(params,
+                               self.rows_to_nests,
+                               return_all_types=return_all_types)
 
-    # Get the log-likelihood at zero and the initial log likelihood
-    # Note, we use intercept_params=None since this will cause the function
-    # to think there are no intercepts being added to the transformation
-    # vector, which is the same as adding zero to the transformation vector
-    basic_nest_params = np.ones(init_nest_params.shape[0])
-    zero_beta_vals = np.zeros(init_betas.shape[0])
-    log_likelihood_at_zero = general_log_likelihood(basic_nest_params,
-                                                    zero_beta_vals,
-                                                    design_matrix,
-                                                    rows_to_obs,
-                                                    rows_to_nests,
-                                                    choice_vector,
-                                                    ridge=ridge)
+    def convenience_calc_probs(self, params):
+        """
+        Calculates the probabilities of the chosen alternative, and the long
+        format probabilities for this model and dataset.
+        """
+        orig_nest_coefs, betas = self.convenience_split_params(params)
+        natural_nest_coefs = nc.naturalize_nest_coefs(orig_nest_coefs)
 
-    # Note the nested logit model has no shape parameters so there is no such
-    # parameter included in the log-likelihood calculations below or above
-    natural_init_nest_params = nc.naturalize_nest_coefs(init_nest_params)
-    initial_log_likelihood = general_log_likelihood(natural_init_nest_params,
-                                                    init_betas,
-                                                    design_matrix,
-                                                    rows_to_obs,
-                                                    rows_to_nests,
-                                                    choice_vector,
-                                                    ridge=ridge)
-    ##########
-    # Print initial model conditions
-    # i.e., log-likelihoods at 'zero' and at initial values
-    ##########
-    if print_results:
-        # Print the log-likelihood at zero
-        print("Log-likelihood at zero: {:,.4f}".format(log_likelihood_at_zero))
+        args = [natural_nest_coefs,
+                betas,
+                self.design,
+                self.rows_to_obs,
+                self.rows_to_nests]
+        kwargs = {"chosen_row_to_obs": self.chosen_row_to_obs,
+                  "return_type": "long_and_chosen_probs"}
 
-        # Print the log-likelihood at the starting values
-        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
-        sys.stdout.flush()
+        probability_results = general_calc_probabilities(*args, **kwargs)
 
-    ##########
-    # Perform the minimization to estimate the nested logit model
-    ##########
-    # Start timing the estimation process
-    start_time = time.time()
+        return probability_results
 
-    results = minimize(calc_neg_nested_log_likelihood_and_gradient,
-                       init_values,
-                       args=(design_matrix,
-                             choice_vector,
-                             rows_to_obs,
-                             rows_to_nests,
-                             constrained_pos,
-                             ridge),
-                       method=method,
-                       jac=True,
-                       tol=loss_tol,
-                       options={'gtol': gradient_tol,
-                                "maxiter": maxiter},
-                       **kwargs)
+    def convenience_calc_log_likelihood(self, params):
+        """
+        Calculates the log-likelihood for this model and dataset.
+        """
+        orig_nest_coefs, betas = self.convenience_split_params(params)
+        natural_nest_coefs = nc.naturalize_nest_coefs(orig_nest_coefs)
 
-    #########
-    # Store the raw and processed outputs of the estimation outputs
-    #########
-    # Calculate the final log-likelihood. Note the '-1' is because we minimized
-    # the negative log-likelihood but we want the actual log-likelihood
-    final_log_likelihood = -1 * results["fun"]
+        args = [natural_nest_coefs,
+                betas,
+                self.design,
+                self.rows_to_obs,
+                self.rows_to_nests,
+                self.choice_vector]
+        kwargs = {"ridge": self.ridge}
+        
+        log_likelihood = general_log_likelihood(*args, **kwargs)
 
-    # Stop timing the estimation process and report the timing results
-    end_time = time.time()
-    if print_results:
-        elapsed_sec = (end_time - start_time)
-        elapsed_min = elapsed_sec / 60.0
-        if elapsed_min > 1.0:
-            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
-        else:
-            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
-        print("Final log-likelihood: {:,.4f}".format(final_log_likelihood))
-        sys.stdout.flush()
+        return log_likelihood
 
-    # Isolate the final shape, intercept, and beta parameters
-    split_res = split_params(results.x, rows_to_nests)
-    final_nest_params, final_utility_coefs = split_res
-    natural_final_nest_params = nc.naturalize_nest_coefs(final_nest_params)
+    def convenience_calc_gradient(self, params):
+        """
+        Calculates the gradient of the log-likelihood for this model / dataset.
+        """
+        orig_nest_coefs, betas = self.convenience_split_params(params)
 
-    # Store the separate values of the nest, shape, intercept, and beta
-    # parameters in the estimation results dict
-    results["utility_coefs"] = final_utility_coefs
-    results["intercept_params"] = None
-    results["shape_params"] = None
-    results["nest_params"] = final_nest_params
+        args = [orig_nest_coefs,
+                betas,
+                self.design,
+                self.choice_vector,
+                self.rows_to_obs,
+                self.rows_to_nests]
+        kwargs = {"ridge": self.ridge}
 
-    # Calculate the predicted probabilities
-    c2obs = chosen_row_to_obs
-    desired_res = "long_and_chosen_probs"
-    probability_results = general_calc_probabilities(natural_final_nest_params,
-                                                     final_utility_coefs,
-                                                     design_matrix,
-                                                     rows_to_obs,
-                                                     rows_to_nests,
-                                                     chosen_row_to_obs=c2obs,
-                                                     return_type=desired_res)
+        return general_gradient(*args, ridge=self.ridge)
 
-    prob_of_chosen_alternatives, long_probs = probability_results
+    def convenience_calc_hessian(self, params):
+        """
+        Calculates the hessian of the log-likelihood for this model / dataset.
+        Note that this function name is INCORRECT with regard to the actual
+        actions performed. The Nested Logit model uses the BHHH approximation
+        to the Fisher Information Matrix in place of the actual hessian.
+        """
+        orig_nest_coefs, betas = self.convenience_split_params(params)
 
-    # Calculate the residual vector
-    residuals = choice_vector - long_probs
+        args = [orig_nest_coefs,
+                betas,
+                self.design,
+                self.choice_vector,
+                self.rows_to_obs,
+                self.rows_to_nests]
 
-    # Calculate the observation specific chi-squared components
-    chi_squared_terms = np.square(residuals) / long_probs
-    individual_chi_squareds = rows_to_obs.T.dot(chi_squared_terms)
+        approx_hess = bhhh_approx(*args, ridge=self.ridge)
 
-    # Store the log-likelihood at zero
-    results["log_likelihood_null"] = log_likelihood_at_zero
+        # Account for the contrained position when presenting the results of
+        # the approximate hessian.
+        if self.constrained_pos is not None:
+            for idx_val in self.constrained_pos:
+                approx_hess[idx_val, :] = 0
+                approx_hess[:, idx_val] = 0
+                approx_hess[idx_val, idx_val] = -1
 
-    # Calculate and store the rho-squared and rho-bar-squared
-    results["rho_squared"] = 1.0 - (final_log_likelihood /
-                                    log_likelihood_at_zero)
-    results["rho_bar_squared"] = 1.0 - ((final_log_likelihood -
-                                         results.x.shape[0]) /
-                                        log_likelihood_at_zero)
+        return approx_hess
 
-    # Calculate and store the final gradient
-    results["final_gradient"] = general_gradient(final_nest_params,
-                                                 final_utility_coefs,
-                                                 design_matrix,
-                                                 choice_vector,
-                                                 rows_to_obs,
-                                                 rows_to_nests,
-                                                 ridge=ridge)
+    def convenience_calc_fisher_approx(self, params):
+        """
+        Calculates the BHHH approximation of the Fisher Information Matrix for
+        this model / dataset. Note that this function name is INCORRECT with
+        regard to the actual actions performed. The Nested Logit model uses a
+        placeholder for the BHHH approximation of the Fisher Information Matrix
+        because the BHHH approximation is already being used to approximate the
+        hessian.
 
-    # Calculate and store the final hessian
-#    results["final_hessian"] = general_hessian(final_utility_coefs,
-#                                               design_matrix,
-#                                               alt_id_vector,
-#                                               rows_to_obs,
-#                                               rows_to_alts,
-#                                               easy_utility_transform,
-#                                               _cloglog_transform_deriv_c,
-#                                               easy_calc_dh_dv,
-#                                               calc_dh_d_alpha,
-#                                               block_matrix_indices,
-#                                               final_intercept_params,
-#                                               final_shape_params,
-#                                               ridge)
-    # Use the BHHH approximation for now, since the analytic hessian seems
-    # hard to compute.
-    results["final_hessian"] = bhhh_approx(final_nest_params,
-                                           final_utility_coefs,
-                                           design_matrix,
-                                           choice_vector,
-                                           rows_to_obs,
-                                           rows_to_nests,
-                                           ridge=ridge)
-    # Account for the 'constrained' parameters
-    for idx_val in constrained_pos:
-        results["final_hessian"][idx_val, :] = 0
-        results["final_hessian"][:, idx_val] = 0
-        results["final_hessian"][idx_val, idx_val] = -1
+        This placeholder allows calculation of a value for the 'robust'
+        standard errors, even though such a value is not useful since it is not
+        correct...
+        """
+        placeholder_bhhh = np.diag(-1 * np.ones(params.shape[0]))
 
-    # Calculate and store the final fisher information matrix
-    # Use a placeholder value for now, especially since what I was using as
-    # the fisher information matrix I'm now calling the bhhh_approximation
-    # and I'm directly using it to approximate the hessian, as opposed to
-    # simply using this to compute the sandwhich estimator
-    results["fisher_info"] = np.diag(-1 * np.ones(results.x.shape[0]))
-#    results["fisher_info"] = cc.calc_fischer_info_matrix(
-#                                                          final_utility_coefs,
-#                                                                design_matrix,
-#                                                                alt_id_vector,
-#                                                                  rows_to_obs,
-#                                                                 rows_to_alts,
-#                                                                choice_vector,
-#                                                       easy_utility_transform,
-#                                                   _cloglog_transform_deriv_c,
-#                                                              easy_calc_dh_dv,
-#                                                              calc_dh_d_alpha,
-#                                                       final_intercept_params,
-#                                                           final_shape_params,
-#                                                                        ridge)
-
-    # Record which parameters were constrained during estimation
-    results["constrained_pos"] = constrained_pos
-
-    # Add all miscellaneous objects that we need to store to the results dict
-    results["final_log_likelihood"] = final_log_likelihood
-    results["chosen_probs"] = prob_of_chosen_alternatives
-    results["long_probs"] = long_probs
-    results["residuals"] = residuals
-    results["ind_chi_squareds"] = individual_chi_squareds
-
-    return results
+        return placeholder_bhhh
 
 
 # Define the nested logit model class
@@ -745,21 +507,29 @@ class NestedLogit(base_mcm.MNDC_Model):
             fixed_params.extend(constrained_pos)
         final_constrained_pos = sorted(list(set(fixed_params)))
 
+        # Create the estimation object
+        zero_vector = np.zeros(init_vals.shape)
+        estimator_args = [self,
+                          mapping_res,
+                          ridge,
+                          zero_vector,
+                          split_param_vec]
+        estimator_kwargs = {"constrained_pos": final_constrained_pos}
+        nested_estimator = NestedEstimator(*estimator_args,
+                                           **estimator_kwargs)
+
+        # Perform one final check on the length of the initial values
+        nested_estimator.check_length_of_initial_values(init_vals)
+
         # Get the estimation results
-        estimation_res = _estimate(init_vals,
-                                   self.design,
-                                   self.choices,
-                                   rows_to_obs,
-                                   rows_to_nests,
-                                   chosen_row_to_obs,
-                                   final_constrained_pos,
-                                   print_results=print_res,
-                                   method=method,
-                                   loss_tol=loss_tol,
-                                   gradient_tol=gradient_tol,
-                                   maxiter=maxiter,
-                                   ridge=ridge,
-                                   **kwargs)
+        estimation_res = estimate(init_vals,
+                                  nested_estimator,
+                                  method,
+                                  loss_tol,
+                                  gradient_tol,
+                                  maxiter,
+                                  print_res,
+                                  use_hessian=False)
 
         # Store the estimation results
         self.store_fit_results(estimation_res)

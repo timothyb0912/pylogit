@@ -17,7 +17,7 @@ import pylogit.nested_logit as nl
 
 class NestedLogitTests(unittest.TestCase):
     """
-    Tests of the `split_params` function, the `NestedLogit` model
+    Tests of the `split_param_vec` function, the `NestedLogit` model
     constructor, and the `fit_mle()` method.
     """
 
@@ -88,15 +88,15 @@ class NestedLogitTests(unittest.TestCase):
 
         return None
 
-    def test_split_params(self):
+    def test_split_param_vec(self):
         """
-        Ensures that split_params returns a tuple of nest coefficients and
+        Ensures that split_param_vec returns a tuple of nest coefficients and
         index coefficients.
         """
-        split_results = nl.split_params(self.fake_all_params,
-                                        self.fake_rows_to_nests)
+        split_results = nl.split_param_vec(self.fake_all_params,
+                                           self.fake_rows_to_nests)
 
-        # Check that the results of split_params are as expected
+        # Check that the results of split_param_vec are as expected
         self.assertIsInstance(split_results, tuple)
         self.assertEqual(len(split_results), 2)
         for item in split_results:
@@ -145,7 +145,8 @@ class NestedLogitTests(unittest.TestCase):
         # Create a variable for the fit_mle function's kwargs.
         # The print_res = False arguments are to make sure strings aren't
         # printed to the console unnecessarily.
-        fit_kwargs = {"ridge": 0.5,
+        fit_kwargs = {"constrained_pos": [1],
+                      "ridge": 0.5,
                       "print_res": False}
 
         # Test to make sure that the ridge warning message is printed when
@@ -211,24 +212,41 @@ class NestedLogitTests(unittest.TestCase):
         Ensure that when _estimate() is called, with an init_values argument
         that is of an incorrect length, a ValueError is raised.
         """
-        # Specify the arguments that are needed for the _estimate() function
-        estimate_args = [None,
-                         self.fake_design,
-                         self.fake_df[self.choice_col].values,
-                         self.fake_rows_to_obs,
-                         self.fake_rows_to_nests,
-                         self.fake_chosen_rows_to_obs,
-                         None]
+        # Bundle the arguments used to construct the nested logit model
+        constructor_args = [self.fake_df,
+                            self.alt_id_col,
+                            self.obs_id_col,
+                            self.choice_col,
+                            self.fake_specification,
+                            self.fake_names]
+        # Bundle the kwargs for constructing the nested_logit_model
+        constructor_kwargs = {"nest_spec": self.fake_nest_spec}
+
+        # Create the mnl model object whose coefficients will be estimated.
+        base_nl = nl.NestedLogit(*constructor_args, **constructor_kwargs)
+
+        # Create an estimator object.
+        zero_vector = np.zeros(self.fake_all_params.shape[0])
+        estimator_args = [base_nl,
+                          base_nl.get_mappings_for_fit(),
+                          None,
+                          zero_vector,
+                          nl.split_param_vec]
+        estimator_kwargs = {"constrained_pos": [1]}
+        nested_estimator = nl.NestedEstimator(*estimator_args,
+                                              **estimator_kwargs)
+
+        # Alias the function being tested
+        func = nested_estimator.check_length_of_initial_values
 
         # Test that the desired error is raised
         for i in [-1, 1]:
-            init_values = np.arange(self.fake_betas.shape[0] + i)
-            estimate_args[0] = init_values
+            init_values = np.arange(self.fake_all_params.shape[0] + i)
 
             self.assertRaisesRegexp(ValueError,
                                     "values are of the wrong dimension",
-                                    nl._estimate,
-                                    *estimate_args)
+                                    func,
+                                    init_values)
 
         return None
 

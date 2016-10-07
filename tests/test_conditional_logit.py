@@ -21,7 +21,7 @@ class HelperFuncTests(unittest.TestCase):
     def setUp(self):
         # Set up the fake arguments
         self.fake_beta = np.arange(3)
-        self.fake_args = ["foo", 1, None]
+        self.fake_args = ["foo", 1]
         self.fake_kwargs = {"fake_arg_1": "bar",
                             "fake_arg_2": 2,
                             "fake_arg_3": True}
@@ -35,12 +35,24 @@ class HelperFuncTests(unittest.TestCase):
         """
         # Store the results of split_param_vec()
         split_results = mnl.split_param_vec(self.fake_beta,
+                                            return_all_types=False,
                                             *self.fake_args,
                                             **self.fake_kwargs)
         # Check for expected results.
         self.assertIsNone(split_results[0])
         self.assertIsNone(split_results[1])
         npt.assert_allclose(split_results[2], self.fake_beta)
+
+        # Store the results of split_param_vec()
+        split_results = mnl.split_param_vec(self.fake_beta,
+                                            return_all_types=True,
+                                            *self.fake_args,
+                                            **self.fake_kwargs)
+        # Check for expected results.
+        self.assertIsNone(split_results[0])
+        self.assertIsNone(split_results[1])
+        self.assertIsNone(split_results[2])
+        npt.assert_allclose(split_results[3], self.fake_beta)
 
         return None
 
