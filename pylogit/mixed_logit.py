@@ -15,11 +15,8 @@ Train, K., 2009. Discrete Choice Models With Simulation. 2 ed., Cambridge
     University Press, New York, NY, USA.
 """
 
-import time
-import sys
 import warnings
 import numpy as np
-from scipy.optimize import minimize
 from scipy.sparse import csr_matrix
 
 import base_multinomial_cm_v2 as base_mcm
@@ -28,7 +25,6 @@ import mixed_logit_calcs as mlc
 from choice_tools import get_dataframe_from_data
 from choice_tools import create_design_matrix
 from choice_tools import create_long_form_mappings
-from choice_tools import ensure_ridge_is_scalar_or_none
 from display_names import model_type_to_display_name
 from estimation import EstimationObj
 from estimation import estimate
@@ -45,21 +41,36 @@ _msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
 _shape_ignore_msg = _msg_1 + _msg_2
 
 
-def split_param_vec(beta, *args, **kwargs):
+def split_param_vec(beta, return_all_types=False, *args, **kwargs):
     """
     Parameters
     ----------
-    beta:       1D numpy array. All elements should by ints, floats, or
-                longs. Should have 1 element for each utility
-                coefficient being estimated (i.e. num_features).
+    beta : 1D numpy array.
+        All elements should by ints, floats, or longs. Should have 1 element
+        for each utility coefficient being estimated (i.e. num_features).
+    return_all_types : bool, optional.
+        Determines whether or not a tuple of 4 elements will be returned (with
+        one element for the nest, shape, intercept, and index parameters for
+        this model). If False, a tuple of 3 elements will be returned, as
+        described below.
 
     Returns
     -------
     tuple.
         `(None, None, beta)`. This function is merely for compatibility with
         the other choice model files.
+
+    Note
+    ----
+    If `return_all_types == True` then the function will return a tuple of four
+    objects. In order, these objects will either be None or the arrays
+    representing the arrays corresponding to the nest, shape, intercept, and
+    index parameters.
     """
-    return None, None, beta
+    if return_all_types:
+        return None, None, None, beta
+    else:
+        return None, None, beta
 
 
 def mnl_utility_transform(sys_utility_array, *args, **kwargs):
@@ -147,7 +158,6 @@ def add_mixl_specific_results_to_estimation_res(estimator, results_dict):
     # Add the various items to the results_dict.
     results_dict["simulated_sequence_probs"] = prob_res[0]
     results_dict["expanded_sequence_probs"] = prob_res[1]
-    results_dict["constrained_pos"] = estimator.constrained_pos
 
     return results_dict
 
@@ -559,14 +569,15 @@ class MixedLogit(base_mcm.MNDC_Model):
                                   loss_tol,
                                   gradient_tol,
                                   maxiter,
-                                  print_res)
-
-        # Store the estimation results
-        self.store_fit_results(estimation_res)
+                                  print_res,
+                                  use_hessian=False)
 
         # Store the mixed logit specific estimation results
         args = [mixl_estimator, estimation_res]
         estimation_res = add_mixl_specific_results_to_estimation_res(*args)
+
+        # Store the estimation results
+        self.store_fit_results(estimation_res)
 
         return None
 
