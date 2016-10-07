@@ -52,7 +52,7 @@ _msg_6 = "parameters are not identified."
 _shape_ref_msg = _msg_4 + _msg_5 + _msg_6
 
 
-def split_param_vec(param_vec, rows_to_alts, design):
+def split_param_vec(param_vec, rows_to_alts, design, return_all_types=False):
     """
     Parameters
     ----------
@@ -66,6 +66,11 @@ def split_param_vec(param_vec, rows_to_alts, design):
         There should be one row per observation per available alternative.
         There should be one column per utility coefficient being estimated. All
         elements should be ints, floats, or longs.
+    return_all_types : bool, optional.
+        Determines whether or not a tuple of 4 elements will be returned (with
+        one element for the nest, shape, intercept, and index parameters for
+        this model). If False, a tuple of 3 elements will be returned, as
+        described below.
 
     Returns
     -------
@@ -74,6 +79,13 @@ def split_param_vec(param_vec, rows_to_alts, design):
         model. The second element will either be an array of the "outside"
         intercept parameters for this model or None. The third element will be
         an array of the index coefficients for this model.
+
+    Note
+    ----
+    If `return_all_types == True` then the function will return a tuple of four
+    objects. In order, these objects will either be None or the arrays
+    representing the arrays corresponding to the nest, shape, intercept, and
+    index parameters.
     """
     # Figure out how many shape parameters we should have for the model
     num_shapes = rows_to_alts.shape[1] - 1
@@ -91,7 +103,10 @@ def split_param_vec(param_vec, rows_to_alts, design):
     else:
         intercepts = None
 
-    return shapes, intercepts, betas
+    if return_all_types:
+        return None, shapes, intercepts, betas
+    else:
+        return shapes, intercepts, betas
 
 def _convert_eta_to_c(eta, ref_position):
     """

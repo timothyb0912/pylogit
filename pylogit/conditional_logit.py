@@ -39,29 +39,53 @@ general_calc_probabilities = cc.calc_probabilities
 general_hessian = cc.calc_hessian
 
 
-def split_param_vec(beta, *args, **kwargs):
+def split_param_vec(beta,
+                    rows_to_alts=None,
+                    design=None,
+                    return_all_types=False,
+                    *args, **kwargs):
     """
     Parameters
     ----------
-    beta:       1D numpy array. All elements should by ints, floats, or
-                longs. Should have 1 element for each utility
-                coefficient being estimated (i.e. num_features).
+    beta : 1D ndarray.
+        All elements should by ints, floats, or longs. Should have 1 element
+        for each utility coefficient being estimated (i.e. num_features).
+    rows_to_alts : None,
+        Not actually used. Included merely for consistency with other models.
+    design : None.
+        Not actually used. Included merely for consistency with other models.
+    return_all_types : bool, optional.
+        Determines whether or not a tuple of 4 elements will be returned (with
+        one element for the nest, shape, intercept, and index parameters for
+        this model). If False, a tuple of 3 elements will be returned, as
+        described below.
 
     Returns
     -------
     tuple.
         `(None, None, beta)`. This function is merely for compatibility with
         the other choice model files.
+
+    Note
+    ----
+    If `return_all_types == True` then the function will return a tuple of four
+    objects. In order, these objects will either be None or the arrays
+    representing the arrays corresponding to the nest, shape, intercept, and
+    index parameters.
     """
-    return None, None, beta
+    if return_all_types:
+        return None, None, None, beta
+    else:
+        return None, None, beta
 
 
 def _mnl_utility_transform(systematic_utilities, *args, **kwargs):
     """
     Parameters
     ----------
-    systematic_utilities:   1D numpy array of the systematic utilities for each
-                            each available alternative for each observation
+    systematic_utilities : 1D ndarray.
+        Should contain the systematic utilities for each each available
+        alternative for each observation.
 
     Returns
     -------
