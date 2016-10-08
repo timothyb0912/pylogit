@@ -896,6 +896,7 @@ class MNDC_Model(object):
         needed_attributes = ["df_model",
                              "nobs",
                              "null_log_likelihood",
+                             "log_likelihood",
                              "rho_squared",
                              "rho_bar_squared",
                              "estimation_message"]
@@ -944,14 +945,16 @@ class MNDC_Model(object):
             value being stored. There should be one element for each value of
             `value_array.`
         series_name : string or None, optional.
-            The name of the pandas series being created for `value_array.`
+            The name of the pandas series being created for `value_array.` This
+            kwarg should be None when `value_array` is a 1D ndarray.
         attribute_name : string.
             The attribute name that will be exposed on the model instance and
             related to the passed `value_array.`
         column_names : list of strings, or None, optional.
             Same as `index_names` except that it pertains to the columns of a
-            2D ndarray. There should be one element for each column of
-            `value_array.`
+            2D ndarray. When `value_array` is a 2D ndarray, There should be one
+            element for each column of `value_array.` This kwarg should be None
+            otherwise.
 
         Returns
         -------
@@ -1186,7 +1189,7 @@ class MNDC_Model(object):
     def _check_result_dict_for_needed_keys(self, results_dict):
         """
         Ensure that `results_dict` has the needed keys to store all the
-        estimation results.
+        estimation results. Raise a helpful ValueError otherwise.
         """
         missing_cols = [x for x in needed_result_keys if x not in results_dict]
         if missing_cols != []:
