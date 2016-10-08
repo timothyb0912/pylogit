@@ -685,40 +685,130 @@ class PostEstimationTests(GenericTestCase):
     function is correctly executed.
     """
     # The functions remaining to be tested include:
-    # [_record_values_for_fit_summary_and_statsmodels,
-    #  _create_fit_summary,
-    #  _store_inferential_results,
+    # [_store_inferential_results,
     #  _store_generic_inference_results,
     #  _store_optional_parameters,
     #  _adjust_inferential_results_for_parameter_contstraints,
     #  _check_result_dict_for_needed_keys]
-    # def setUp(self):
-    #   """
-    #   Perform additional setup materials needed to test the store estimation
-    #   results functions.
-    #   """
-    #   # Perform all of the usual setup actions
-    #   super(GenericTestCase, self).setUp()
+    def setUp(self):
+        """
+        Perform additional setup materials needed to test the store estimation
+        results functions.
+        """
+        # Create the betas to be used during the tests
+        self.fake_betas = np.array([-0.6])
 
-    #   # Create the attributes and post-estimation dictionary that is needed
-    #   self.log_likelihood = -10
-    #   self.fitted_probs = np.array([0.6, 0.78])
-    #   self.long_fitted_probs = np.array([0.1, 0.6, 0.3, 0.22, 0.78])
-    #   self.long_residuals = np.array([-0.1, 0.4, -0.3, 0.78, -0.78])
-    #   self.ind_chi_squareds = (np.square(self.long_residuals) /
-    #                            self.long_fitted_probs)
-    #   self.chi_square = self.ind_chi_squareds.sum()
-    #   self.estimation_success = True
-    #   self.estimation_message = "Estimation converged."
-    #   self.null_log_likelihood = -23
-    #   self.rho_squared = 1 - (self.log_likelihood / self.null_log_likelihood)
-    #   self.rho_bar_squared = (self.rho_squared +
-    #                           self.fake_all_params.shape[0] /
-    #                           self.null_log_likelihood)
-    #   self.basic_attr_dict = {}
-    #   self.basic_attr_dict["final_log_likelihood"] = self.log_likelihood
-    #   self.basic_attr_dict["chosen_probs"] = self.fitted_probs
-    #   self.basic_attr_dict["long_probs"] = self.long_fitted_probs
+        # Create the fake outside intercepts to be used during the tests
+        self.fake_intercepts = np.array([1, 0.5])
+
+        # Create names for the intercept parameters
+        self.fake_intercept_names = ["ASC 1", "ASC 2"]
+
+        # Record the position of the intercept that is not being estimated
+        self.fake_intercept_ref_pos = 2
+
+        # Create the shape parameters to be used during the tests. Note that
+        # these are the reparameterized shape parameters, thus they will be
+        # exponentiated in the fit_mle process and various calculations.
+        self.fake_shapes = np.array([-1, 1])
+
+        # Create names for the intercept parameters
+        self.fake_shape_names = ["Shape 1", "Shape 2"]
+
+        # Record the position of the shape parameter that is being constrained
+        self.fake_shape_ref_pos = 2
+
+        # Create an array of all model parameters
+        self.fake_all_params = np.concatenate((self.fake_shapes,
+                                               self.fake_intercepts,
+                                               self.fake_betas))
+
+        # The mapping between rows and alternatives is given below.
+        self.fake_rows_to_alts = csr_matrix(np.array([[1, 0, 0],
+                                                      [0, 1, 0],
+                                                      [0, 0, 1],
+                                                      [1, 0, 0],
+                                                      [0, 0, 1]]))
+
+        # Create the fake design matrix with columns denoting X
+        # The intercepts are not included because they are kept outside the
+        # index in the scobit model.
+        self.fake_design = np.array([[1],
+                                     [2],
+                                     [3],
+                                     [1.5],
+                                     [3.5]])
+
+        # Create the index array for this set of choice situations
+        self.fake_index = self.fake_design.dot(self.fake_betas)
+
+        # Create the needed dataframe for the Asymmetric Logit constructor
+        self.fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2],
+                                     "alt_id": [1, 2, 3, 1, 3],
+                                     "choice": [0, 1, 0, 0, 1],
+                                     "x": self.fake_design[:, 0],
+                                     "intercept": [1 for i in range(5)]})
+
+        # Record the various column names
+        self.alt_id_col = "alt_id"
+        self.obs_id_col = "obs_id"
+        self.choice_col = "choice"
+
+        # Create the index specification  and name dictionaryfor the model
+        self.fake_specification = OrderedDict()
+        self.fake_names = OrderedDict()
+        self.fake_specification["x"] = [[1, 2, 3]]
+        self.fake_names["x"] = ["x (generic coefficient)"]
+
+        # Create a fake nest specification for the model
+        self.fake_nest_spec = OrderedDict()
+        self.fake_nest_spec["Nest 1"] = [1, 3]
+        self.fake_nest_spec["Nest 2"] = [2]
+
+         # Bundle args and kwargs used to construct the Asymmetric Logit model.
+        self.constructor_args = [self.fake_df,
+                                 self.alt_id_col,
+                                 self.obs_id_col,
+                                 self.choice_col,
+                                 self.fake_specification]
+
+        # Create a variable for the kwargs being passed to the constructor
+        self.constructor_kwargs = {"intercept_ref_pos":
+                                   self.fake_intercept_ref_pos,
+                                   "shape_ref_pos": self.fake_shape_ref_pos,
+                                   "names": self.fake_names,
+                                   "intercept_names":
+                                   self.fake_intercept_names,
+                                   "shape_names": self.fake_shape_names,
+                                   "nest_spec": self.fake_nest_spec}
+
+        # Create a generic model object
+        self.model_obj = base_cm.MNDC_Model(*self.constructor_args,
+                                            **self.constructor_kwargs)
+
+        # Create the attributes and post-estimation dictionary that is needed
+        self.log_likelihood = -10
+        self.fitted_probs = np.array([0.6, 0.78])
+        self.long_fitted_probs = np.array([0.1, 0.6, 0.3, 0.22, 0.78])
+        self.long_residuals = np.array([-0.1, 0.4, -0.3, 0.78, -0.78])
+        self.ind_chi_squareds = (np.square(self.long_residuals) /
+                                 self.long_fitted_probs)
+        self.chi_square = self.ind_chi_squareds.sum()
+        self.estimation_success = True
+        self.estimation_message = "Estimation converged."
+        self.null_log_likelihood = -23
+        self.rho_squared = 1 - (self.log_likelihood / self.null_log_likelihood)
+        self.rho_bar_squared = (self.rho_squared +
+                                self.fake_all_params.shape[0] /
+                                self.null_log_likelihood)
+        self.estimation_message = "Succeded. This is just a test."
+        # self.basic_attr_dict = {}
+        # self.basic_attr_dict["final_log_likelihood"] = self.log_likelihood
+        # self.basic_attr_dict["chosen_probs"] = self.fitted_probs
+        # self.basic_attr_dict["long_probs"] = self.long_fitted_probs
+
+        return None
+
     def test_check_result_dict_for_needed_keys(self):
         """
         Ensure that the _check_result_dict_for_needed_keys method raises a
@@ -783,4 +873,142 @@ class PostEstimationTests(GenericTestCase):
             # Set the attribute back
             setattr(self.model_obj, attr, basic_series.copy())
 
+        # Check that the summary has all the elements that are expected
+        func()
+        self.assertIsInstance(self.model_obj.summary, pd.DataFrame)
+        self.assertEqual(self.model_obj.summary.iloc[0].tolist(),
+                         [5 for x in needed_attributes])
+
         return None
+
+    def test_record_values_for_fit_summary_and_statsmodels(self):
+        """
+        Ensure that _record_values_for_fit_summary_and_statsmodels stores the
+        desired attributes and values on the model object.
+        """
+        # Record the attributes that are needed for the function to work
+        needed_attributes = ["fitted_probs",
+                             "params",
+                             "log_likelihood",
+                             "standard_errors"]
+
+        # Create a dictionary that maps the needed objects to their respective
+        # values
+        np.random.seed(0)
+        values = [self.fitted_probs,
+                  self.fake_all_params,
+                  self.log_likelihood,
+                  np.random.uniform(size=self.fake_all_params.shape[0])]
+        attr_to_values = dict(zip(needed_attributes, values))
+
+        # Store the input values on the model object
+        for key in attr_to_values:
+            setattr(self.model_obj, key, attr_to_values[key])
+
+        # Alias the function that is being tested
+        func = self.model_obj._record_values_for_fit_summary_and_statsmodels
+
+        # Check that the function raises an appropriate error when a needed
+        # attribute is missing
+        for key in attr_to_values:
+            # Delete the attribute
+            delattr(self.model_obj, key)
+            # Ensure the correct error is raised
+            msg = "Call this function only after setting/calculating all other"
+            msg_2 = " estimation results attributes"
+            error_msg = msg + msg_2
+            self.assertRaisesRegexp(NotImplementedError,
+                                    error_msg,
+                                    func)
+            # Put the attribute back.
+            setattr(self.model_obj, key, attr_to_values[key])
+
+        # Record the new attribute names and values that will be created
+        new_attr_and_values = {"nobs": self.fitted_probs.shape[0],
+                               "df_model": self.fake_all_params.shape[0],
+                               "df_resid": self.fitted_probs.shape[0] -
+                                           self.fake_all_params.shape[0],
+                                "llf": self.log_likelihood,
+                                "bse": attr_to_values["standard_errors"]}
+
+        # Check that the desired attributes are all set when we call the
+        # function with all of the needed inputs
+        func()
+        for key, value in new_attr_and_values.items():
+            if key != "bse":
+                self.assertEqual(value, getattr(self.model_obj, key))
+            else:
+                npt.assert_allclose(value, getattr(self.model_obj, key))
+
+        return None
+
+    def test_create_fit_summary(self):
+        """
+        Ensure that the appropriate error is raised when create_fit_summary is
+        called without the correct input attributes stored on the model
+        instance and ensure that the correct summary series is created when the
+        function is called with the correct inputs.
+        """
+        # Make sure we have all attributes needed to create the results summary
+        needed_attributes = ["df_model",
+                             "nobs",
+                             "null_log_likelihood",
+                             "log_likelihood",
+                             "rho_squared",
+                             "rho_bar_squared",
+                             "estimation_message"]
+        correct_values = [self.fake_all_params.shape[0],
+                          self.fitted_probs.shape[0],
+                          self.null_log_likelihood,
+                          self.log_likelihood,
+                          self.rho_squared,
+                          self.rho_bar_squared,
+                          self.estimation_message]
+        attr_to_values = dict(zip(needed_attributes, correct_values))
+
+        # Store the input values on the model object
+        for key in attr_to_values:
+            setattr(self.model_obj, key, attr_to_values[key])
+
+        # Alias the function that is being tested
+        func = self.model_obj._create_fit_summary
+
+        # Check that the function raises an appropriate error when a needed
+        # attribute is missing
+        for key in attr_to_values:
+            # Delete the attribute
+            delattr(self.model_obj, key)
+            # Ensure the correct error is raised
+            msg = "Call this function only after setting/calculating all other"
+            msg_2 = " estimation results attributes"
+            error_msg = msg + msg_2
+            self.assertRaisesRegexp(NotImplementedError,
+                                    error_msg,
+                                    func)
+            # Put the attribute back.
+            setattr(self.model_obj, key, attr_to_values[key])
+
+        # Note the desired index names of the values in the fit summary
+        desired_index_names = ["Number of Parameters",
+                               "Number of Observations",
+                               "Null Log-Likelihood",
+                               "Fitted Log-Likelihood",
+                               "Rho-Squared",
+                               "Rho-Bar-Squared",
+                               "Estimation Message"]
+
+        # Check that the desired attributes are all set when we call the
+        # function with all of the needed inputs
+        func()
+        self.assertIsInstance(self.model_obj.fit_summary, pd.Series)
+        self.assertEqual(self.model_obj.fit_summary.tolist(), correct_values)
+        self.assertEqual(self.model_obj.fit_summary.index.tolist(),
+                         desired_index_names)
+
+        return None
+
+    # def test_store_inferential_results(self):
+    #     """
+    #     Ensure that appropriate errors are raised if incorrect arguments are
+    #     passed to the function
+    #     """
