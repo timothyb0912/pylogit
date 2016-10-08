@@ -677,3 +677,110 @@ class BaseModelMethodTests(GenericTestCase):
         npt.assert_allclose(subset_results, interval_array[0, :][None, :])
 
         return None
+
+
+class PostEstimationTests(GenericTestCase):
+    """
+    This suite of tests should ensure that the logic in the store_fit_results
+    function is correctly executed.
+    """
+    # The functions remaining to be tested include:
+    # [_record_values_for_fit_summary_and_statsmodels,
+    #  _create_fit_summary,
+    #  _store_inferential_results,
+    #  _store_generic_inference_results,
+    #  _store_optional_parameters,
+    #  _adjust_inferential_results_for_parameter_contstraints,
+    #  _check_result_dict_for_needed_keys]
+    # def setUp(self):
+    #   """
+    #   Perform additional setup materials needed to test the store estimation
+    #   results functions.
+    #   """
+    #   # Perform all of the usual setup actions
+    #   super(GenericTestCase, self).setUp()
+
+    #   # Create the attributes and post-estimation dictionary that is needed
+    #   self.log_likelihood = -10
+    #   self.fitted_probs = np.array([0.6, 0.78])
+    #   self.long_fitted_probs = np.array([0.1, 0.6, 0.3, 0.22, 0.78])
+    #   self.long_residuals = np.array([-0.1, 0.4, -0.3, 0.78, -0.78])
+    #   self.ind_chi_squareds = (np.square(self.long_residuals) /
+    #                            self.long_fitted_probs)
+    #   self.chi_square = self.ind_chi_squareds.sum()
+    #   self.estimation_success = True
+    #   self.estimation_message = "Estimation converged."
+    #   self.null_log_likelihood = -23
+    #   self.rho_squared = 1 - (self.log_likelihood / self.null_log_likelihood)
+    #   self.rho_bar_squared = (self.rho_squared +
+    #                           self.fake_all_params.shape[0] /
+    #                           self.null_log_likelihood)
+    #   self.basic_attr_dict = {}
+    #   self.basic_attr_dict["final_log_likelihood"] = self.log_likelihood
+    #   self.basic_attr_dict["chosen_probs"] = self.fitted_probs
+    #   self.basic_attr_dict["long_probs"] = self.long_fitted_probs
+    def test_check_result_dict_for_needed_keys(self):
+        """
+        Ensure that the _check_result_dict_for_needed_keys method raises a
+        helpful ValueError if the results dict is missing a needed key and that
+        the function returns None otherwise.
+        """
+        # Create a fake estimation results dictionary.
+        base_dict = {x: None for x in base_cm.needed_result_keys}
+
+        # Alias the function being tested
+        func = self.model_obj._check_result_dict_for_needed_keys
+
+        for key in base_cm.needed_result_keys:
+            # Delete the needed key from the dictionary
+            del base_dict[key]
+            # Make sure that we get a value error when testing the function
+            self.assertRaisesRegexp(ValueError,
+                                    "keys are missing",
+                                    func,
+                                    base_dict)
+            # Add the needed key back to the dictionary.
+            base_dict[key] = None
+
+        self.assertIsNone(func(base_dict))
+
+        return None
+
+    def test_create_results_summary(self):
+        """
+        Ensure that the expected summary dataframe is created when
+        `_create_results_summary` is called. Ensure that if any of the
+        necessary attributes are missing from the model object, then a
+        NotImplementedError is raised.
+        """
+        # Note the attributes that are needed to create the results summary
+        needed_attributes = ["params",
+                             "standard_errors",
+                             "tvalues",
+                             "pvalues",
+                             "robust_std_errs",
+                             "robust_t_stats",
+                             "robust_p_vals"]
+
+        # Initialize a very simple series for each of these attributes.
+        basic_series = pd.Series([5], index=["x"])
+        for attr in needed_attributes:
+            setattr(self.model_obj, attr, basic_series.copy())
+
+        # Alias the function that is neeeded
+        func = self.model_obj._create_results_summary
+
+        # Note part of the error msg that is expected
+        msg = "Call this function only after setting/calculating all other"
+
+        # Check that the necessary NotImplementedErrors are raised.
+        for attr in needed_attributes:
+            delattr(self.model_obj, attr)
+            # Make sure that we get a value error when testing the function
+            self.assertRaisesRegexp(NotImplementedError,
+                                    msg,
+                                    func)
+            # Set the attribute back
+            setattr(self.model_obj, attr, basic_series.copy())
+
+        return None

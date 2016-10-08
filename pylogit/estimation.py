@@ -401,9 +401,15 @@ def calc_individual_chi_squares(residuals,
 
     Parameters
     ----------
-    residuals
-    long_probabilities
-    rows_to_obs
+    residuals : 1D ndarray.
+        The choice vector minus the predicted probability of each alternative
+        for each observation.
+    long_probabilities : 1D ndarray.
+        The probability of each alternative being chosen in each choice
+        situation.
+    rows_to_obs : 2D scipy sparse array.
+        Should map each row of the long format dataferame to the unique 
+        observations in the dataset.
 
     Returns
     -------

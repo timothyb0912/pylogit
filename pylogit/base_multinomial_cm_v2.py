@@ -33,6 +33,25 @@ from choice_calcs import calc_probabilities, calc_asymptotic_covariance
 from nested_choice_calcs import calc_nested_probs
 import mixed_logit_calcs as mlc
 
+# Create a list of the necesssary result dictionary keys
+needed_result_keys = ["final_log_likelihood",
+                      "chosen_probs",
+                      "long_probs",
+                      "residuals",
+                      "ind_chi_squareds",
+                      "success",
+                      "message",
+                      "rho_squared",
+                      "rho_bar_squared",
+                      "log_likelihood_null",
+                      "utility_coefs",
+                      "intercept_params",
+                      "shape_params",
+                      "nest_params",
+                      "final_gradient",
+                      "final_hessian",
+                      "fisher_info"]
+
 
 def ensure_valid_nums_in_specification_cols(specification, dataframe):
     """
@@ -746,25 +765,25 @@ class MNDC_Model(object):
                                          mix_id_col=self.mixing_id_col,
                                          dense=dense)
 
-    def store_fit_results(self, results_dict):
+    def _store_basic_estimation_results(self, results_dict):
         """
+        Extracts the basic estimation results (i.e. those that need no further
+        calculation or logic applied to them) and stores them on the model
+        object.
+
         Parameters
-        ----------
+         ----------
         results_dict : dict.
             The estimation result dictionary that is output from
             scipy.optimize.minimize. In addition to the standard keys which are
             included, it should also contain the following keys:
-           ` ["final_gradient", "final_hessian", "fisher_info",
-            "final_log_likelihood", "chosen_probs", "long_probs", "residuals",
-             "ind_chi_squareds"]`.
-            The "final_gradient", "final_hessian", and "fisher_info" values
-            should be the gradient, hessian, and Fisher-Information Matrix of
-            the log likelihood, evaluated at the final parameter vector.
+            `["final_log_likelihood", "chosen_probs", "long_probs",
+              "residuals", "ind_chi_squareds", "sucess", "message",
+              "rho_squared", "rho_bar_squared", "log_likelihood_null"]`
 
         Returns
         -------
-        None. Will calculate and store a variety of estimation results and
-        inferential statistics as attributes of the model instance.
+        None.
         """
         # Store the log-likelilhood, fitted probabilities, residuals, and
         # individual chi-square statistics
@@ -779,20 +798,6 @@ class MNDC_Model(object):
         self.estimation_success = results_dict["success"]
         self.estimation_message = results_dict["message"]
 
-        # Account for peculiar things from the em algorithm
-        if "log_likelihood_progress" in results_dict:
-            self.log_likelihood_progression =\
-                            np.array(results_dict["log_likelihood_progress"])
-        else:
-            self.log_likelihood_progression = None
-        if "estimation_reason" in results_dict:
-            self.em_estimation_reason = results_dict["estimation_reason"]
-        else:
-            self.em_estimation_reason = None
-        # Account for attributes from the mixed logit model.
-        if not hasattr(self, "design_3d"):
-            self.design_3d = None
-
         # Store the summary measures of the model fit
         self.rho_squared = results_dict["rho_squared"]
         self.rho_bar_squared = results_dict["rho_bar_squared"]
@@ -800,177 +805,34 @@ class MNDC_Model(object):
         # Store the initial and null log-likelihoods
         self.null_log_likelihood = results_dict["log_likelihood_null"]
 
-        # Initialize the lists of all parameter names and all parameter values
-        # Note we add the new mixing variables to the list of index
-        # coefficients after estimation so that we can correctly create the
-        # design matrix needed for estimation
-        if self.mixing_vars is not None:
-            new_ind_var_names = ["Sigma " + x for x in self.mixing_vars]
-            self.ind_var_names += new_ind_var_names
-        all_names = deepcopy(self.ind_var_names)
-        all_params = [deepcopy(results_dict["utility_coefs"])]
+        return None
 
-        ##########
-        # Figure out whether this model had nest, shape, or intercept
-        # parameters and store each of these appropriately
-        ##########
-        if results_dict["intercept_params"] is not None:
-            # Identify the number of intercept parameters
-            num_intercepts = results_dict["intercept_params"].shape[0]
+    def _create_results_summary(self):
+        """
+        Create the dataframe that displays the estimation results, and store
+        it on the model instance.
 
-            # Get the names of the intercept parameters
-            if self.intercept_names is None:
-                intercept_names = ["Outside_ASC_{}".format(x) for x in
-                                   range(1, num_intercepts + 1)]
-            else:
-                intercept_names = self.intercept_names
+        Returns
+        -------
+        None.
+        """
+        # Make sure we have all attributes needed to create the results summary
+        needed_attributes = ["params",
+                             "standard_errors",
+                             "tvalues",
+                             "pvalues",
+                             "robust_std_errs",
+                             "robust_t_stats",
+                             "robust_p_vals"]
+        try:
+            assert all([hasattr(self, attr) for attr in needed_attributes])
+            assert all([isinstance(getattr(self, attr), pd.Series)
+                        for attr in needed_attributes])
+        except AssertionError:
+            msg = "Call this function only after setting/calculating all other"
+            msg_2 = " estimation results attributes"
+            raise NotImplementedError(msg + msg_2)
 
-            # Store the names of the intercept parameters
-            all_names = intercept_names + all_names
-            # Store the values of the intercept parameters
-            all_params.insert(0, results_dict["intercept_params"])
-
-            # Store the intercept parameters
-            self.intercepts = pd.Series(results_dict["intercept_params"],
-                                        index=intercept_names,
-                                        name="intercept_parameters")
-        else:
-            self.intercepts = None
-
-        if results_dict["shape_params"] is not None:
-            # Identify the number of shape parameters
-            num_shapes = results_dict["shape_params"].shape[0]
-
-            # Get the names of the shape parameters
-            if self.shape_names is None:
-                shape_names = ["shape_{}".format(x) for x in
-                               range(1, num_shapes + 1)]
-            else:
-                shape_names = self.shape_names
-
-            # Store the names of the shape parameters
-            all_names = shape_names + all_names
-            # Store the values of the shape parameters
-            all_params.insert(0, results_dict["shape_params"])
-
-            # Store the shape parameters
-            self.shapes = pd.Series(results_dict["shape_params"],
-                                    index=shape_names,
-                                    name="shape_parameters")
-        else:
-            self.shapes = None
-
-        if results_dict["nest_params"] is not None:
-            # Identify the number of nestt parameters
-            num_nests = results_dict["nest_params"].shape[0]
-
-            # Get the names of the nest parameters
-            if self.nest_names is None:
-                nest_names = ["Nest_Param_{}".format(x) for x in
-                              range(1, num_nests + 1)]
-            else:
-                nest_names = [x + " Nest Param" for x in self.nest_names]
-
-            # Store the names of the nest parameters
-            all_names = nest_names + all_names
-            # Store the values of the nest parameters
-            all_params.insert(0, results_dict["nest_params"])
-
-            # Store the nest parameters
-            self.nests = pd.Series(results_dict["nest_params"],
-                                   index=nest_names,
-                                   name="nest_parameters")
-        else:
-            self.nests = None
-
-        ##########
-        # Store the model results and values needed for model inference
-        ##########
-        # Store the utility coefficients
-        self.coefs = pd.Series(results_dict["utility_coefs"],
-                               index=self.ind_var_names,
-                               name="coefficients")
-
-        # Store the gradient
-        self.gradient = pd.Series(results_dict["final_gradient"],
-                                  index=all_names,
-                                  name="gradient")
-
-        # Store the hessian
-        self.hessian = pd.DataFrame(results_dict["final_hessian"],
-                                    columns=all_names,
-                                    index=all_names)
-
-        # Store the variance-covariance matrix
-        self.cov = pd.DataFrame(-1 * scipy.linalg.inv(self.hessian),
-                                columns=all_names,
-                                index=all_names)
-
-        # Store all of the estimated parameters
-        self.params = pd.Series(np.concatenate(all_params, axis=0),
-                                index=all_names,
-                                name="parameters")
-
-        # Store the standard errors
-        self.standard_errors = pd.Series(np.sqrt(np.diag(self.cov)),
-                                         index=all_names,
-                                         name="std_err")
-
-        # Store the t-stats of the estimated parameters
-        self.tvalues = self.params / self.standard_errors
-        self.tvalues.name = "t_stats"
-
-        # Store the p-values
-        self.pvalues = pd.Series(2 *
-                                 scipy.stats.norm.sf(np.abs(self.tvalues)),
-                                 index=all_names,
-                                 name="p_values")
-
-        # Store the fischer information matrix of estimated coefficients
-        self.fisher_information = pd.DataFrame(results_dict["fisher_info"],
-                                               columns=all_names,
-                                               index=all_names)
-
-        # Store the 'robust' variance-covariance matrix
-        self.robust_cov = calc_asymptotic_covariance(self.hessian,
-                                                     self.fisher_information)
-
-        # Store the 'robust' standard errors
-        self.robust_std_errs = pd.Series(np.sqrt(np.diag(self.robust_cov)),
-                                         index=all_names,
-                                         name="robust_std_err")
-
-        # Store the 'robust' t-stats of the estimated coefficients
-        self.robust_t_stats = self.params / self.robust_std_errs
-        self.robust_t_stats.name = "robust_t_stats"
-
-        # Store the 'robust' p-values
-        one_sided_p_vals = scipy.stats.norm.sf(np.abs(self.robust_t_stats))
-        self.robust_p_vals = pd.Series(2 *
-                                       one_sided_p_vals,
-                                       index=all_names,
-                                       name="robust_p_values")
-        #####
-        # Insert cleanup activity for the covariance matrix, the hessian,
-        # the fisher information matrix, the robust covariance matrix, the
-        # standard errors, the t-stats, the p-values, the robust standard
-        # errors, the robust t-stats, and the robust p-values on account of
-        # any "constrained" parameters that were not actually estimated.
-        #####
-        # Only perform cleanup activities if necessary
-        params_constrained = ("constrained_pos" in results_dict and
-                              results_dict["constrained_pos"] is not None)
-        if params_constrained:
-            for series in [self.standard_errors, self.tvalues,
-                           self.pvalues, self.robust_std_errs,
-                           self.robust_t_stats, self.robust_p_vals]:
-                for pos in results_dict["constrained_pos"]:
-                    series.loc[all_names[pos]] = np.nan
-
-        ##########
-        # Store a summary dataframe of the estimation results
-        # (base it on statsmodels summary dataframe/table perhaps?)
-        ##########
         self.summary = pd.concat((self.params,
                                   self.standard_errors,
                                   self.tvalues,
@@ -979,9 +841,33 @@ class MNDC_Model(object):
                                   self.robust_t_stats,
                                   self.robust_p_vals), axis=1)
 
-        ##########
-        # Record values for the fit_summary and statsmodels table
-        ##########
+        return None
+
+    def _record_values_for_fit_summary_and_statsmodels(self):
+        """
+        Store the various estimation results that are used to describe how well
+        the estimated model fits the given dataset, and record the values that
+        are needed for the statsmodels estimation results table. All values are
+        stored on the model instance.
+
+        Returns
+        -------
+        None.
+        """
+        # Make sure we have all attributes needed to create the results summary
+        needed_attributes = ["fitted_probs",
+                             "params",
+                             "log_likelihood",
+                             "standard_errors"]
+        try:
+            assert all([hasattr(self, attr) for attr in needed_attributes])
+            assert all([getattr(self, attr) is not None
+                        for attr in needed_attributes])
+        except AssertionError:
+            msg = "Call this function only after setting/calculating all other"
+            msg_2 = " estimation results attributes"
+            raise NotImplementedError(msg + msg_2)
+
         # Record the number of observations
         self.nobs = self.fitted_probs.shape[0]
         # This is the number of estimated parameters
@@ -994,9 +880,34 @@ class MNDC_Model(object):
         # This is just a repeat of the standard errors
         self.bse = self.standard_errors
 
-        ##########
-        # Store a "Fit Summary"
-        ##########
+        return None
+
+    def _create_fit_summary(self):
+        """
+        Create and store a pandas series that will display to useres the
+        various statistics/values that indicate how well the estimated model
+        fit the given dataset.
+
+        Returns
+        -------
+        None.
+        """
+        # Make sure we have all attributes needed to create the results summary
+        needed_attributes = ["df_model",
+                             "nobs",
+                             "null_log_likelihood",
+                             "rho_squared",
+                             "rho_bar_squared",
+                             "estimation_message"]
+        try:
+            assert all([hasattr(self, attr) for attr in needed_attributes])
+            assert all([getattr(self, attr) is not None
+                        for attr in needed_attributes])
+        except AssertionError:
+            msg = "Call this function only after setting/calculating all other"
+            msg_2 = " estimation results attributes"
+            raise NotImplementedError(msg + msg_2)
+
         self.fit_summary = pd.Series([self.df_model,
                                       self.nobs,
                                       self.null_log_likelihood,
@@ -1011,6 +922,383 @@ class MNDC_Model(object):
                                             "Rho-Squared",
                                             "Rho-Bar-Squared",
                                             "Estimation Message"])
+
+        return None
+
+    def _store_inferential_results(self,
+                                   value_array,
+                                   index_names,
+                                   attribute_name,
+                                   series_name=None,
+                                   column_names=None):
+        """
+        Store the estimation results that relate to statistical inference, such
+        as parameter estimates, standard errors, p-values, etc.
+
+        Parameters
+        ----------
+        value_array : 1D or 2D ndarray.
+            Contains the values that are to be stored on the model instance.
+        index_names : list of strings.
+            Contains the names that are to be displayed on the 'rows' for each
+            value being stored. There should be one element for each value of
+            `value_array.`
+        series_name : string or None, optional.
+            The name of the pandas series being created for `value_array.`
+        attribute_name : string.
+            The attribute name that will be exposed on the model instance and
+            related to the passed `value_array.`
+        column_names : list of strings, or None, optional.
+            Same as `index_names` except that it pertains to the columns of a
+            2D ndarray. There should be one element for each column of
+            `value_array.`
+
+        Returns
+        -------
+        None. Stores a pandas series or dataframe on the model instance.
+        """
+        if len(value_array.shape) == 1:
+            assert series_name is not None
+            new_attribute_value = pd.Series(value_array,
+                                            index=index_names,
+                                            name=series_name)
+        elif len(value_array.shape) == 2:
+            assert column_names is not None
+            new_attribute_value = pd.DataFrame(value_array,
+                                               index=index_names,
+                                               columns=column_names)
+
+        setattr(self, attribute_name, new_attribute_value)
+
+        return None
+
+    def _store_generic_inference_results(self,
+                                         results_dict,
+                                         all_params,
+                                         all_names):
+        """
+        Store the model inference values that are common to all choice models.
+        This includes things like index coefficients, gradients, hessians,
+        asymptotic covariance matrices, t-values, p-values, and robust versions
+        of these values.
+
+        Parameters
+        ----------
+        results_dict : dict.
+            The estimation result dictionary that is output from
+            scipy.optimize.minimize. In addition to the standard keys which are
+            included, it should also contain the following keys:
+           `["utility_coefs", "final_gradient", "final_hessian",
+             "fisher_info"]`.
+            The "final_gradient", "final_hessian", and "fisher_info" values
+            should be the gradient, hessian, and Fisher-Information Matrix of
+            the log likelihood, evaluated at the final parameter vector.
+        all_params : list of 1D ndarrays.
+            Should contain the various types of parameters that were actually
+            estimated.
+        all_names : list of strings.
+            Should cntain names of each estimated parameter.
+
+        Returns
+        -------
+        None. Stores all results on the model instance.
+        """
+        # Store the utility coefficients
+        self._store_inferential_results(results_dict["utility_coefs"],
+                                        index_names=self.ind_var_names,
+                                        attribute_name="coefs",
+                                        series_name="coefficients")
+
+        # Store the gradient
+        self._store_inferential_results(results_dict["final_gradient"],
+                                        index_names=all_names,
+                                        attribute_name="gradient",
+                                        series_name="gradient")
+
+        # Store the hessian
+        self._store_inferential_results(results_dict["final_hessian"],
+                                        index_names=all_names,
+                                        attribute_name="hessian",
+                                        column_names=all_names)
+
+        # Store the variance-covariance matrix
+        self._store_inferential_results(-1 * scipy.linalg.inv(self.hessian),
+                                        index_names=all_names,
+                                        attribute_name="cov",
+                                        column_names=all_names)
+
+        # Store ALL of the estimated parameters
+        self._store_inferential_results(np.concatenate(all_params, axis=0),
+                                        index_names=all_names,
+                                        attribute_name="params",
+                                        series_name="parameters")
+
+        # Store the standard errors
+        self._store_inferential_results(np.sqrt(np.diag(self.cov)),
+                                        index_names=all_names,
+                                        attribute_name="standard_errors",
+                                        series_name="std_err")
+
+        # Store the t-stats of the estimated parameters
+        self.tvalues = self.params / self.standard_errors
+        self.tvalues.name = "t_stats"
+
+        # Store the p-values
+        p_vals = 2 * scipy.stats.norm.sf(np.abs(self.tvalues))
+        self._store_inferential_results(p_vals,
+                                        index_names=all_names,
+                                        attribute_name="pvalues",
+                                        series_name="p_values")
+
+        # Store the fischer information matrix of estimated coefficients
+        self._store_inferential_results(results_dict["fisher_info"],
+                                        index_names=all_names,
+                                        attribute_name="fisher_information",
+                                        column_names=all_names)
+
+        # Store the 'robust' variance-covariance matrix
+        robust_covariance = calc_asymptotic_covariance(self.hessian,
+                                                       self.fisher_information)
+        self._store_inferential_results(robust_covariance,
+                                        index_names=all_names,
+                                        attribute_name="robust_cov",
+                                        column_names=all_names)
+
+        # Store the 'robust' standard errors
+        self._store_inferential_results(np.sqrt(np.diag(self.robust_cov)),
+                                        index_names=all_names,
+                                        attribute_name="robust_std_errs",
+                                        series_name="robust_std_err")
+
+        # Store the 'robust' t-stats of the estimated coefficients
+        self.robust_t_stats = self.params / self.robust_std_errs
+        self.robust_t_stats.name = "robust_t_stats"
+
+        # Store the 'robust' p-values
+        one_sided_p_vals = scipy.stats.norm.sf(np.abs(self.robust_t_stats))
+        self._store_inferential_results(2 * one_sided_p_vals,
+                                        index_names=all_names,
+                                        attribute_name="robust_p_vals",
+                                        series_name="robust_p_values")
+
+        return None
+
+    def _store_optional_parameters(self,
+                                   optional_params,
+                                   name_list_attr,
+                                   default_name_str,
+                                   all_names,
+                                   all_params,
+                                   param_attr_name,
+                                   series_name):
+        """
+        Extract the optional parameters from the `results_dict`, save them
+        to the model object, and update the list of all parameters and all
+        parameter names.
+
+        Parameters
+        ----------
+        optional_params : 1D ndarray.
+            The optional parameters whose values and names should be stored.
+        name_list_attr : str.
+            The attribute name on the model object where the names of the
+            optional estimated parameters will be stored (if they exist).
+        default_name_str : str.
+            The name string that will be used to create generic names for the
+            estimated parameters, in the event that the estimated parameters
+            do not have names that were specified by the user. Should contain
+            empty curly braces for use with python string formatting.
+        all_names : list of strings.
+            The current list of the names of the estimated parameters. The
+            names of these optional parameters will be added to the beginning
+            of this list.
+        all_params : list of 1D ndarrays.
+            Each array is a set of estimated parameters. The current optional
+            parameters will be added to the beginning of this list.
+        param_attr_name : str.
+            The attribute name that will be used to store the optional
+            parameter values on the model object.
+        series_name : str.
+            The string that will be used as the name of the series that
+            contains the optional parameters.
+
+        Returns
+        -------
+        (all_names, all_params) : tuple.
+        """
+        # Identify the number of optional parameters
+        num_elements = optional_params.shape[0]
+
+        # Get the names of the optional parameters
+        parameter_names = getattr(self, name_list_attr)
+        if parameter_names is None:
+            parameter_names = [default_name_str.format(x) for x in
+                               range(1, num_elements + 1)]
+
+        # Store the names of the optional parameters in all_names
+        all_names = parameter_names + all_names
+        # Store the values of the optional parameters in all_params
+        all_params.insert(0, optional_params)
+
+        # Store the optional parameters on the model object
+        self._store_inferential_results(optional_params,
+                                        index_names=parameter_names,
+                                        attribute_name=param_attr_name,
+                                        series_name=series_name)
+        return all_names, all_params
+
+    def _adjust_inferential_results_for_parameter_constraints(self,
+                                                              constraints):
+        """
+        Ensure that parameters that were constrained during estimation do not
+        have any values showed for inferential results. After all, no inference
+        was performed.
+
+        Parameters
+        ----------
+        constraints : list of ints, or None.
+            If list, should contain the positions in the array of all estimated
+            parameters that were constrained to their initial values.
+
+        Returns
+        -------
+        None.
+        """
+        if constraints is not None:
+            # Ensure the model object has inferential results
+            inferential_attributes = ["standard_errors",
+                                      "tvalues",
+                                      "pvalues",
+                                      "robust_std_errs",
+                                      "robust_t_stats",
+                                      "robust_p_vals"]
+            assert all([hasattr(self, x) for x in inferential_attributes])
+            assert hasattr(self, "params")
+
+            all_names = self.params.index.tolist()
+
+            for series in [getattr(self, x) for x in inferential_attributes]:
+                for pos in constraints:
+                    series.loc[all_names[pos]] = np.nan
+
+        return None
+
+    def _check_result_dict_for_needed_keys(self, results_dict):
+        """
+        Ensure that `results_dict` has the needed keys to store all the
+        estimation results.
+        """
+        missing_cols = [x for x in needed_result_keys if x not in results_dict]
+        if missing_cols != []:
+            msg = "The following keys are missing from results_dict\n{}"
+            raise ValueError(msg.format(missing_cols))
+        return None
+
+    def store_fit_results(self, results_dict):
+        """
+        Parameters
+        ----------
+        results_dict : dict.
+            The estimation result dictionary that is output from
+            scipy.optimize.minimize. In addition to the standard keys which are
+            included, it should also contain the following keys:
+           `["final_gradient", "final_hessian", "fisher_info",
+             "final_log_likelihood", "chosen_probs", "long_probs", "residuals",
+             "ind_chi_squareds"]`.
+            The "final_gradient", "final_hessian", and "fisher_info" values
+            should be the gradient, hessian, and Fisher-Information Matrix of
+            the log likelihood, evaluated at the final parameter vector.
+
+        Returns
+        -------
+        None. Will calculate and store a variety of estimation results and
+        inferential statistics as attributes of the model instance.
+        """
+        # Check to make sure the results_dict has all the needed keys.
+        self._check_result_dict_for_needed_keys(results_dict)
+
+        # Store the basic estimation results that simply need to be transferred
+        # from the results_dict to the model instance.
+        self._store_basic_estimation_results(results_dict)
+
+        # Account for attributes from the mixed logit model.
+        if not hasattr(self, "design_3d"):
+            self.design_3d = None
+
+        # Initialize the lists of all parameter names and all parameter values
+        # Note we add the new mixing variables to the list of index
+        # coefficients after estimation so that we can correctly create the
+        # design matrix during the estimation proces. The create_design_3d
+        # function relies on the original list of independent variable names.
+        if self.mixing_vars is not None:
+            new_ind_var_names = ["Sigma " + x for x in self.mixing_vars]
+            self.ind_var_names += new_ind_var_names
+        all_names = deepcopy(self.ind_var_names)
+        all_params = [deepcopy(results_dict["utility_coefs"])]
+
+        ##########
+        # Figure out whether this model had nest, shape, or intercept
+        # parameters and store each of these appropriately
+        ##########
+        if results_dict["intercept_params"] is not None:
+            storage_args = [results_dict["intercept_params"],
+                            "intercept_names",
+                            "Outside_ASC_{}",
+                            all_names,
+                            all_params,
+                            "intercepts",
+                            "intercept_parameters"]
+            storage_results = self._store_optional_parameters(*storage_args)
+            all_names, all_params = storage_results
+        else:
+            self.intercepts = None
+
+        if results_dict["shape_params"] is not None:
+            storage_args = [results_dict["shape_params"],
+                            "shape_names",
+                            "Shape_{}",
+                            all_names,
+                            all_params,
+                            "shapes",
+                            "shape_parameters"]
+            storage_results = self._store_optional_parameters(*storage_args)
+            all_names, all_params = storage_results
+        else:
+            self.shapes = None
+
+        if results_dict["nest_params"] is not None:
+            storage_args = [results_dict["nest_params"],
+                            "nest_names",
+                            "Nest_Param_{}",
+                            all_names,
+                            all_params,
+                            "nests",
+                            "nest_parameters"]
+            storage_results = self._store_optional_parameters(*storage_args)
+            all_names, all_params = storage_results
+        else:
+            self.nests = None
+
+        # Store the model results and values needed for model inference
+        self._store_generic_inference_results(results_dict,
+                                              all_params,
+                                              all_names)
+
+        # Adjust the inferential results to account for parameters that were
+        # not actually estimated, i.e. parameters that were constrained.
+        constraints = results_dict["constrained_pos"]
+        self._adjust_inferential_results_for_parameter_constraints(constraints)
+
+        # Store a summary dataframe of the estimation results
+        self._create_results_summary()
+
+        # Record values for the fit_summary and statsmodels table
+        self._record_values_for_fit_summary_and_statsmodels()
+
+        # Store a "Fit Summary"
+        self._create_fit_summary()
+
+        return None
 
     # Note that the function below is a placeholder and template for the
     # function to be placed in each model class.
