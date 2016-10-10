@@ -1197,6 +1197,17 @@ class MNDC_Model(object):
             raise ValueError(msg.format(missing_cols))
         return None
 
+    def _add_mixing_variable_names_to_individual_vars(self):
+        """
+        Ensure that the model objects mixing variables are added to its list of
+        individual variables.
+        """
+        assert isinstance(self.ind_var_names, list)
+        if self.mixing_vars is not None:
+            new_ind_var_names = ["Sigma " + x for x in self.mixing_vars]
+            self.ind_var_names += new_ind_var_names
+        return None
+
     def store_fit_results(self, results_dict):
         """
         Parameters
@@ -1233,9 +1244,7 @@ class MNDC_Model(object):
         # coefficients after estimation so that we can correctly create the
         # design matrix during the estimation proces. The create_design_3d
         # function relies on the original list of independent variable names.
-        if self.mixing_vars is not None:
-            new_ind_var_names = ["Sigma " + x for x in self.mixing_vars]
-            self.ind_var_names += new_ind_var_names
+        self._add_mixing_variable_names_to_individual_vars()
         all_names = deepcopy(self.ind_var_names)
         all_params = [deepcopy(results_dict["utility_coefs"])]
 
@@ -1429,7 +1438,7 @@ class MNDC_Model(object):
 
         Returns
         -------
-        statsmodels.summary object.
+        statsmodels.summary object or None.
         """
         try:
             # Get the statsmodels Summary class
