@@ -15,9 +15,10 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 from scipy.sparse import csr_matrix
-from scipy.sparse import diags
+import scipy.stats
 
 import pylogit.base_multinomial_cm_v2 as base_cm
+import pylogit.choice_calcs as choice_calcs
 
 
 # Create a generic TestCase class so that we can define a single setUp method
@@ -685,11 +686,7 @@ class PostEstimationTests(GenericTestCase):
     function is correctly executed.
     """
     # The functions remaining to be tested include:
-    # [_store_inferential_results,
-    #  _store_generic_inference_results,
-    #  _store_optional_parameters,
-    #  _adjust_inferential_results_for_parameter_contstraints,
-    #  _check_result_dict_for_needed_keys]
+    # [_store_generic_inference_results]
     def setUp(self):
         """
         Perform additional setup materials needed to test the store estimation
@@ -802,10 +799,7 @@ class PostEstimationTests(GenericTestCase):
                                 self.fake_all_params.shape[0] /
                                 self.null_log_likelihood)
         self.estimation_message = "Succeded. This is just a test."
-        # self.basic_attr_dict = {}
-        # self.basic_attr_dict["final_log_likelihood"] = self.log_likelihood
-        # self.basic_attr_dict["chosen_probs"] = self.fitted_probs
-        # self.basic_attr_dict["long_probs"] = self.long_fitted_probs
+        self.estimation_success = True
 
         return None
 
@@ -1007,8 +1001,335 @@ class PostEstimationTests(GenericTestCase):
 
         return None
 
-    # def test_store_inferential_results(self):
-    #     """
-    #     Ensure that appropriate errors are raised if incorrect arguments are
-    #     passed to the function
-    #     """
+    def test_store_inferential_results(self):
+        """
+        Ensure that appropriate errors are raised if incorrect arguments are
+        passed to the function
+        """
+        # Create the arrays to be stored
+        example_array = np.arange(4)
+        example_array_2d = np.arange(16).reshape((4, 4))
+        # Create the necessary arguments
+        index_names = ["feras", "sreeta", "tim", "mustapha"]
+        attribute_name = "phd"
+        series_name="doctoral"
+        column_names=["club", "116", "1st", "floor"]
+
+        # Alias the function being tested
+        func = self.model_obj._store_inferential_results
+
+        # Make sure Assertion Errors are raised when using incorrect arguments
+        self.assertRaises(AssertionError,
+                          func,
+                          example_array,
+                          index_names,
+                          attribute_name)
+
+        self.assertRaises(AssertionError,
+                          func,
+                          example_array_2d,
+                          index_names,
+                          attribute_name)
+
+        # Make sure that the function stores the correct attributes
+        for example in [example_array, example_array_2d]:
+            args = [example, index_names, attribute_name]
+            kwargs = {"series_name": series_name, "column_names": column_names}
+            func(*args, **kwargs)
+
+            created_attribute = getattr(self.model_obj, attribute_name)
+            # Make sure the attribute is of the correct type
+            if len(example.shape) == 1:
+                self.assertIsInstance(created_attribute, pd.Series)
+            else:
+                self.assertIsInstance(created_attribute, pd.DataFrame)
+                # Make sure the attribute has the correct column names
+                self.assertEqual(created_attribute.columns.tolist(),
+                                 column_names)
+            # Make sure the attribute has the correct index names
+            self.assertEqual(created_attribute.index.tolist(), index_names)
+            # Make sure the attribute has the correct values
+            npt.assert_allclose(example, created_attribute.values)
+
+        return None
+
+    def test_store_optional_parameters(self):
+        """
+        Ensure that the function correctly stores optional parameters on the
+        passed lists.
+        """
+        # Create a fake all_params and all_names list.
+        all_params = [self.fake_shapes]
+        all_names = deepcopy(self.fake_shape_names)
+
+        # Create the necessary arguments for the function.
+        name_list_attribute = "intercept_names"
+        default_name_str = "ASC {}"
+        param_attr_name = "intercepts"
+        series_name = "intercepts"
+        
+        # Alias the function being tested
+        func = self.model_obj._store_optional_parameters
+
+        # Place the needed objects on the model object
+        setattr(self.model_obj, name_list_attribute, self.fake_intercept_names)
+
+        # Test the function
+        func_args = [self.fake_intercepts,
+                     name_list_attribute,
+                     default_name_str,
+                     all_names,
+                     all_params,
+                     param_attr_name,
+                     series_name]
+        new_all_names, new_all_params = func(*func_args)
+        self.assertEqual(new_all_names,
+                         self.fake_intercept_names + self.fake_shape_names)
+        npt.assert_allclose(new_all_params[0], self.fake_intercepts)
+
+        # Delete the name list attribute and try the function again
+        setattr(self.model_obj, name_list_attribute, None)
+        new_all_names, new_all_params = func(*func_args)
+        self.assertEqual(new_all_names,
+                         self.fake_intercept_names + self.fake_shape_names)
+        npt.assert_allclose(new_all_params[0], self.fake_intercepts)
+
+        return None
+
+    def test_adjust_inferential_results_for_parameter_constraints(self):
+        """
+        Ensure that the adjustment for constrained parameters works as desired,
+        placeing NaNs in the locations of the various inferential result series
+        where a parameter was constrained.
+        """
+        # Take note of the various series that are created to hold the
+        # inferential results.
+        inferential_attributes = ["standard_errors",
+                                  "tvalues",
+                                  "pvalues",
+                                  "robust_std_errs",
+                                  "robust_t_stats",
+                                  "robust_p_vals"]
+        # Set a random seed for reproducibility
+        np.random.seed(0)
+        # Create the data needed for the various inferential results
+        data = np.random.uniform(size=(5, len(inferential_attributes) + 1))
+        dataframe = pd.DataFrame(data,
+                                 columns=inferential_attributes + ["params"])
+        # Store the inferential arrays on the model object
+        for key in dataframe.columns:
+            setattr(self.model_obj, key, dataframe[key])
+        # Alias the function that is to be tested
+        func =\
+        self.model_obj._adjust_inferential_results_for_parameter_constraints
+
+        # Set the constraints
+        constraints = [0]
+        dataframe.loc[0, :] = np.nan
+
+        # Perform the tests
+        func(constraints)
+        for key in dataframe.columns[:-1]:
+            new_attribute = getattr(self.model_obj, key)
+            self.assertTrue(np.isnan(new_attribute.iloc[0]))
+            npt.assert_allclose(new_attribute.values[1:],
+                                dataframe[key].values[1:])
+
+        return None
+
+    def test_store_generic_inference_results(self):
+        """
+        Ensure that we can correctly store the given variables that are common
+        to all inferential procedures after model estimation.
+        """
+        # Record the keys that are needed
+        needed_keys = ["utility_coefs",
+                       "final_gradient",
+                       "final_hessian",
+                       "fisher_info"]
+
+        # Set a random seed for reproducibility
+        np.random.seed(0)
+        # Create the data needed for the various inferential results
+        data = np.random.uniform(low=0,
+                                 high=1,
+                                 size=(5, 2))
+
+        # Create fake names for the needed results
+        all_names = ["Elly", "Feras", "Sreeta", "Mustapha", "Tim"]
+        self.model_obj.ind_var_names = all_names
+        all_params = [data[:, 0]]
+        # assert all_params.shape[0] == len(all_names)
+
+        # Create a fake hessian and fake fisher info
+        fake_hessian = np.diag(-4 * np.ones(data.shape[0]))
+        fake_fisher = np.diag(2 * np.ones(data.shape[0]))
+        cov_matrix = np.diag(0.25 * np.ones(data.shape[0]))
+
+        # Create the dictionary that is needed for this function
+        needed_dict = {"utility_coefs": data[:, 0],
+                       "final_gradient": data[:, 1],
+                       "final_hessian": fake_hessian,
+                       "fisher_info": fake_fisher}
+
+        # Alias the function being tested
+        func = self.model_obj._store_generic_inference_results
+
+        # Determine what attributes should be created
+        expected_attributes = ["coefs",
+                               "gradient",
+                               "hessian",
+                               "cov",
+                               "params",
+                               "standard_errors",
+                               "tvalues",
+                               "pvalues",
+                               "fisher_information",
+                               "robust_cov",
+                               "robust_std_errs",
+                               "robust_t_stats",
+                               "robust_p_vals"]
+
+        # Perform the tests
+        func(needed_dict, all_params, all_names)
+        for attr_name in expected_attributes:
+            print attr_name
+            self.assertTrue(hasattr(self.model_obj, attr_name))
+            self.assertTrue(isinstance(getattr(self.model_obj, attr_name),
+                                       (pd.Series, pd.DataFrame)))
+        npt.assert_allclose(self.model_obj.coefs.values,
+                            needed_dict["utility_coefs"])
+        npt.assert_allclose(self.model_obj.params.values,
+                            needed_dict["utility_coefs"])
+        npt.assert_allclose(self.model_obj.gradient.values,
+                            needed_dict["final_gradient"])
+        npt.assert_allclose(self.model_obj.hessian.values, fake_hessian)
+        npt.assert_allclose(self.model_obj.cov.values, cov_matrix)
+        npt.assert_allclose(self.model_obj.fisher_information.values,
+                            fake_fisher)
+        args = [self.model_obj.standard_errors.values,
+                0.5 * np.ones(needed_dict["utility_coefs"].shape[0])]
+        npt.assert_allclose(*args)
+
+        expected_t_stats = (needed_dict["utility_coefs"] /
+                        0.5 * np.ones(needed_dict["utility_coefs"].shape[0]))
+        args = [self.model_obj.tvalues.values, expected_t_stats]
+        npt.assert_allclose(*args)
+
+        expected_p_vals = 2 * scipy.stats.norm.sf(np.abs(expected_t_stats))
+        npt.assert_allclose(self.model_obj.pvalues, expected_p_vals)
+
+        args = [fake_hessian, fake_fisher]
+        expected_robust_cov = choice_calcs.calc_asymptotic_covariance(*args)
+        npt.assert_allclose(self.model_obj.robust_cov.values,
+                            expected_robust_cov)
+
+        npt.assert_allclose(self.model_obj.robust_std_errs.values,
+                            np.sqrt(np.diag(expected_robust_cov)))
+
+        robust_t_stats = data[:, 0] / self.model_obj.robust_std_errs.values
+        npt.assert_allclose(self.model_obj.robust_t_stats, robust_t_stats)
+
+        robust_p_vals = 2 * scipy.stats.norm.sf(np.abs(robust_t_stats))
+        npt.assert_allclose(self.model_obj.robust_p_vals, robust_p_vals)
+
+        return None
+
+    def test_addition_of_mixing_variables_to_ind_vars(self):
+        """
+        Ensure that the mixing variables are added to the individual variables.
+        """
+        # Set the mixing variables
+        self.model_obj.mixing_vars = ["Test", "of", "mixing", "addition"]
+        self.model_obj.ind_var_names = ["Generic X"]
+
+        # Note what the result should be
+        expected_names = (self.model_obj.ind_var_names +
+                          ["Sigma " + x for x in self.model_obj.mixing_vars])
+        # Use the given function
+        self.model_obj._add_mixing_variable_names_to_individual_vars()
+        # Perform the test
+        self.assertEqual(self.model_obj.ind_var_names, expected_names)
+
+        return None
+
+    def test_get_statsmodels_summary(self):
+        """
+        Ensure correct formatting and return of a statsmodels summary table.
+        Note that we only explicitly check the numbers in the table of
+        estimation results.
+        """
+        # Set the type of this model
+        model_type = "Test Model Object"
+        self.model_obj.model_type = model_type
+
+        # Set the needed attributes
+        self.model_obj.estimation_success = self.estimation_success
+        self.model_obj.nobs = self.fitted_probs.shape[0]
+        self.model_obj.df_model = 1
+        self.model_obj.df_resid = self.model_obj.nobs - self.model_obj.df_model
+        self.model_obj.rho_squared = self.rho_squared
+        self.model_obj.rho_bar_squared = self.rho_bar_squared
+        self.model_obj.llf = self.log_likelihood
+        self.model_obj.null_log_likelihood = self.null_log_likelihood
+
+        # Store the inferential results that will go into the table
+        self.model_obj.coefs = pd.Series(self.fake_betas,
+                                         index=self.fake_names["x"],
+                                         name="coefs")
+        self.model_obj.params = self.model_obj.coefs.copy()
+        self.model_obj.params.name = "params"
+        self.model_obj.bse = pd.Series(np.array([0.3]),
+                                       index=self.fake_names["x"],
+                                       name="standard_errors")
+        self.model_obj.standard_errors = self.model_obj.bse.copy()
+        self.model_obj.tvalues = self.model_obj.params / self.model_obj.bse
+        self.model_obj.pvalues = pd.Series(2 *\
+                           scipy.stats.norm.sf(np.abs(self.model_obj.tvalues)),
+                           index=self.fake_names["x"], name="p_values")
+
+        # Alias the function that will be tested
+        func = self.model_obj.get_statsmodels_summary
+
+        # Try the various tests
+        try:
+            from statsmodels.iolib.summary import Summary
+            # Handle the different ways of accessing the StringIO module in
+            # different python versions.
+            import sys
+            if sys.version_info[0] < 3: 
+                from StringIO import StringIO
+            else:
+                from io import StringIO
+
+            # Get the summary
+            summary = func()
+            self.assertIsInstance(summary, Summary)
+
+            # Convert the two tables of the summary into pandas dataframes
+            # table_1_buffer = StringIO(summary.tables[0].as_csv())
+            table_2_buffer = StringIO(summary.tables[1].as_csv())
+            table_2_df = pd.read_csv(table_2_buffer)
+
+            # Figure out the numerical values that should be displayed in the
+            # table that is shown to users.
+            expected_values = np.array([self.model_obj.params.iat[0],
+                                        self.model_obj.bse.iat[0],
+                                        self.model_obj.tvalues.iat[0],
+                                        self.model_obj.pvalues.iat[0]])
+            # Note that the summary table rounds values to the third decimal
+            # place.
+            expected_values = np.round(expected_values, decimals=3)
+
+            # Only look at the numerical values, (minus the confidence
+            # intervals that are tested elsewhere).
+            summary_vals = table_2_df.iloc[0, 1:-1].values.astype(np.float64)
+            npt.assert_allclose(summary_vals, expected_values)
+
+            return None
+
+        except ImportError:
+            return None
+
+
+
