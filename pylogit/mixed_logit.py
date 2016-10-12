@@ -40,6 +40,12 @@ _msg_1 = "The Mixed MNL Model has no shape parameters. "
 _msg_2 = "shape_names and shape_ref_pos will be ignored if passed."
 _shape_ignore_msg = _msg_1 + _msg_2
 
+# Create a warning string that will be issued if ridge regression is performed.
+_msg_3 = "NOTE: An L2-penalized regression is being performed. The "
+_msg_4 = "reported standard errors and robust standard errors "
+_msg_5 = "***WILL BE INCORRECT***."
+_ridge_warning_msg = _msg_3 + _msg_4 + _msg_5
+
 
 def split_param_vec(beta, return_all_types=False, *args, **kwargs):
     """
@@ -523,14 +529,7 @@ class MixedLogit(base_mcm.MNDC_Model):
         self.ridge_param = ridge
 
         if ridge is not None:
-            msg = "NOTE: An L2-penalized regression is being performed. The "
-            msg_2 = "reported standard errors and robust standard errors "
-            msg_3 = "***WILL BE INCORRECT***."
-
-            print("=" * 30)
-            print(msg + msg_2 + msg_3)
-            print("=" * 30)
-            print("\n")
+            warnings.warn(_ridge_warning_msg)
 
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations

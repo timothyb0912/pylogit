@@ -115,7 +115,7 @@ class EstimationObj(object):
     def convenience_split_params(self, params, return_all_types=False):
         """
         Splits parameter vector into shape, intercept, and index parameters.
-        
+
         Parameters
         ----------
         params : 1D ndarray.
