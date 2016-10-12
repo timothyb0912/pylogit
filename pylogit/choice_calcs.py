@@ -160,8 +160,7 @@ def calc_probabilities(beta,
         chosen_exponentials = np.asarray(
                          chosen_row_to_obs.transpose().dot(long_exponentials))
         if len(long_exponentials.shape) > 1 and long_exponentials.shape[1] > 1:
-            chosen_probs = (chosen_exponentials /
-                            individual_denominators)
+            chosen_probs = chosen_exponentials / individual_denominators
         else:
             chosen_probs = (chosen_exponentials /
                             individual_denominators).ravel()
@@ -261,10 +260,12 @@ def calc_log_likelihood(beta,
     if ridge is None:
         return log_likelihood
     else:
-        if shape_params is not None:
-            params = np.concatenate((shape_params, beta), axis=0)
+        param_list = [x for x in [shape_params, intercept_params, beta]
+                      if x is not None]
+        if len(param_list) > 1:
+            params = np.concatenate(param_list, axis=0)
         else:
-            params = beta
+            params = param_list[0]
         return log_likelihood - ridge * np.square(params).sum()
 
 

@@ -1581,11 +1581,11 @@ def convert_wide_to_long(wide_data,
     try:
         assert final_long_df.shape == (num_rows, num_cols)
     except AssertionError:
-        print("There is an error with the dataframe that will be returned")
-        print("The shape of the dataframe should be {}".format((num_rows,
-                                                                num_cols)))
-        msg = "Instead, the returned dataframe will have shape: {}"
-        print(msg.format(final_long_df.shape))
+        msg_1 = "There is an error with the dataframe that will be returned."
+        msg_2 = "The shape of the dataframe should be {}".format((num_rows,
+                                                                  num_cols))
+        msg_3 = "Instead, the returned dataframe will have shape: {}"
+        print("\n".join([msg_1, msg_2, msg_3.format(final_long_df.shape)]))
 
     # Return the wide format dataframe
     return final_long_df
