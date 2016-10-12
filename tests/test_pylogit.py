@@ -3,7 +3,6 @@ Tests for the user-facing choice model constructor.
 """
 import unittest
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
@@ -11,7 +10,6 @@ import pandas as pd
 
 import pylogit
 import pylogit.display_names as display_names
-# from scipy.sparse import csr_matrix
 
 
 # Get the dictionary that maps the model type to the names of the model that

@@ -18,6 +18,11 @@ import pylogit.mixed_logit_calcs as mlc
 import pylogit.mixed_logit as mixed_logit
 
 
+# Use the following to always show the warnings
+np.seterr(all='warn')
+warnings.simplefilter("always")
+
+
 def temp_utility_transform(sys_utility_array, *args, **kwargs):
     """
     Parameters
@@ -177,6 +182,79 @@ class MixedLogitCalculations(unittest.TestCase):
                                           long_probs_draw_2[:, None]),
                                          axis=1)
 
+        ###########
+        # Create a mixed logit object for later use.
+        ##########
+        # Create a fake old long format dataframe for mixed logit model object
+        self.alt_id_column = "alt_id"
+        self.situation_id_column = "situation_id"
+        self.obs_id_column = "observation_id"
+        self.choice_column = "choice"
+
+        self.fake_old_df = pd.DataFrame({"x": self.fake_design[:, 2],
+                                    self.alt_id_column: self.alternative_ids,
+                                    self.situation_id_column:
+                                                            self.situation_ids,
+                                    self.obs_id_column: self.individual_ids,
+                                    self.choice_column: self.choice_array})
+        self.fake_old_df["intercept"] = 1
+
+        # Create a fake specification
+        self.fake_spec = OrderedDict()
+        self.fake_names = OrderedDict()
+
+        self.fake_spec["intercept"] = [1, 2]
+        self.fake_names["intercept"] = ["ASC 1", "ASC 2"]
+
+        self.fake_spec["x"] = [[1, 2, 3]]
+        self.fake_names["x"] = ["beta_x"]
+
+        # Specify the mixing variable
+        self.fake_mixing_vars = ["beta_x"]
+
+        # Create a fake version of a mixed logit model object
+        self.mixl_obj = mixed_logit.MixedLogit(data=self.fake_old_df,
+                                               alt_id_col=self.alt_id_column,
+                                               obs_id_col=self.situation_id_column,
+                                               choice_col=self.choice_column,
+                                               specification=self.fake_spec,
+                                               names=self.fake_names,
+                                               mixing_id_col=self.obs_id_column,
+                                               mixing_vars=self.fake_mixing_vars)
+
+        # Set all the necessary attributes for prediction:
+        # design_3d, coefs, intercepts, shapes, nests, mixing_pos
+        self.mixl_obj.design_3d = self.fake_design_3d
+        self.mixl_obj.coefs = pd.Series(self.fake_betas_ext)
+        self.mixl_obj.intercepts = None
+        self.mixl_obj.shapes = None
+        self.mixl_obj.nests = None
+
+        return None
+
+    def test_split_param_vec(self):
+        """
+        Ensures that split_param_vec returns (None, None, index_coefs)
+        when called from within mixed_logit.py. Also ensures that the
+        return_all_types keyword arguments work as expected.
+        """
+        # Store the results of split_param_vec()
+        split_results = mixed_logit.split_param_vec(self.fake_betas,
+                                                    return_all_types=False)
+        # Check for expected results.
+        self.assertIsNone(split_results[0])
+        self.assertIsNone(split_results[1])
+        npt.assert_allclose(split_results[2], self.fake_betas)
+
+        # Store the results of split_param_vec()
+        split_results = mixed_logit.split_param_vec(self.fake_betas,
+                                                    return_all_types=True)
+                # Check for expected results.
+        self.assertIsNone(split_results[0])
+        self.assertIsNone(split_results[1])
+        self.assertIsNone(split_results[2])
+        npt.assert_allclose(split_results[3], self.fake_betas)
+
         return None
 
     def test_mnl_utility_transform(self):
@@ -219,6 +297,27 @@ class MixedLogitCalculations(unittest.TestCase):
                                 "mixing_pos",
                                 mlc.create_expanded_design_for_mixing,
                                 *args)
+
+        return None
+
+    def test_check_length_of_initial_values(self):
+        """
+        Ensure that a ValueError is raised when one passes an init_vals
+        argument of the wrong length.
+        """
+        # Alias the function to be checked
+        func = mixed_logit.check_length_of_init_values
+
+        for i in [-1, 1]:
+            init_vals = np.ones(self.fake_design_3d.shape[2] + i)
+            self.assertRaisesRegexp(ValueError,
+                                    "wrong dimension",
+                                    func,
+                                    self.fake_design_3d,
+                                    init_vals)
+
+        self.assertIsNone(func(self.fake_design_3d,
+                               np.ones(self.fake_design_3d.shape[2])))
 
         return None
 
@@ -643,61 +742,17 @@ class MixedLogitCalculations(unittest.TestCase):
         ##########
         # Calcluate the predicted probabilities using the function being tested
         ##########
-
-        # Create a fake old long format dataframe for mixed logit model object
-        alt_id_column = "alt_id"
-        situation_id_column = "situation_id"
-        obs_id_column = "observation_id"
-        choice_column = "choice"
-
-        fake_old_df = pd.DataFrame({"x": self.fake_design[:, 2],
-                                    alt_id_column: self.alternative_ids,
-                                    situation_id_column: self.situation_ids,
-                                    obs_id_column: self.individual_ids,
-                                    choice_column: self.choice_array})
-        fake_old_df["intercept"] = 1
-
-        # Create a fake specification
-        fake_spec = OrderedDict()
-        fake_names = OrderedDict()
-
-        fake_spec["intercept"] = [1, 2]
-        fake_names["intercept"] = ["ASC 1", "ASC 2"]
-
-        fake_spec["x"] = [[1, 2, 3]]
-        fake_names["x"] = ["beta_x"]
-
-        # Specify the mixing variable
-        fake_mixing_vars = ["beta_x"]
-
-        # Create a fake version of a mixed logit model object
-        fake_mixl_obj = mixed_logit.MixedLogit(data=fake_old_df,
-                                               alt_id_col=alt_id_column,
-                                               obs_id_col=situation_id_column,
-                                               choice_col=choice_column,
-                                               specification=fake_spec,
-                                               names=fake_names,
-                                               mixing_id_col=obs_id_column,
-                                               mixing_vars=fake_mixing_vars)
-
-        # Set all the necessary attributes for prediction:
-        # design_3d, coefs, intercepts, shapes, nests, mixing_pos
-        fake_mixl_obj.design_3d = self.fake_design_3d
-        fake_mixl_obj.coefs = pd.Series(self.fake_betas_ext)
-        fake_mixl_obj.intercepts = None
-        fake_mixl_obj.shapes = None
-        fake_mixl_obj.nests = None
-
         # Create a fake long format dataframe of the data to be predicted
         predictive_df = pd.DataFrame({"x": new_design[:, 2],
-                                      alt_id_column: new_alt_ids,
-                                      situation_id_column: new_situation_ids,
-                                      obs_id_column: new_obs_ids})
+                                      self.alt_id_column: new_alt_ids,
+                                      self.situation_id_column:
+                                                             new_situation_ids,
+                                      self.obs_id_column: new_obs_ids})
         predictive_df["intercept"] = 1
 
         # Calculate the probabilities of each alternative being chosen in
         # each choice situation being predictied
-        function_pred_probs = fake_mixl_obj.panel_predict(predictive_df,
+        function_pred_probs = self.mixl_obj.panel_predict(predictive_df,
                                                           num_test_draws,
                                                           seed=chosen_seed)
 
@@ -750,3 +805,139 @@ class MixedLogitCalculations(unittest.TestCase):
         npt.assert_allclose(func_neg_gradient, expected_neg_gradient)
 
         return None
+
+    def test_outside_intercept_error_in_fit_mle(self):
+        """
+        Ensures that a ValueError is raised when users try to use any other
+        type of initial value input methods other than the `init_vals`
+        argument of `fit_mle()`. This prevents people from expecting the use
+        of outside intercept or shape parameters to work with the Mixed Logit
+        model.
+        """
+        # Create a variable for the arguments to the fit_mle function.
+        fit_args = [self.fake_betas, 800]
+
+        # Create variables for the incorrect kwargs.
+        # The print_res = False arguments are to make sure strings aren't
+        # printed to the console unnecessarily.
+        kwarg_map_1 = {"init_shapes": np.array([1, 2]),
+                       "print_res": False}
+        kwarg_map_2 = {"init_intercepts": np.array([1]),
+                       "print_res": False}
+        kwarg_map_3 = {"init_coefs": np.array([1]),
+                       "print_res": False}
+
+        # Test to ensure that the kwarg ignore message is printed when using
+        # any of these three incorrect kwargs
+        for kwargs in [kwarg_map_1, kwarg_map_2, kwarg_map_3]:
+            self.assertRaises(ValueError, self.mixl_obj.fit_mle,
+                              *fit_args, **kwargs)
+
+        return None
+
+    def test_ridge_warning_in_fit_mle(self):
+        """
+        Ensure that a UserWarning is raised when one passes the ridge keyword
+        argument to the `fit_mle` method of an Mixed Logit model object.
+        """
+        # Create the mnl model object whose coefficients will be estimated.
+        base_mixl = self.mixl_obj
+
+        # Create a variable for the arguments to the fit_mle function.
+        fit_args = [self.fake_betas_ext, 2]
+
+        # Create a variable for the fit_mle function's kwargs.
+        # The print_res = False arguments are to make sure strings aren't
+        # printed to the console unnecessarily.
+        kwargs = {"ridge": "foo",
+                  "print_res": False,
+                  "seed": 1}
+
+        # Test to make sure that the ridge warning message is printed when
+        # using the ridge keyword argument
+        with warnings.catch_warnings(record=True) as w:
+            # Use this filter to always trigger the  UserWarnings
+            warnings.simplefilter('always', UserWarning)
+
+            self.assertRaises(TypeError,
+                              base_mixl.fit_mle,
+                              *fit_args,
+                              **kwargs)
+            self.assertGreaterEqual(len(w), 1)
+            self.assertIsInstance(w[0].category, type(UserWarning))
+            self.assertIn(mixed_logit._ridge_warning_msg, str(w[0].message))
+
+        return None
+
+    def test_outside_intercept_error_in_constructor(self):
+        """
+        Ensures that a ValueError is raised when the 'intercept_ref_pos' kwarg
+        is passed to the MNL model constructor. This prevents people from
+        expecting the use of outside intercept parameters to work with the MNL
+        model.
+        """
+        # Create a variable for the standard arguments to this function.
+        standard_args = [self.fake_old_df,
+                         self.alt_id_column,
+                         self.situation_id_column,
+                         self.choice_column,
+                         self.fake_spec]
+        # Create a variable for the kwargs being passed to the constructor
+        kwarg_map = {"names": self.fake_names,
+                     "mixing_id_col": self.obs_id_column,
+                     "mixing_vars": self.fake_mixing_vars,
+                     "intercept_ref_pos": 2}
+
+        self.assertRaises(ValueError,
+                          mixed_logit.MixedLogit,
+                          *standard_args,
+                          **kwarg_map)
+        return None
+
+    def test_shape_ignore_msg_in_constructor(self):
+        """
+        Ensures that a UserWarning is raised when the 'shape_ref_pos' or
+        'shape_names' keyword arguments are passed to the Mixed Logit model
+        constructor. This warns people against expecting the Mixed Logit to
+        work with shape parameters, and alerts them to the fact they are using
+        a Mixed Logit model when they might have been expecting to instantiate
+        a different choice model.
+        """
+        # Create a variable for the standard arguments to this function.
+        standard_args = [self.fake_old_df,
+                         self.alt_id_column,
+                         self.situation_id_column,
+                         self.choice_column,
+                         self.fake_spec]
+
+        # Create a variable for the kwargs being passed to the constructor
+        kwarg_map = {"names": self.fake_names,
+                     "mixing_id_col": self.obs_id_column,
+                     "mixing_vars": self.fake_mixing_vars}
+        kwarg_map_1 = {"shape_ref_pos": 2}
+        kwarg_map_1.update(kwarg_map)
+        kwarg_map_2 = {"shape_names": OrderedDict([("x", ["foo"])])}
+        kwarg_map_2.update(kwarg_map)
+
+        # Test to ensure that the shape ignore message is printed when using
+        # either of these two kwargs
+        with warnings.catch_warnings(record=True) as context:
+            # Use this filter to always trigger the  UserWarnings
+            warnings.simplefilter('always', UserWarning)
+
+            for pos, bad_kwargs in enumerate([kwarg_map_1, kwarg_map_2]):
+                # Create a Mixed Logit model object with the irrelevant kwargs.
+                # This should trigger a UserWarning
+                mixl_obj = mixed_logit.MixedLogit(*standard_args, **bad_kwargs)
+                # Check that the warning has been created.
+                self.assertEqual(len(context), pos + 1)
+                self.assertIsInstance(context[-1].category, type(UserWarning))
+                self.assertIn(mixed_logit._shape_ignore_msg,
+                              str(context[-1].message))
+
+        return None
+
+    # def test_add_mixl_specific_results_to_estimation_res(self):
+    #     """
+    #     Ensure that the desired key value pairs are added
+    #     """
