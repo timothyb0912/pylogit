@@ -230,6 +230,28 @@ class MixedEstimator(EstimationObj):
 
         return None
 
+    def convenience_split_params(self, params, return_all_types=False):
+        """
+        Splits parameter vector into shape, intercept, and index parameters.
+
+        Parameters
+        ----------
+        params : 1D ndarray.
+            The array of parameters being estimated or used in calculations.
+        return_all_types : bool, optional.
+            Determines whether or not a tuple of 4 elements will be returned
+            (with one element for the nest, shape, intercept, and index
+            parameters for this model). If False, a tuple of 3 elements will
+            be returned with one element for the shape, intercept, and index
+            parameters.
+
+        Returns
+        -------
+        tuple. Will have 4 or 3 elements based on `return_all_types`.
+        """
+        return self.split_params(params,
+                                 return_all_types=return_all_types)
+
     def check_length_of_initial_values(self, init_values):
         """
         Ensures that the initial values are of the correct length.
@@ -313,7 +335,7 @@ class MixedEstimator(EstimationObj):
 
         approx_hess = general_bhhh(*args, ridge=self.ridge)
 
-        # Account for the contrained position when presenting the results of
+        # Account for the constrained position when presenting the results of
         # the approximate hessian.
         if self.constrained_pos is not None:
             for idx_val in self.constrained_pos:
@@ -656,7 +678,7 @@ class MixedLogit(base_mcm.MNDC_Model):
             made from each mixing distribution for the random coefficients.
         return_long_probs : bool, optional.
             Indicates whether or not the long format probabilites (a 1D numpy
-            array with oneelement per observation per available alternative)
+            array with one element per observation per available alternative)
             should be returned. Default == True.
         choice_col : str or None, optonal.
             Denotes the column in long_form which contains a one if the
@@ -692,9 +714,14 @@ class MixedLogit(base_mcm.MNDC_Model):
 
         Notes
         -----
-        It is NOT valid to have `chosen_row_to_obs == None` and
+        It is NOT valid to have `choice_col == None` and
         `return_long_probs == False`.
         """
+        # Ensure that the function arguments are valid
+        if choice_col is None and not return_long_probs:
+            msg = "choice_col is None AND return_long_probs == False"
+            raise ValueError(msg)
+
         # Get the dataframe of observations we'll be predicting on
         dataframe = get_dataframe_from_data(data)
 
@@ -710,12 +737,9 @@ class MixedLogit(base_mcm.MNDC_Model):
         for column in [self.alt_id_col,
                        self.obs_id_col,
                        self.mixing_id_col]:
-            if column is not None:
-                try:
-                    assert column in dataframe.columns
-                except AssertionError as e:
-                    print("{} not in data.columns".format(column))
-                    raise e
+            if column is not None and column not in dataframe.columns:
+                msg = "{} not in data.columns".format(column)
+                raise ValueError(msg)
 
         # Get the new column of alternative IDs and get the new design matrix
         new_alt_IDs = dataframe[self.alt_id_col].values
@@ -913,8 +937,3 @@ class MixedLogit(base_mcm.MNDC_Model):
         # just return the chosen probabilities.
         elif chosen_probs is not None:
             return chosen_probs
-        else:
-            msg = "chosen_row_to_obs is None AND return_long_probs == False"
-            raise Exception(msg)
-
-        return None

@@ -213,14 +213,15 @@ class MixedLogitCalculations(unittest.TestCase):
         self.fake_mixing_vars = ["beta_x"]
 
         # Create a fake version of a mixed logit model object
-        self.mixl_obj = mixed_logit.MixedLogit(data=self.fake_old_df,
-                                               alt_id_col=self.alt_id_column,
-                                               obs_id_col=self.situation_id_column,
-                                               choice_col=self.choice_column,
-                                               specification=self.fake_spec,
-                                               names=self.fake_names,
-                                               mixing_id_col=self.obs_id_column,
-                                               mixing_vars=self.fake_mixing_vars)
+        args = [self.fake_old_df,
+                self.alt_id_column,
+                self.situation_id_column,
+                self.choice_column,
+                self.fake_spec]
+        kwargs = {"names": self.fake_names,
+                  "mixing_id_col": self.obs_id_column,
+                  "mixing_vars": self.fake_mixing_vars}
+        self.mixl_obj = mixed_logit.MixedLogit(*args, **kwargs)
 
         # Set all the necessary attributes for prediction:
         # design_3d, coefs, intercepts, shapes, nests, mixing_pos
@@ -229,6 +230,17 @@ class MixedLogitCalculations(unittest.TestCase):
         self.mixl_obj.intercepts = None
         self.mixl_obj.shapes = None
         self.mixl_obj.nests = None
+
+        # Create a mixed logit estimator object for testing.
+        self.ridge = 0.5
+        zero_vector = np.zeros(self.fake_betas_ext.shape[0])
+        args = [self.mixl_obj,
+                self.mixl_obj.get_mappings_for_fit(),
+                self.ridge,
+                zero_vector,
+                mixed_logit.split_param_vec]
+
+        self.estimator = mixed_logit.MixedEstimator(*args)
 
         return None
 
@@ -305,8 +317,9 @@ class MixedLogitCalculations(unittest.TestCase):
         Ensure that a ValueError is raised when one passes an init_vals
         argument of the wrong length.
         """
-        # Alias the function to be checked
+        # Alias the functions to be checked
         func = mixed_logit.check_length_of_init_values
+        func_2 = self.estimator.check_length_of_initial_values
 
         for i in [-1, 1]:
             init_vals = np.ones(self.fake_design_3d.shape[2] + i)
@@ -316,8 +329,14 @@ class MixedLogitCalculations(unittest.TestCase):
                                     self.fake_design_3d,
                                     init_vals)
 
+            self.assertRaisesRegexp(ValueError,
+                                    "wrong dimension",
+                                    func_2,
+                                    init_vals)
+
         self.assertIsNone(func(self.fake_design_3d,
                                np.ones(self.fake_design_3d.shape[2])))
+        self.assertIsNone(func_2(np.ones(self.fake_design_3d.shape[2])))
 
         return None
 
@@ -444,12 +463,17 @@ class MixedLogitCalculations(unittest.TestCase):
         self.assertAlmostEqual(true_log_likelihood, function_log_likelihood)
 
         # Test the function with the ridge penalty
-        ridge = 0.5
-        args_2.append(ridge)
+        args_2.append(self.ridge)
         true_log_like_w_ridge = (true_log_likelihood -
-                                 ridge * (self.fake_betas_ext**2).sum())
+                                 self.ridge * (self.fake_betas_ext**2).sum())
         new_func_log_like = mlc.calc_mixed_log_likelihood(*args_2)
         self.assertAlmostEqual(true_log_like_w_ridge, new_func_log_like)
+
+        # Use the convenience function for the mixed logit estimator to test
+        # the same functionality
+        convenience_func = self.estimator.convenience_calc_log_likelihood
+        self.assertAlmostEqual(convenience_func(self.fake_betas_ext),
+                               true_log_like_w_ridge)
 
         return None
 
@@ -500,12 +524,17 @@ class MixedLogitCalculations(unittest.TestCase):
         npt.assert_allclose(gradient, function_gradient)
 
         # Test the function with a ridge penalty
-        ridge = 0.5
-        ridge_penalty = 2 * ridge * self.fake_betas_ext
+        ridge_penalty = 2 * self.ridge * self.fake_betas_ext
         new_gradient = gradient - ridge_penalty
-        args.append(ridge)
+        args.append(self.ridge)
         new_func_gradient = mlc.calc_mixed_logit_gradient(*args)
         npt.assert_allclose(new_gradient, new_func_gradient)
+
+        # Use the convenience function for the mixed logit estimator to test
+        # the same functionality
+        convenience_func = self.estimator.convenience_calc_gradient
+        npt.assert_allclose(new_gradient,
+                            convenience_func(self.fake_betas_ext))
 
         return None
 
@@ -568,12 +597,17 @@ class MixedLogitCalculations(unittest.TestCase):
         npt.assert_allclose(bhhh_matrix, function_bhhh)
 
         # Perform the test with the ridge coefficient
-        ridge = 0.5
-        args.append(ridge)
+        args.append(self.ridge)
         func_res2 = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
-        new_neg_bhhh = bhhh_matrix + 2 * ridge
+        new_neg_bhhh = bhhh_matrix + 2 * self.ridge
 
         npt.assert_allclose(new_neg_bhhh, func_res2)
+
+        # Perform the same test using the convenience function in the estimator
+        # object.
+        convenience_func = self.estimator.convenience_calc_hessian
+        npt.assert_allclose(new_neg_bhhh,
+                            convenience_func(self.fake_betas_ext))
 
         return None
 
@@ -601,6 +635,7 @@ class MixedLogitCalculations(unittest.TestCase):
         new_alt_ids = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3])
         new_situation_ids = np.array([1, 1, 1, 2, 2, 2, 3, 3, 3])
         new_obs_ids = np.array([1, 1, 1, 3, 3, 3, 3, 3, 3])
+        new_choices = np.array([0, 1, 0, 0, 0, 1, 1, 0, 0])
 
         # Take the chosen number of draws from the normal distribution for each
         # unique observation who has choice situations being predicted.
@@ -747,14 +782,35 @@ class MixedLogitCalculations(unittest.TestCase):
                                       self.alt_id_column: new_alt_ids,
                                       self.situation_id_column:
                                                              new_situation_ids,
-                                      self.obs_id_column: new_obs_ids})
+                                      self.obs_id_column: new_obs_ids,
+                                      self.choice_column: new_choices})
         predictive_df["intercept"] = 1
 
         # Calculate the probabilities of each alternative being chosen in
         # each choice situation being predictied
-        function_pred_probs = self.mixl_obj.panel_predict(predictive_df,
+        kwargs = {"choice_col": self.choice_column,
+                  "seed": chosen_seed}
+        results = self.mixl_obj.panel_predict(predictive_df,
+                                              num_test_draws,
+                                              **kwargs)
+        function_chosen_probs, _ = results
+
+        # Get the 'true' chosen probabilities
+        true_chosen_probs = true_pred_probs[np.where(new_choices == 1)]
+
+        # Repeat the prediction process without the choice column
+        results = self.mixl_obj.panel_predict(predictive_df,
+                                              num_test_draws,
+                                              seed=chosen_seed)
+        function_pred_probs = results
+
+        # Ensure that the chosen probabilities, by themselves, can be returned
+        kwargs = {"choice_col": self.choice_column,
+                  "return_long_probs": False,
+                  "seed": chosen_seed}
+        second_chosen_probs = self.mixl_obj.panel_predict(predictive_df,
                                                           num_test_draws,
-                                                          seed=chosen_seed)
+                                                          **kwargs)
 
         ##########
         # Perform the actual tests.
@@ -766,6 +822,54 @@ class MixedLogitCalculations(unittest.TestCase):
                          new_design.shape[0])
         assert not np.allclose(wrong_pred_probs, function_pred_probs)
         npt.assert_allclose(true_pred_probs, function_pred_probs)
+
+        # Test for desired return types and equality of probability arrays
+        self.assertIsInstance(function_chosen_probs, np.ndarray)
+        self.assertEqual(len(function_chosen_probs.shape), 1)
+        self.assertEqual(function_chosen_probs.shape[0],
+                         true_chosen_probs.shape[0])
+        npt.assert_allclose(true_chosen_probs, function_chosen_probs)
+
+        # Ensure that all variations of the returned chosen probs are correct
+        npt.assert_allclose(second_chosen_probs, function_chosen_probs)
+
+        # Make sure the appropriate errors are raised when the input dataframe
+        # is missing needed columns
+        new_predictive_df = predictive_df.copy()
+        for col in [self.alt_id_column,
+                    self.situation_id_column,
+                    self.obs_id_column]:
+            # Delete the column from the new dataframe
+            del new_predictive_df[col]
+
+            # Ensure the panel_predict function raises an error
+            self.assertRaisesRegexp(ValueError,
+                                    "not in data.columns",
+                                    self.mixl_obj.panel_predict,
+                                    new_predictive_df,
+                                    num_test_draws,
+                                    seed=chosen_seed)
+
+            # Puth the column back in new_predictive_df
+            new_predictive_df[col] = predictive_df[col]
+
+        return None
+
+    def test_value_error_in_panel_predict_for_incorrect_args(self):
+        """
+        Ensure that a ValueError is raised when `return_long_probs  == False`
+        and `choice_col is None`.
+        """
+        func = self.mixl_obj.panel_predict
+        args = [None, 20]
+
+        msg = "choice_col is None AND return_long_probs == False"
+        self.assertRaisesRegexp(ValueError,
+                                msg,
+                                func,
+                                *args,
+                                return_long_probs=False,
+                                choice_col=None)
 
         return None
 
@@ -937,7 +1041,112 @@ class MixedLogitCalculations(unittest.TestCase):
 
         return None
 
-    # def test_add_mixl_specific_results_to_estimation_res(self):
-    #     """
-    #     Ensure that the desired key value pairs are added
-    #     """
+    def test_mixl_estimator_constructor(self):
+        """
+        Ensure that we can instantiate the mixed logit estimator object.
+        """
+        # Create various parameters needed to create the mixed logit estimator
+        ridge = 0.5
+        zero_vector = np.zeros(self.fake_betas_ext.shape[0])
+
+        # Get the arguments needed for the object constructor
+        args = [self.mixl_obj,
+                self.mixl_obj.get_mappings_for_fit(),
+                ridge,
+                zero_vector,
+                mixed_logit.split_param_vec]
+
+        mixed_logit_etimator = mixed_logit.MixedEstimator(*args)
+
+        npt.assert_allclose(mixed_logit_etimator.design_3d,
+                            self.mixl_obj.design_3d)
+
+        return None
+
+    def test_add_mixl_specific_results_to_estimation_res(self):
+        """
+        Ensure that the desired key value pairs are added to the results
+        dictionary.
+        """
+        # Create a fake results dictionary
+        results_dict = {}
+        results_dict["long_probs"] = self.prob_array
+
+        # Get the probability of each sequence of choices, given the draws
+        args = [results_dict["long_probs"],
+                self.estimator.choice_vector,
+                self.estimator.rows_to_mixers]
+        kwargs = {"return_type": 'all'}
+        prob_res = mlc.calc_choice_sequence_probs(*args, **kwargs)
+
+        # Alias the function to be tested
+        func = mixed_logit.add_mixl_specific_results_to_estimation_res
+
+        # Map the new keys that should be added to results dict to the values
+        # those keys should have.
+        expected_results = {}
+        expected_results["simulated_sequence_probs"] = prob_res[0]
+        expected_results["expanded_sequence_probs"] = prob_res[1]
+
+        # Test the function
+        results_dict = func(self.estimator, results_dict)
+        self.assertTrue([x in results_dict for x in expected_results.keys()])
+        for key in expected_results:
+            npt.assert_allclose(results_dict[key], expected_results[key])
+
+        return None
+
+    def test_convenience_calc_hessian(self):
+        """
+        Ensure that the constraints are correctly accounted for.
+        test_calc_bhhh_hessian_approximation_mixed_logit() already tested the
+        main functionality of the convenience_calc_hessian method.
+        """
+        # Set a constrained position on the estimator object
+        constrained_idx = 1
+        self.estimator.constrained_pos = [constrained_idx]
+
+
+        # Alias the function that is being tested
+        func = self.estimator.convenience_calc_hessian
+
+        # Retrieve the BHHH matrix for this dataset
+        bhhh_approx = func(self.fake_betas_ext)
+
+        # Ensure that the second row and second column look like they came
+        # from an identity matrix. The only non-zero value in the row should
+        # be -1.
+        self.assertEqual(bhhh_approx[constrained_idx, :].tolist(),
+                         [0, -1, 0, 0])
+        self.assertEqual(bhhh_approx[:, constrained_idx].tolist(),
+                         [0, -1, 0, 0])
+
+        return None
+
+    def test_convenience_calc_fisher_approx(self):
+        """
+        Ensure that the desired placeholder is returned since we don't
+        calculate the analytic hessian, and the BHHH approximation is already
+        used to approximate the hessian.
+        """
+        expected_matrix = np.diag(-1 * np.ones(self.fake_betas_ext.shape[0]))
+
+        func = self.estimator.convenience_calc_fisher_approx
+        function_results = func(self.fake_betas_ext)
+
+        npt.assert_allclose(expected_matrix, function_results)
+
+        return None
+
+    def test_execution_of_fit_mle(self):
+        """
+        This function simply tests whether or not the fit_mle function can
+        be run without throwing an error.
+        """
+        init_vals = np.zeros(self.fake_betas_ext.shape[0])
+        num_draws = 2
+        seed=1
+
+        self.mixl_obj.fit_mle(init_vals, num_draws, seed=seed)
+
+        return None
