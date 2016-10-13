@@ -1469,7 +1469,6 @@ class MNDC_Model(object):
                     ('Method:', ['MLE']),
                     ('Date:', None),
                     ('Time:', None),
-            # ('No. iterations:', ["%d" % self.mle_retvals['iterations']]),
                     ('converged:', [str(self.estimation_success)])
                     ]
 
