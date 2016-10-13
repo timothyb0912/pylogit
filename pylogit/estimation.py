@@ -519,7 +519,10 @@ def calc_and_store_post_estimation_results(results_dict,
     # Calculate the residuals and individual chi-square values
     #####
     # Calculate the residual vector
-    residuals = estimator.choice_vector - long_probs
+    if len(long_probs.shape) == 1:
+        residuals = estimator.choice_vector - long_probs
+    else:
+        residuals = estimator.choice_vector[:, None] - long_probs
     results_dict["residuals"] = residuals
 
     # Calculate the observation specific chi-squared components
