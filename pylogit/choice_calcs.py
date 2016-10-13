@@ -117,6 +117,9 @@ def calc_probabilities(beta,
         msg_1 = "Cannot calculate probabilities with both 3D design matrix AND"
         msg_2 = " 2D coefficient array."
         raise ValueError(msg_1 + msg_2)
+    if chosen_row_to_obs is None and return_long_probs == False:
+        msg = "chosen_row_to_obs is None AND return_long_probs == False"
+        raise ValueError(msg)
 
     # Calculate the systematic utility for each alternative for each individual
     sys_utilities = design.dot(beta)
@@ -176,11 +179,6 @@ def calc_probabilities(beta,
     # chosen probabilities.
     elif chosen_probs is not None:
         return chosen_probs
-    else:
-        msg = "chosen_row_to_obs is None AND return_long_probs == False"
-        raise Exception(msg)
-
-    return None
 
 
 def calc_log_likelihood(beta,
@@ -356,7 +354,7 @@ def create_matrix_blocks(long_probs, matrix_block_indices):
         # is associated with the current observation
         current_probs = long_probs[indices]
         # Get the outer product of the current probabilities
-#        probability_outer_prod = np.outer(current_probs, current_probs)
+        # probability_outer_prod = np.outer(current_probs, current_probs)
         probability_outer_prod = robust_outer_product(current_probs,
                                                       current_probs)
 
@@ -875,8 +873,9 @@ def calc_fisher_info_matrix(beta,
     Returns
     -------
     fisher_matrix : 2D numpy array.
-        It's shape is `(beta.shape[0], beta.shape[0])`. Contains the BHHH
-        approximation to the Fisher Information matrix of the log likelihood.
+        It will be a square matrix, with one row and one column for each shape,
+        intercept, and index coefficient. Contains the BHHH approximation to
+        the Fisher Information matrix of the log likelihood.
     """
     # Calculate the systematic utility for each alternative for each individual
     sys_utilities = design.dot(beta)
@@ -945,8 +944,9 @@ def calc_fisher_info_matrix(beta,
 
     # Compute and return the outer product of each row of the gradient
     # with itself. Then sum these individual matrices together.
-#    fisher_matrix = (gradient_vec[:, :, np.newaxis] *
-#                     gradient_vec[:, np.newaxis, :]).sum(axis=0)
+    # fisher_matrix = (gradient_vec[:, :, np.newaxis] *
+    #                  gradient_vec[:, np.newaxis, :]).sum(axis=0)
+
     # The next five lines replicate the procedure accomplished in two
     # lines by the vectorized code above. However, when the design
     # matrix is large, the vectorized code will cause memory problems
