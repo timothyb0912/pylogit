@@ -15,7 +15,6 @@ Created on Tues Feb 22 09:30:44 2016
 """
 import pickle
 from copy import deepcopy
-from collections import OrderedDict
 
 import scipy.linalg
 import scipy.stats
@@ -665,7 +664,7 @@ class MNDC_Model(object):
             check_for_empty_nests_in_nest_spec(nest_spec)
 
             # Collect all lists of alternative ids belonging to each nest
-            list_elements = reduce(lambda x, y: x + y, 
+            list_elements = reduce(lambda x, y: x + y,
                                    [nest_spec[key] for key in nest_spec])
 
             ensure_alt_ids_in_nest_spec_are_ints(nest_spec, list_elements)
@@ -1546,7 +1545,7 @@ class MNDC_Model(object):
 
         # Make sure each array has the correct number of elements
         num_index_coefs = len(self.ind_var_names)
-            
+
         check_num_rows_of_parameter_array(param_list[0],
                                           num_index_coefs,
                                           'param_list[0]')

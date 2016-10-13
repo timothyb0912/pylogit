@@ -257,7 +257,7 @@ class NestedEstimator(EstimationObj):
                 self.rows_to_nests,
                 self.choice_vector]
         kwargs = {"ridge": self.ridge}
-        
+
         log_likelihood = general_log_likelihood(*args, **kwargs)
 
         return log_likelihood
@@ -274,7 +274,6 @@ class NestedEstimator(EstimationObj):
                 self.choice_vector,
                 self.rows_to_obs,
                 self.rows_to_nests]
-        kwargs = {"ridge": self.ridge}
 
         return general_gradient(*args, ridge=self.ridge)
 
@@ -492,9 +491,6 @@ class NestedLogit(base_mcm.MNDC_Model):
         # Construct the mappings from alternatives to observations and from
         # chosen alternatives to observations
         mapping_res = self.get_mappings_for_fit()
-        rows_to_obs = mapping_res["rows_to_obs"]
-        rows_to_nests = mapping_res["rows_to_nests"]
-        chosen_row_to_obs = mapping_res["chosen_row_to_obs"]
 
         # Determine the degenerate nests whose nesting parameters are to be
         # constrained to one. Note the following functions assume that the nest

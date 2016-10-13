@@ -164,9 +164,11 @@ class MNLEstimator(LogitTypeEstimator):
         # Pre-calculate the derivative of the transformation vector with
         # respect to the vector of systematic utilities
         dh_dv = diags(np.ones(self.design.shape[0]), 0, format='csr')
+
         # Create a function to calculate dh_dv which will return the
         # pre-calculated result when called
-        calc_dh_dv = lambda *args: dh_dv
+        def calc_dh_dv(*args):
+            return dh_dv
 
         self.calc_dh_dv = calc_dh_dv
         self.calc_dh_d_alpha = _mnl_transform_deriv_alpha

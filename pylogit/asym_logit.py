@@ -24,7 +24,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import LogitTypeEstimator
 from estimation import estimate
-from display_names import model_type_to_display_name
+from display_names import model_type_to_display_name as display_name_dict
 
 # Define the boundary values which are not to be exceeded ducing computation
 max_comp_value = 1e300
@@ -107,6 +107,7 @@ def split_param_vec(param_vec, rows_to_alts, design, return_all_types=False):
         return None, shapes, intercepts, betas
     else:
         return shapes, intercepts, betas
+
 
 def _convert_eta_to_c(eta, ref_position):
     """
@@ -330,7 +331,6 @@ def _asym_utility_transform(systematic_utilities,
     transformed_utilities[np.isposinf(transformed_utilities)] = max_comp_value
     transformed_utilities[np.isneginf(transformed_utilities)] = -max_comp_value
 
-
     # Be sure to return a 2D array since other functions will be expecting that
     if len(transformed_utilities.shape) == 1:
         transformed_utilities = transformed_utilities[:, np.newaxis]
@@ -471,7 +471,7 @@ def _asym_transform_deriv_shape(systematic_utilities,
     output_array : 2D numpy matrix.
         This matrix's data is to be replaced with the correct derivatives of
         the transformed systematic utilities with respect to the vector of
-        transformed shape parameters. Should have shape 
+        transformed shape parameters. Should have shape
         `(systematic_utilities.shape[0], shape_params.shape[0])`.
 
     Returns
@@ -885,7 +885,7 @@ class MNAL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type=model_type_to_display_name["Asym"])
+                                   model_type=display_name_dict["Asym"])
 
         # Store the utility transform function
         self.utility_transform = partial(_asym_utility_transform,

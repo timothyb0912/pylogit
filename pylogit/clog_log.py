@@ -20,7 +20,7 @@ import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import LogitTypeEstimator
 from estimation import estimate
-from display_names import model_type_to_display_name
+from display_names import model_type_to_display_name as display_name_dict
 
 # Define the boundary values which are not to be exceeded ducing computation
 max_comp_value = 1e300
@@ -167,7 +167,6 @@ def _cloglog_utility_transform(systematic_utilities,
     # Guard against overflow when systematic utilities are completely too big.
     inf_idx = np.isposinf(transformations)
     transformations[inf_idx] = max_comp_value
-
 
     # Account for the outside intercept parameters if there are any.
     if intercept_params is not None and intercept_ref_pos is not None:
@@ -582,7 +581,7 @@ class MNCL(base_mcm.MNDC_Model):
                                    intercept_ref_pos=intercept_ref_pos,
                                    names=names,
                                    intercept_names=intercept_names,
-                                   model_type=model_type_to_display_name["Cloglog"])
+                                   model_type=display_name_dict["Cloglog"])
 
         # Store the utility transform function
         self.utility_transform = partial(_cloglog_utility_transform,

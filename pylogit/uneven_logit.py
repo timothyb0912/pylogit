@@ -22,11 +22,10 @@ import warnings
 import numpy as np
 from scipy.sparse import diags
 
-import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import LogitTypeEstimator
 from estimation import estimate
-from display_names import model_type_to_display_name
+from display_names import model_type_to_display_name as display_name_dict
 
 
 # Define the boundary values which are not to be exceeded during computation
@@ -697,7 +696,7 @@ class MNUL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type=model_type_to_display_name["Uneven"])
+                                   model_type=display_name_dict["Uneven"])
 
         # Store the utility transform function
         self.utility_transform = partial(_uneven_utility_transform,
@@ -823,8 +822,8 @@ class MNUL(base_mcm.MNDC_Model):
             #     condition_2 = init_intercepts is None
             #     assert condition_1 or condition_2
             # except AssertionError as e:
-            #     msg = "init_intercepts should only be used if 'intercept' is "
-            #     msg_2 = "not in one's index specification."
+            #     msg = "init_intercepts should only be used if 'intercept' is"
+            #     msg_2 = " not in one's index specification."
             #     msg_3 = "Either make init_intercepts = None or remove "
             #     msg_4 = "'intercept' from the specification."
             #     print(msg + msg_2 )

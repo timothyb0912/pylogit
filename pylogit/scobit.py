@@ -16,11 +16,10 @@ import warnings
 import numpy as np
 from scipy.sparse import diags
 
-import choice_calcs as cc
 import base_multinomial_cm_v2 as base_mcm
 from estimation import LogitTypeEstimator
 from estimation import estimate
-from display_names import model_type_to_display_name
+from display_names import model_type_to_display_name as display_name_dict
 
 # Define the boundary values which are not to be exceeded during computation
 max_comp_value = 1e300
@@ -40,12 +39,6 @@ _ridge_warning_msg = _msg + _msg_2 + _msg_3
 _msg_4 = "The Multinomial Scobit model estimates all shape parameters"
 _msg_5 = ", so shape_ref_pos will be ignored if passed."
 _shape_ref_msg = _msg_4 + _msg_5
-
-# Alias necessary functions from the base multinomial choice model module
-general_log_likelihood = cc.calc_log_likelihood
-general_gradient = cc.calc_gradient
-general_calc_probabilities = cc.calc_probabilities
-general_hessian = cc.calc_hessian
 
 
 def split_param_vec(param_vec, rows_to_alts, design, return_all_types=False):
@@ -197,7 +190,7 @@ def _scobit_utility_transform(systematic_utilities,
     term_2 = np.log(powered_term - 1)
     # Guard against overvlow
     too_big_idx = np.isposinf(powered_term)
-    term_2[too_big_idx] = (-1 * long_natural_shapes[too_big_idx] * 
+    term_2[too_big_idx] = (-1 * long_natural_shapes[too_big_idx] *
                            systematic_utilities[too_big_idx])
 
     transformations = long_intercepts - term_2
@@ -700,7 +693,7 @@ class MNSL(base_mcm.MNDC_Model):
                                    names=names,
                                    intercept_names=intercept_names,
                                    shape_names=shape_names,
-                                   model_type=model_type_to_display_name["Scobit"])
+                                   model_type=display_name_dict["Scobit"])
 
         ##########
         # Store the utility transform function
@@ -827,8 +820,8 @@ class MNSL(base_mcm.MNDC_Model):
             #     condition_2 = init_intercepts is None
             #     assert condition_1 or condition_2
             # except AssertionError as e:
-            #     msg = "init_intercepts should only be used if 'intercept' is "
-            #     msg_2 = "not in one's index specification."
+            #     msg = "init_intercepts should only be used if 'intercept' is"
+            #     msg_2 = " not in one's index specification."
             #     msg_3 = "Either make init_intercepts = None or remove "
             #     msg_4 = "'intercept' from the specification."
             #     print(msg + msg_2 )

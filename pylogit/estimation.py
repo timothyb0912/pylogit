@@ -204,6 +204,7 @@ class EstimationObj(object):
         """
         return -1 * self.convenience_calc_hessian(params)
 
+
 class LogitTypeEstimator(EstimationObj):
     """
     Generic class for storing pointers to data and methods needed in the
@@ -408,7 +409,7 @@ def calc_individual_chi_squares(residuals,
         The probability of each alternative being chosen in each choice
         situation.
     rows_to_obs : 2D scipy sparse array.
-        Should map each row of the long format dataferame to the unique 
+        Should map each row of the long format dataferame to the unique
         observations in the dataset.
 
     Returns
@@ -466,7 +467,7 @@ def calc_and_store_post_estimation_results(results_dict,
         keys: `["fun", "x", "log_likelihood_null"]`.
     estimator : an instance of the EstimationObj class.
         Should contain the following attributes or methods:
-          
+
           - convenience_split_params
           - convenience_calc_probs
           - convenience_calc_gradient

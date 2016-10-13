@@ -90,29 +90,30 @@ def calc_nested_probs(nest_coefs,
     -------
     See above for documentation of the `return_type` kwarg.
     """
-    # Check for 2D index coefs or nesting coefficients
+    # Check for 2D index coefficients or nesting coefficients
     try:
         assert len(index_coefs.shape) <= 2
         assert (len(index_coefs.shape) == 1) or (index_coefs.shape[1] == 1)
         assert len(nest_coefs.shape) <= 2
-        assert ((len(nest_coefs.shape) == 1) or (nest_coefs.shape[1] == 1))
+        assert (len(nest_coefs.shape) == 1) or (nest_coefs.shape[1] == 1)
     except AssertionError:
-        msg = "Support for 2D index_coefs or nest_coefs not yet implemented"
+        msg = "Support for 2D index_coefs or nest_coefs not yet implemented."
         raise NotImplementedError(msg)
 
     # Check for kwarg validity
-    try:
-        valid_return_types = ['long_probs', 'chosen_probs',
-                              'long_and_chosen_probs',
-                              'all_prob_dict']
-        assert return_type in valid_return_types
-    except AssertionError:
-        msg = "return_type must be one of the following values:"
+    valid_return_types = ['long_probs',
+                          'chosen_probs',
+                          'long_and_chosen_probs',
+                          'all_prob_dict']
+    if return_type not in valid_return_types:
+        msg = "return_type must be one of the following values: "
         raise ValueError(msg + str(valid_return_types))
 
-    if chosen_row_to_obs is None and return_type == 'chosen_probs':
-        msg = "chosen_row_to_obs is None AND return_type == chosen_probs"
-        raise Exception(msg + "\nThis is invalid.")
+    chosen_probs_needed = ['chosen_probs', 'long_and_chosen_probs']
+    if chosen_row_to_obs is None and return_type in chosen_probs_needed:
+        msg = "chosen_row_to_obs is None AND return_type in {}."
+        raise ValueError(msg.format(chosen_probs_needed) +
+                         "\nThis is invalid.")
 
     # Calculate the index for each alternative for each individual, V = X*beta
     index_vals = design.dot(index_coefs)
@@ -250,8 +251,6 @@ def calc_nested_probs(nest_coefs,
 
         return prob_dict
 
-    return None
-
 
 def calc_nested_log_likelihood(nest_coefs,
                                index_coefs,
@@ -322,7 +321,7 @@ def calc_nested_log_likelihood(nest_coefs,
         return log_likelihood
     else:
         # Note that the 20 is used in place of 'infinity' since I would really
-        # like to specify the expected value of the nest coefficient to 1, but
+        # like to specify the expected value of the nest coefficient as 1, but
         # that would make the logit of the nest parameter infinity. Instead I
         # use 20 as a close enough value-- (1 + exp(-20))**-1 is approx. 1.
         params = np.concatenate(((nest_coefs - 20), index_coefs), axis=0)
@@ -470,7 +469,7 @@ def naturalize_nest_coefs(nest_coef_estimates):
 
     # Guard against underflow
     zero_idx = (nest_coefs == 0)
-    nest_coefs[zero_idx] == min_comp_value
+    nest_coefs[zero_idx] = min_comp_value
 
     return nest_coefs
 
