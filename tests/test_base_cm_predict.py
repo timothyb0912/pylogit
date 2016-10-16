@@ -13,6 +13,8 @@ import pylogit.asym_logit as asym
 import pylogit.choice_calcs as choice_calcs
 import pylogit.mixed_logit_calcs as mlc
 import pylogit.mixed_logit as mixed_logit
+import pylogit.nested_logit as nested_logit
+import pylogit.nested_choice_calcs as nlc
 
 
 class PredictFunctionTestsMixl(unittest.TestCase):
@@ -344,6 +346,150 @@ class PredictFunctionTestLogitType(unittest.TestCase):
                                  self.model_obj.intercepts.values,
                                  self.model_obj.shapes.values,
                                  None],
+                  "return_long_probs": True,
+                  "choice_col": None}
+
+        # Get the function results
+        func_results = func(*args, **kwargs)
+
+        # Perform the desired tests
+        self.assertIsInstance(func_results, np.ndarray)
+        self.assertEqual(func_results.shape, expected_results.shape)
+        npt.assert_allclose(func_results, expected_results)
+
+        # Test the function without passing param_list
+        kwargs["param_list"] = None
+        func_results_2 = func(*args, **kwargs)
+        self.assertIsInstance(func_results_2, np.ndarray)
+        self.assertEqual(func_results_2.shape, expected_results.shape)
+        npt.assert_allclose(func_results_2, expected_results)
+
+        return None
+
+
+class PredictFunctionTestNestedLogit(unittest.TestCase):
+    """
+    Ensure that, at least sometimes, we return expected results when using the
+    predict function with a nested logit model.
+    """
+    def setUp(self):
+        # Create the betas to be used during the tests
+        self.fake_betas = np.array([0.3, -0.6, 0.2])
+        # Create the fake nest coefficients to be used during the tests
+        # Note that these are the 'natural' nest coefficients, i.e. the
+        # inverse of the scale parameters for each nest. They should be bigger
+        # than or equal to 1.
+        self.natural_nest_coefs = np.array([1 - 1e-16, 0.5])
+        # Create an array of all model parameters
+        self.fake_all_params = np.concatenate((self.natural_nest_coefs,
+                                               self.fake_betas))
+        # The set up being used is one where there are two choice situations,
+        # The first having three alternatives, and the second having only two.
+        # The nest memberships of these alternatives are given below.
+        self.fake_rows_to_nests = csr_matrix(np.array([[1, 0],
+                                                       [1, 0],
+                                                       [0, 1],
+                                                       [1, 0],
+                                                       [0, 1]]))
+
+        # Create a sparse matrix that maps the rows of the design matrix to the
+        # observatins
+        self.fake_rows_to_obs = csr_matrix(np.array([[1, 0],
+                                                     [1, 0],
+                                                     [1, 0],
+                                                     [0, 1],
+                                                     [0, 1]]))
+
+        # Create the fake design matrix with columns denoting ASC_1, ASC_2, X
+        self.fake_design = np.array([[1, 0, 1],
+                                     [0, 1, 2],
+                                     [0, 0, 3],
+                                     [1, 0, 1.5],
+                                     [0, 0, 3.5]])
+
+        # Create fake versions of the needed arguments for the MNL constructor
+        self.fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2],
+                                     "alt_id": [1, 2, 3, 1, 3],
+                                     "choice": [0, 1, 0, 0, 1],
+                                     "x": range(5),
+                                     "intercept": [1 for i in range(5)]})
+
+        # Record the various column names
+        self.alt_id_col = "alt_id"
+        self.obs_id_col = "obs_id"
+        self.choice_col = "choice"
+
+        # Store the choice array
+        self.choice_array = self.fake_df[self.choice_col].values
+
+        # Create a sparse matrix that maps the chosen rows of the design
+        # matrix to the observatins
+        self.fake_chosen_rows_to_obs = csr_matrix(np.array([[0, 0],
+                                                            [1, 0],
+                                                            [0, 0],
+                                                            [0, 0],
+                                                            [0, 1]]))
+
+        # Create the index specification  and name dictionaryfor the model
+        self.fake_specification = OrderedDict()
+        self.fake_specification["intercept"] = [1, 2]
+        self.fake_specification["x"] = [[1, 2, 3]]
+        self.fake_names = OrderedDict()
+        self.fake_names["intercept"] = ["ASC 1", "ASC 2"]
+        self.fake_names["x"] = ["x (generic coefficient)"]
+
+        # Create the nesting specification
+        self.fake_nest_spec = OrderedDict()
+        self.fake_nest_spec["Nest 1"] = [1, 2]
+        self.fake_nest_spec["Nest 2"] = [3]
+
+        # Create a nested logit object
+        args = [self.fake_df,
+                self.alt_id_col,
+                self.obs_id_col,
+                self.choice_col,
+                self.fake_specification]
+        kwargs = {"names": self.fake_names,
+                  "nest_spec": self.fake_nest_spec}
+        self.model_obj = nested_logit.NestedLogit(*args, **kwargs)
+
+        self.model_obj.coefs = pd.Series(self.fake_betas)
+        self.model_obj.intercepts = None
+        self.model_obj.shapes = None
+        def logit(x):
+            return np.log(x / (1 - x))
+        self.model_obj.nests = pd.Series(logit(self.natural_nest_coefs))
+
+        # Store a ridge parameter
+        self.ridge = 0.5
+
+        # Gather the arguments needed for the calc_nested_probs function
+        args = [self.natural_nest_coefs,
+                self.fake_betas,
+                self.model_obj.design,
+                self.fake_rows_to_obs,
+                self.fake_rows_to_nests]
+        kwargs = {"return_type": "long_probs"}
+        self.prob_array = nlc.calc_nested_probs(*args, **kwargs)
+
+        return None
+
+    def test_predict_function(self):
+        """
+        Ensure that the predict function returns expected results for the
+        nested logit model.
+        """
+        # Alias the function that will be tested
+        func = self.model_obj.predict
+        # Get the expected results
+        expected_results = self.prob_array
+
+        # Gather the needed arguments for the test
+        args = [self.fake_df]
+        kwargs = {"param_list": [self.model_obj.coefs.values,
+                                 None,
+                                 None,
+                                 self.model_obj.nests.values],
                   "return_long_probs": True,
                   "choice_col": None}
 

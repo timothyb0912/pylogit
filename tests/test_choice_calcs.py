@@ -1660,4 +1660,3 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(function_result, expected_result)
 
         return None
-
