@@ -804,6 +804,10 @@ def calc_hessian(beta,
     if ridge is not None:
         hess -= 2 * ridge
 
+    # Make sure we are returning standard numpy arrays
+    if isinstance(hess, np.matrixlib.defmatrix.matrix):
+        hess = np.asarray(hess)
+
     return hess
 
 
