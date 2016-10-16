@@ -191,12 +191,12 @@ class MixedLogitCalculations(unittest.TestCase):
         self.obs_id_column = "observation_id"
         self.choice_column = "choice"
 
-        self.fake_old_df = pd.DataFrame({"x": self.fake_design[:, 2],
-                                    self.alt_id_column: self.alternative_ids,
-                                    self.situation_id_column:
-                                                            self.situation_ids,
-                                    self.obs_id_column: self.individual_ids,
-                                    self.choice_column: self.choice_array})
+        data = {"x": self.fake_design[:, 2],
+                self.alt_id_column: self.alternative_ids,
+                self.situation_id_column: self.situation_ids,
+                self.obs_id_column: self.individual_ids,
+                self.choice_column: self.choice_array}
+        self.fake_old_df = pd.DataFrame(data)
         self.fake_old_df["intercept"] = 1
 
         # Create a fake specification
