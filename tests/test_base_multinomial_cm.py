@@ -1,15 +1,12 @@
 """
-Tests for the base_multinomial_cm_v2.py file. These tests do not include tests of
-the functions that perform the mathematical calculations necessary to estimate
-the predict function.
+Tests for the base_multinomial_cm_v2.py file. These tests do not include tests
+of the functions that perform the mathematical calculations necessary to
+estimate the predict function.
 """
-import warnings
 import unittest
 import os
-import pickle
 from collections import OrderedDict
 from copy import deepcopy
-from functools import partial
 
 import numpy as np
 import numpy.testing as npt
@@ -1330,6 +1327,3 @@ class PostEstimationTests(GenericTestCase):
 
         except ImportError:
             return None
-
-
-
