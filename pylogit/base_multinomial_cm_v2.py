@@ -30,6 +30,7 @@ from choice_tools import ensure_object_is_ordered_dict
 from choice_tools import ensure_columns_are_in_dataframe
 from choice_calcs import calc_probabilities, calc_asymptotic_covariance
 from nested_choice_calcs import calc_nested_probs
+from nested_choice_calcs import naturalize_nest_coefs
 import mixed_logit_calcs as mlc
 
 # Create a list of the necesssary result dictionary keys
@@ -1704,9 +1705,11 @@ class MNDC_Model(object):
         # Get the probability of each observation choosing each available
         # alternative
         if self.model_type == "Nested Logit Model":
+            # Get the 'natural' nest coefficients for prediction
+            new_natural_nests = naturalize_nest_coefs(new_nest_coefs)
             # This condition accounts for the fact that we have a different
             # functional interface for nested vs non-nested models
-            return calc_nested_probs(new_nest_coefs,
+            return calc_nested_probs(new_natural_nests,
                                      new_index_coefs,
                                      new_design,
                                      new_rows_to_obs,
