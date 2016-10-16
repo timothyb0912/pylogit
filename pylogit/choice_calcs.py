@@ -8,9 +8,9 @@ Created on Sun Feb 28 09:12:36 2016
 @summary:   Contains generic functions necessary for calculating choice
             probabilities and for estimating the choice models.
 """
-import scipy.linalg
-import scipy.stats
 import numpy as np
+import scipy.stats
+import scipy.linalg
 from scipy.linalg import block_diag
 from scipy.sparse import hstack
 
@@ -28,8 +28,8 @@ min_comp_value = 1e-300
 def calc_probabilities(beta,
                        design,
                        alt_IDs,
-                       alt_to_obs,
-                       alt_to_shapes,
+                       rows_to_obs,
+                       rows_to_alts,
                        utility_transform,
                        intercept_params=None,
                        shape_params=None,
@@ -53,11 +53,11 @@ def calc_probabilities(beta,
         All elements should be ints. There should be one row per obervation per
         available alternative for the given observation. Elements denote the
         alternative corresponding to the given row of the design matrix.
-    alt_to_obs : 2D ndarray.
+    rows_to_obs : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per observation. This matrix maps the rows of the design
         matrix to the unique observations (on the columns).
-    alt_to_shapes : 2D ndarray.
+    rows_to_alts : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per possible alternative. This matrix maps the rows of the
         design matrix to the possible alternatives for this dataset.
@@ -117,8 +117,8 @@ def calc_probabilities(beta,
         msg_1 = "Cannot calculate probabilities with both 3D design matrix AND"
         msg_2 = " 2D coefficient array."
         raise ValueError(msg_1 + msg_2)
-    if chosen_row_to_obs is None and return_long_probs == False:
-        msg = "chosen_row_to_obs is None AND return_long_probs == False"
+    if chosen_row_to_obs is None and return_long_probs is False:
+        msg = "chosen_row_to_obs is None AND return_long_probs is False"
         raise ValueError(msg)
 
     # Calculate the systematic utility for each alternative for each individual
@@ -128,7 +128,7 @@ def calc_probabilities(beta,
     # The transformed utilities will be of shape (num_rows, 1)
     transformed_utilities = utility_transform(sys_utilities,
                                               alt_IDs,
-                                              alt_to_shapes,
+                                              rows_to_alts,
                                               shape_params,
                                               intercept_params)
 
@@ -145,9 +145,9 @@ def calc_probabilities(beta,
     # long_probs will be of shape (num_rows,) Each element will provide the
     # probability of the observation associated with that row having the
     # alternative associated with that row as the observation's outcome
-    individual_denominators = np.asarray(alt_to_obs.transpose().dot(
+    individual_denominators = np.asarray(rows_to_obs.transpose().dot(
                                                     long_exponentials))
-    long_denominators = np.asarray(alt_to_obs.dot(individual_denominators))
+    long_denominators = np.asarray(rows_to_obs.dot(individual_denominators))
     if len(long_exponentials.shape) > 1 and long_exponentials.shape[1] > 1:
         long_probs = (long_exponentials / long_denominators)
     else:
@@ -184,8 +184,8 @@ def calc_probabilities(beta,
 def calc_log_likelihood(beta,
                         design,
                         alt_IDs,
-                        alt_to_obs,
-                        alt_to_shapes,
+                        rows_to_obs,
+                        rows_to_alts,
                         choice_vector,
                         utility_transform,
                         intercept_params=None,
@@ -205,11 +205,11 @@ def calc_log_likelihood(beta,
         All elements should be ints. There should be one row per obervation per
         available alternative for the given observation. Elements denote the
         alternative corresponding to the given row of the design matrix.
-    alt_to_obs : 2D ndarray.
+    rows_to_obs : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per observation. This matrix maps the rows of the design
         matrix to the unique observations (on the columns).
-    alt_to_shapes : 2D ndarray.
+    rows_to_alts : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per possible alternative. This matrix maps the rows of the
         design matrix to the possible alternatives for this dataset.
@@ -245,8 +245,8 @@ def calc_log_likelihood(beta,
     long_probs = calc_probabilities(beta,
                                     design,
                                     alt_IDs,
-                                    alt_to_obs,
-                                    alt_to_shapes,
+                                    rows_to_obs,
+                                    rows_to_alts,
                                     utility_transform,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
@@ -267,8 +267,195 @@ def calc_log_likelihood(beta,
         return log_likelihood - ridge * np.square(params).sum()
 
 
+def calc_gradient(beta,
+                  design,
+                  alt_IDs,
+                  rows_to_obs,
+                  rows_to_alts,
+                  choice_vector,
+                  utility_transform,
+                  transform_first_deriv_c,
+                  transform_first_deriv_v,
+                  transform_deriv_alpha,
+                  intercept_params,
+                  shape_params,
+                  ridge):
+    """
+    Parameters
+    ----------
+    beta : 1D ndarray.
+        All elements should by ints, floats, or longs. Should have 1 element
+        for each utility coefficient being estimated (i.e. num_features).
+    design : 2D ndarray.
+        Tjere should be one row per observation per available alternative.
+        There should be one column per utility coefficient being estimated. All
+        elements should be ints, floats, or longs.
+    alt_IDs : 1D ndarray.
+        All elements should be ints. There should be one row per obervation per
+        available alternative for the given observation. Elements denote the
+        alternative corresponding to the given row of the design matrix.
+    rows_to_obs : 2D scipy sparse array.
+        There should be one row per observation per available alternative and
+        one column per observation. This matrix maps the rows of the design
+        matrix to the unique observations (on the columns).
+    rows_to_alts : 2D scipy sparse array
+        There should be one row per observation per available alternative and
+        one column per possible alternative. This matrix maps the rows of the
+        design matrix to the possible alternatives for this dataset.
+    choice_vector : 1D ndarray.
+        All elements should be either ones or zeros. There should be one row
+        per observation per available alternative for the given observation.
+        Elements denote the alternative which is chosen by the given
+        observation with a 1 and a zero otherwise.
+    utility_transform : callable.
+        Must accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, and miscellaneous args and kwargs. Should return a 1D
+        array whose elements contain the appropriately transformed systematic
+        utility values, based on the current model being evaluated.
+    transform_first_deriv_c : callable.
+        Must accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, the `rows_to_alts` array, (shape parameters if there
+        are any) and miscellaneous args and kwargs. Should return a 2D matrix
+        or sparse array whose elements contain the derivative of the tranformed
+        utility vector with respect to the vector of shape parameters. The
+        dimensions of the returned vector should be
+        `(design.shape[0], num_alternatives)`. If there are no shape parameters
+        then the callable should return None.
+    transform_first_deriv_v : callable.
+        Must accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, (shape parameters if there are any) and miscellaneous
+        args and kwargs. Should return a 2D array whose elements contain the
+        derivative of the tranformed utility vector with respect to the vector
+        of systematic utilities. The dimensions of the returned vector should
+        be `(design.shape[0], design.shape[0])`.
+    transform_deriv_alpha : callable.
+        Must accept a 1D array of systematic utility values, a 1D array of
+        alternative IDs, the `rows_to_alts` array, (intercept parameters if
+        there are any) and miscellaneous args and kwargs. Should return a 2D
+        array whose elements contain the derivative of the tranformed utility
+        vector with respect to the vector of shape parameters. The dimensions
+        of the returned vector should be
+        `(design.shape[0], num_alternatives - 1)`. If there are no intercept
+        parameters, the callable should return None.
+    intercept_params : 1D numpy array or None.
+        If an array, each element should be an int, float, or long. For
+        identifiability, there should be J- 1 elements where J is the total
+        number of observed alternatives for this dataset. Default == None.
+    shape_params : 1D ndarray or None.
+       If an array, each element should be an int, float, or long. There should
+       be one value per shape parameter of the model being used.
+       Default == None.
+    ridge : int, float, long, or None.
+        Determines whether or not ridge regression is performed. If an int,
+        float or long is passed, then that scalar determines the ridge penalty
+        for the optimization. Default = None.
+
+    Returns
+    -------
+    gradient : 1D ndarray.
+       It's shape is (beta.shape[0], ). It is the second derivative of the log-
+       likelihood with respect to beta.
+    """
+    # Calculate the systematic utility for each alternative for each individual
+    sys_utilities = design.dot(beta)
+
+    # Calculate the probability of each individual choosing each available
+    # alternative for that individual.
+    long_probs = calc_probabilities(beta,
+                                    design,
+                                    alt_IDs,
+                                    rows_to_obs,
+                                    rows_to_alts,
+                                    utility_transform,
+                                    intercept_params=intercept_params,
+                                    shape_params=shape_params,
+                                    return_long_probs=True)
+
+    ##########
+    # Get the required matrices
+    ##########
+    # Differentiate the transformed utilities with respect to the shape params
+    # Note that dh_dc should be a sparse array
+    dh_dc = transform_first_deriv_c(sys_utilities, alt_IDs,
+                                    rows_to_alts, shape_params)
+    # Differentiate the transformed utilities by the intercept params
+    # Note that dh_d_alpha should be a sparse array
+    dh_d_alpha = transform_deriv_alpha(sys_utilities, alt_IDs,
+                                       rows_to_alts, intercept_params)
+    # Differentiate the transformed utilities with respect to the systematic
+    # utilities. Note that dh_dv should be a sparse matrix
+    dh_dv = transform_first_deriv_v(sys_utilities, alt_IDs,
+                                    rows_to_alts, shape_params)
+    # Differentiate the transformed utilities with respect to the utility
+    # coefficients. Note that dh_db should be a dense **matrix**, not a dense
+    # 2D array. This is because the dot product of a 2D scipy sparse array and
+    # a 2D dense numpy array yields a 2D dense numpy matrix
+    dh_db = dh_dv.dot(design)
+    # Differentiate the log likelihood w/ respect to the transformed utilities
+    # Note that d_ll_dh will be a dense 2D numpy array.
+    d_ll_dh = (choice_vector - long_probs)[np.newaxis, :]
+
+    # Calculate the gradient of the log-likelihood with respect to the betas
+    d_ll_d_beta = d_ll_dh.dot(dh_db)
+
+    ##########
+    # Form and return the gradient
+    ##########
+    if shape_params is not None and intercept_params is not None:
+        # Note that we use d_ll_dh * dh_dc and d_ll_dh * dh_d_alpha because
+        # that is how one computes the dot product between a dense 2D numpy
+        # array and a 2D sparse matrix. This is due to numpy ndarrays and
+        # scipy sparse matrices not playing nicely together. However, numpy
+        # ndarrays and numpy matrices can be dot producted together,
+        # hence d_ll_dh.dot(dh_db).
+
+        # Note that the 'np.asarray' is because dll_dh * dh_dc will be a row
+        # matrix, but we want a 1D numpy array.
+        gradient = np.concatenate((np.asarray(d_ll_dh * hstack((dh_dc,
+                                                                dh_d_alpha),
+                                                               format='csr')),
+                                   d_ll_d_beta), axis=1).ravel()
+        params = np.concatenate((shape_params, intercept_params, beta),
+                                axis=0)
+
+    elif shape_params is not None and intercept_params is None:
+        # Note that we use d_ll_dh * dh_dc because that is how one computes
+        # the dot product between a dense 2D numpy array and a 2D sparse matrix
+        # This is due to numpy ndarrays and scipy sparse matrices not playing
+        # nicely together. However, numpy ndarrays and numpy matrices can be
+        # dot producted together, hence d_ll_dh.dot(dh_db).
+
+        # Note that the 'np.asarray' is because dll_dh * dh_dc will be a row
+        # matrix, but we want a 1D numpy array.
+        gradient = np.concatenate((np.asarray(d_ll_dh * dh_dc), d_ll_d_beta),
+                                  axis=1).ravel()
+        params = np.concatenate((shape_params, beta), axis=0)
+
+    elif shape_params is None and intercept_params is not None:
+        # Note that we use d_ll_dh * dh_d_alpha because that's how one computes
+        # the dot product between a dense 2D numpy array and a 2D sparse matrix
+        # This is due to numpy ndarrays and scipy sparse matrices not playing
+        # nicely together. However, numpy ndarrays and numpy matrices can be
+        # dot producted together, hence d_ll_dh.dot(dh_db).
+
+        # Note 'np.asarray' is used because dll_dh * dh_d_alpha will be a row
+        # matrix, but we want a 1D numpy array.
+        gradient = np.concatenate((np.asarray(d_ll_dh * dh_d_alpha),
+                                   d_ll_d_beta), axis=1).ravel()
+        params = np.concatenate((intercept_params, beta), axis=0)
+
+    else:
+        gradient = d_ll_d_beta.ravel()
+        params = beta
+
+    if ridge is not None:
+        gradient -= 2 * ridge * params
+
+    return gradient
+
+
 ##########
-# The two functions below are used, jointly, to construct dP_dV, the block
+# The three functions below are used, jointly, to construct dP_dV, the block
 # diagonal matrix that is the derivative of the long probability vector with
 # respect to the long vector of index values = X*beta.
 ##########
@@ -284,7 +471,7 @@ def create_matrix_block_indices(row_to_obs):
     Returns
     -------
     output_indices : list of arrays.
-        There will be one array per column in `alt_to_obs`. The array will note
+        There will be one array per column in `row_to_obs`. The array will note
         which rows correspond to which observations.
     """
     # Initialize the list of index arrays to be returned
@@ -293,7 +480,7 @@ def create_matrix_block_indices(row_to_obs):
     num_obs = row_to_obs.shape[1]
     # Get the indices of the non-zero elements and their values
     row_indices, col_indices, values = scipy.sparse.find(row_to_obs)
-    # Iterate over each observation, i.e. each column in alt_to_obs, and
+    # Iterate over each observation, i.e. each column in row_to_obs, and
     # determine which rows belong to that observation (i.e. the rows with ones
     # in them).
     for col in xrange(num_obs):
@@ -339,10 +526,10 @@ def create_matrix_blocks(long_probs, matrix_block_indices):
     Returns
     -------
     output_matrices : list of matrices.
-        Each matrix will contain the derivative of P_i with respect to V_i, and
+        Each matrix will contain the derivative of P_i with respect to H_i, and
         there will be one matrix for each observations i. P_i is the array of
         probabilities of each observation being associated with its available
-        alternatives. V_i is the array of systematic utilities for each
+        alternatives. H_i is the array of transformed index values for each
         alternative that is available to observation i.
     """
     # Initialize the list of matrices that is to be returned.
@@ -354,12 +541,12 @@ def create_matrix_blocks(long_probs, matrix_block_indices):
         # is associated with the current observation
         current_probs = long_probs[indices]
         # Get the outer product of the current probabilities
-        # probability_outer_prod = np.outer(current_probs, current_probs)
-        probability_outer_prod = robust_outer_product(current_probs,
-                                                      current_probs)
+        # probability_outer_product = np.outer(current_probs, current_probs)
+        probability_outer_product = robust_outer_product(current_probs,
+                                                         current_probs)
 
         # Create the desired dP_i/dh_i matrix
-        dP_i_dh_i = np.diag(current_probs) - probability_outer_prod
+        dP_i_dh_i = np.diag(current_probs) - probability_outer_product
         # Ensure that the diagonal is positive and non-zero, since it must be.
         diag_idx = np.diag_indices_from(dP_i_dh_i)
         diag_values = dP_i_dh_i[diag_idx].copy()
@@ -370,204 +557,22 @@ def create_matrix_blocks(long_probs, matrix_block_indices):
         for i in xrange(underflow_idxs[0].size):
             row_idx, col_idx = underflow_idxs[0][i], underflow_idxs[1][i]
             if row_idx != col_idx:
+                # Since this type of underflow essentially comes from
+                # multiplying two very small numbers, just set the overall
+                # result to a small number
                 dP_i_dh_i[row_idx,
-                          col_idx] = -1 * probability_outer_prod[row_idx,
-                                                                 col_idx]
+                          col_idx] = -1 * min_comp_value
         # Store the desired dP_i/dh_i matrix
         output_matrices.append(dP_i_dh_i)
 
     return output_matrices
 
 
-def calc_gradient(beta,
-                  design,
-                  alt_IDs,
-                  alt_to_obs,
-                  alt_to_shapes,
-                  choice_vector,
-                  utility_transform,
-                  transform_first_deriv_c,
-                  transform_first_deriv_v,
-                  transform_deriv_alpha,
-                  intercept_params,
-                  shape_params,
-                  ridge):
-    """
-    Parameters
-    ----------
-    beta : 1D ndarray.
-        All elements should by ints, floats, or longs. Should have 1 element
-        for each utility coefficient being estimated (i.e. num_features).
-    design : 2D ndarray.
-        Tjere should be one row per observation per available alternative.
-        There should be one column per utility coefficient being estimated. All
-        elements should be ints, floats, or longs.
-    alt_IDs : 1D ndarray.
-        All elements should be ints. There should be one row per obervation per
-        available alternative for the given observation. Elements denote the
-        alternative corresponding to the given row of the design matrix.
-    alt_to_obs : 2D scipy sparse array.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-    alt_to_shapes : 2D scipy sparse array
-        There should be one row per observation per available alternative and
-        one column per possible alternative. This matrix maps the rows of the
-        design matrix to the possible alternatives for this dataset.
-    choice_vector : 1D ndarray.
-        All elements should be either ones or zeros. There should be one row
-        per observation per available alternative for the given observation.
-        Elements denote the alternative which is chosen by the given
-        observation with a 1 and a zero otherwise.
-    utility_transform : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, and miscellaneous args and kwargs. Should return a 1D
-        array whose elements contain the appropriately transformed systematic
-        utility values, based on the current model being evaluated.
-    transform_first_deriv_c : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, the `alt_to_shapes` array, (shape parameters if there
-        are any) and miscellaneous args and kwargs. Should return a 2D matrix
-        or sparse array whose elements contain the derivative of the tranformed
-        utility vector with respect to the vector of shape parameters. The
-        dimensions of the returned vector should be
-        `(design.shape[0], num_alternatives)`. If there are no shape parameters
-        then the callable should return None.
-    transform_first_deriv_v : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, (shape parameters if there are any) and miscellaneous
-        args and kwargs. Should return a 2D array whose elements contain the
-        derivative of the tranformed utility vector with respect to the vector
-        of systematic utilities. The dimensions of the returned vector should
-        be `(design.shape[0], design.shape[0])`.
-    transform_deriv_alpha : callable.
-        Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, the `alt_to_shapes` array, (intercept parameters if
-        there are any) and miscellaneous args and kwargs. Should return a 2D
-        array whose elements contain the derivative of the tranformed utility
-        vector with respect to the vector of shape parameters. The dimensions
-        of the returned vector should be
-        `(design.shape[0], num_alternatives - 1)`. If there are no intercept
-        parameters, the callable should return None.
-    intercept_params : 1D numpy array or None.
-        If an array, each element should be an int, float, or long. For
-        identifiability, there should be J- 1 elements where J is the total
-        number of observed alternatives for this dataset. Default == None.
-    shape_params : 1D ndarray or None.
-       If an array, each element should be an int, float, or long. There should
-       be one value per shape parameter of the model being used.
-       Default == None.
-    ridge : int, float, long, or None.
-        Determines whether or not ridge regression is performed. If an int,
-        float or long is passed, then that scalar determines the ridge penalty
-        for the optimization. Default = None.
-
-    Returns
-    -------
-    gradient : 1D ndarray.
-       It's shape is (beta.shape[0], ). It is the second derivative of the log-
-       likelihood with respect to beta.
-    """
-    # Calculate the systematic utility for each alternative for each individual
-    sys_utilities = design.dot(beta)
-
-    # Calculate the probability of each individual choosing each available
-    # alternative for that individual.
-    long_probs = calc_probabilities(beta,
-                                    design,
-                                    alt_IDs,
-                                    alt_to_obs,
-                                    alt_to_shapes,
-                                    utility_transform,
-                                    intercept_params=intercept_params,
-                                    shape_params=shape_params,
-                                    return_long_probs=True)
-
-    ##########
-    # Get the required matrices
-    ##########
-    # Differentiate the transformed utilities with respect to the shape params
-    # Note that dh_dc should be a sparse array
-    dh_dc = transform_first_deriv_c(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
-    # Differentiate the transformed utilities by the intercept params
-    # Note that dh_d_alpha should be a sparse array
-    dh_d_alpha = transform_deriv_alpha(sys_utilities, alt_IDs,
-                                       alt_to_shapes, intercept_params)
-    # Differentiate the transformed utilities with respect to the systematic
-    # utilities. Note that dh_dv should be a sparse matrix
-    dh_dv = transform_first_deriv_v(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
-    # Differentiate the transformed utilities with respect to the utility
-    # coefficients. Note that dh_db should be a dense **matrix**, not a dense
-    # 2D array. This is because the dot product of a 2D scipy sparse array and
-    # a 2D dense numpy array yields a 2D dense numpy matrix
-    dh_db = dh_dv.dot(design)
-    # Differentiate the log likelihood w/ respect to the transformed utilities
-    # Note that d_ll_dh will be a dense 2D numpy array.
-    d_ll_dh = (choice_vector - long_probs)[np.newaxis, :]
-
-    ##########
-    # Form and return the gradient
-    ##########
-    if shape_params is not None and intercept_params is not None:
-        # Note that we use d_ll_dh * dh_dc and d_ll_dh * dh_d_alpha because
-        # that is how one computes the dot product between a dense 2D numpy
-        # array and a 2D sparse matrix. This is due to numpy ndarrays and
-        # scipy sparse matrices not playing nicely together. However, numpy
-        # ndarrays and numpy matrices can be dot producted together,
-        # hence d_ll_dh.dot(dh_db).
-
-        # Note that the 'np.asarray' is because dll_dh * dh_dc will be a row
-        # matrix, but we want a 1D numpy array.
-        gradient = np.concatenate((np.asarray(d_ll_dh * hstack((dh_dc,
-                                                                dh_d_alpha),
-                                                               format='csr')),
-                                   d_ll_dh.dot(dh_db)), axis=1).ravel()
-        params = np.concatenate((shape_params, intercept_params, beta),
-                                axis=0)
-
-    elif shape_params is not None and intercept_params is None:
-        # Note that we use d_ll_dh * dh_dc because that is how one computes
-        # the dot product between a dense 2D numpy array and a 2D sparse matrix
-        # This is due to numpy ndarrays and scipy sparse matrices not playing
-        # nicely together. However, numpy ndarrays and numpy matrices can be
-        # dot producted together, hence d_ll_dh.dot(dh_db).
-
-        # Note that the 'np.asarray' is because dll_dh * dh_dc will be a row
-        # matrix, but we want a 1D numpy array.
-        gradient = np.concatenate((np.asarray(d_ll_dh * dh_dc),
-                                   d_ll_dh.dot(dh_db)), axis=1).ravel()
-        params = np.concatenate((shape_params, beta), axis=0)
-
-    elif shape_params is None and intercept_params is not None:
-        # Note that we use d_ll_dh * dh_d_alpha because that's how one computes
-        # the dot product between a dense 2D numpy array and a 2D sparse matrix
-        # This is due to numpy ndarrays and scipy sparse matrices not playing
-        # nicely together. However, numpy ndarrays and numpy matrices can be
-        # dot producted together, hence d_ll_dh.dot(dh_db).
-
-        # Note 'np.asarray' is used because dll_dh * dh_d_alpha will be a row
-        # matrix, but we want a 1D numpy array.
-        gradient = np.concatenate((np.asarray(d_ll_dh * dh_d_alpha),
-                                   d_ll_dh.dot(dh_db)), axis=1).ravel()
-        params = np.concatenate((intercept_params, beta), axis=0)
-
-    else:
-        gradient = d_ll_dh.dot(dh_db).ravel()
-        params = beta
-
-    if ridge is not None:
-        gradient -= 2 * ridge * params
-
-    return gradient
-
-
 def calc_hessian(beta,
                  design,
                  alt_IDs,
-                 alt_to_obs,
-                 alt_to_shapes,
+                 rows_to_obs,
+                 rows_to_alts,
                  utility_transform,
                  transform_first_deriv_c,
                  transform_first_deriv_v,
@@ -590,11 +595,11 @@ def calc_hessian(beta,
         All elements should be ints. There should be one row per obervation per
         available alternative for the given observation. Elements denote the
         alternative corresponding to the given row of the design matrix.
-    alt_to_obs : 2D ndarray.
+    rows_to_obs : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per observation. This matrix maps the rows of the design
         matrix to the unique observations (on the columns).
-    alt_to_shapes: 2D ndarray.
+    rows_to_alts: 2D ndarray.
         There should be one row per observation per available alternative and
         one column per possible alternative. This matrix maps the rows of the
         design matrix to the possible alternatives for this dataset.
@@ -605,7 +610,7 @@ def calc_hessian(beta,
         utility values, based on the current model being evaluated.
     transform_first_deriv_c : callable.
         Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, the `alt_to_shapes` array, (shape parameters if there
+        alternative IDs, the `rows_to_alts` array, (shape parameters if there
         are any) and miscellaneous args and kwargs. Should return a 2D array
         whose elements contain the derivative of the tranformed utilities with
         respect to the vector of shape parameters. The dimensions of the
@@ -619,7 +624,7 @@ def calc_hessian(beta,
         be `(design.shape[0], design.shape[0])`.
     transform_deriv_alpha : callable.
         Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, the alt_to_shapes array, (intercept parameters if
+        alternative IDs, the rows_to_alts array, (intercept parameters if
         there are any) and miscellaneous args and kwargs. Should return a 2D
         array whose elements contain the derivative of the tranformed utilities
         with respect to the vector of shape parameters. The dimensions of the
@@ -655,8 +660,8 @@ def calc_hessian(beta,
     long_probs = calc_probabilities(beta,
                                     design,
                                     alt_IDs,
-                                    alt_to_obs,
-                                    alt_to_shapes,
+                                    rows_to_obs,
+                                    rows_to_alts,
                                     utility_transform,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
@@ -667,15 +672,15 @@ def calc_hessian(beta,
     # Differentiate the transformed utilities with respect to the shape params
     # Note that dh_dc will be a 2D scipy sparse matrix
     dh_dc = transform_first_deriv_c(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
+                                    rows_to_alts, shape_params)
     # Differentiate the transformed utilities with respect to the systematic
     # utilities. Note that dh_dv will be a 2D scipy sparse matrix.
     dh_dv = transform_first_deriv_v(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
+                                    rows_to_alts, shape_params)
     # Differentiate the transformed utilities by the intercept params
     # Note that dh_d_alpha should be a sparse array
     dh_d_alpha = transform_deriv_alpha(sys_utilities, alt_IDs,
-                                       alt_to_shapes, intercept_params)
+                                       rows_to_alts, intercept_params)
     # Differentiate the transformed utilities with respect to the utility
     # coefficients. Note that dh_db will be a 2D dense numpy matrix
     dh_db = dh_dv.dot(design)
@@ -805,8 +810,8 @@ def calc_hessian(beta,
 def calc_fisher_info_matrix(beta,
                             design,
                             alt_IDs,
-                            alt_to_obs,
-                            alt_to_shapes,
+                            rows_to_obs,
+                            rows_to_alts,
                             choice_vector,
                             utility_transform,
                             transform_first_deriv_c,
@@ -829,11 +834,11 @@ def calc_fisher_info_matrix(beta,
         All elements should be ints. There should be one row per obervation per
         available alternative for the given observation. Elements denote the
         alternative corresponding to the given row of the design matrix.
-    alt_to_obs : 2D ndarray.
+    rows_to_obs : 2D ndarray.
         There should be one row per observation per available alternative and
         one column per observation. This matrix maps the rows of the design
         matrix to the unique observations (on the columns).
-    alt_to_shapes : 2D ndarray
+    rows_to_alts : 2D ndarray
         There should be one row per observation per available alternative and
         one column per possible alternative. This matrix maps the rows of the
         design matrix to the possible alternatives for this dataset.
@@ -849,7 +854,7 @@ def calc_fisher_info_matrix(beta,
         systematic utility values, based on the current model being evaluated.
     transform_first_deriv_c : callable.
         Must accept a 1D array of systematic utility values, a 1D array of
-        alternative IDs, the `alt_to_shapes` array, (shape parameters if there
+        alternative IDs, the `rows_to_alts` array, (shape parameters if there
         are any) and miscellaneous args and kwargs. Should return a 2D array
         whose elements contain the derivative of the tranformed utilities with
         respect to the vector of shape parameters. The dimensions of the
@@ -885,8 +890,8 @@ def calc_fisher_info_matrix(beta,
     long_probs = calc_probabilities(beta,
                                     design,
                                     alt_IDs,
-                                    alt_to_obs,
-                                    alt_to_shapes,
+                                    rows_to_obs,
+                                    rows_to_alts,
                                     utility_transform,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
@@ -897,15 +902,15 @@ def calc_fisher_info_matrix(beta,
     ##########
     # Differentiate the transformed utilities with respect to the shape params
     dh_dc = transform_first_deriv_c(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
+                                    rows_to_alts, shape_params)
     # Differentiate the transformed utilities with respect to the systematic
     # utilities
     dh_dv = transform_first_deriv_v(sys_utilities, alt_IDs,
-                                    alt_to_shapes, shape_params)
+                                    rows_to_alts, shape_params)
     # Differentiate the transformed utilities by the intercept params
     # Note that dh_d_alpha should be a sparse array
     dh_d_alpha = transform_deriv_alpha(sys_utilities, alt_IDs,
-                                       alt_to_shapes, intercept_params)
+                                       rows_to_alts, intercept_params)
     # Differentiate the transformed utilities with respect to the utility
     # coefficients. This should be a dense numpy array.
     dh_db = np.asarray(dh_dv.dot(design))
@@ -941,6 +946,12 @@ def calc_fisher_info_matrix(beta,
                                                    dh_db), axis=1)
     else:
         gradient_vec = d_ll_dh.T * dh_db
+
+    # Make sure that we calculate the gradient PER OBSERVATION
+    # and then take the outer products of those gradients.
+    # Note that this is different than taking the outer products of the
+    # gradient of the log-likelihood per available alternative per observation
+    gradient_vec = rows_to_obs.T.dot(gradient_vec)
 
     # Compute and return the outer product of each row of the gradient
     # with itself. Then sum these individual matrices together.
