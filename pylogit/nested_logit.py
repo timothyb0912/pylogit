@@ -128,7 +128,7 @@ class NestedEstimator(EstimationObj):
             Determines whether or not ridge regression is performed. If a
             scalar is passed, then that scalar determines the ridge penalty for
             the optimization. The scalar should be greater than or equal to
-            zero..
+            zero.
     zero_vector : 1D ndarray.
         Determines what is viewed as a "null" set of parameters. It is
         explicitly passed because some parameters (e.g. parameters that must be
