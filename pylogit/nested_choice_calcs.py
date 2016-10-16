@@ -132,6 +132,7 @@ def calc_nested_probs(nest_coefs,
 
     # Calculate the e^(scaled-index) = exp(V / lambda)
     exp_scaled_index = np.exp(scaled_index)
+
     # Guard against overflow
     inf_idx = np.isposinf(exp_scaled_index)
     exp_scaled_index[inf_idx] = max_comp_value
@@ -170,6 +171,7 @@ def calc_nested_probs(nest_coefs,
     long_exp_sums = (rows_to_nests.multiply(long_exp_sums_per_nest)
                                   .sum(axis=1)
                                   .A).ravel()
+
 
     # Get the denominators for each individual
     ind_denom = (np.power(ind_exp_sums_per_nest,
@@ -320,11 +322,9 @@ def calc_nested_log_likelihood(nest_coefs,
     if ridge is None:
         return log_likelihood
     else:
-        # Note that the 20 is used in place of 'infinity' since I would really
-        # like to specify the expected value of the nest coefficient as 1, but
-        # that would make the logit of the nest parameter infinity. Instead I
-        # use 20 as a close enough value-- (1 + exp(-20))**-1 is approx. 1.
-        params = np.concatenate(((nest_coefs - 20), index_coefs), axis=0)
+        # Note that the 1.0 is used since the 'null' nest coefficient is equal
+        # to 1.0.
+        params = np.concatenate(((nest_coefs - 1.0), index_coefs), axis=0)
 
         return log_likelihood - ridge * np.square(params).sum()
 
