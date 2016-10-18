@@ -349,3 +349,26 @@ class ComputationalSetUp(unittest.TestCase):
         self.assertAlmostEqual(penalized_log_likelihood, function_results_2)
 
         return None
+
+    def test_naturalize_nest_coefs(self):
+        """
+        Ensure that we return expected results when using
+        naturalize_nest_coefs.
+        """
+        # Create a set of reparametrized nest coefficients
+        orig_nest_coefs = np.array([-800, -5, -1, 0, 1, 5])
+
+        # Calculate what the results should be
+        expected_coefs = (1.0 + np.exp(-1 * orig_nest_coefs))**-1
+        expected_coefs[0] = nlc.min_comp_value
+
+        # Get and test the results of the naturalize_nest_coefs function
+        function_results = nlc.naturalize_nest_coefs(orig_nest_coefs)
+
+        self.assertIsInstance(function_results, np.ndarray)
+        self.assertEqual(function_results.shape, expected_coefs.shape)
+        npt.assert_allclose(function_results, expected_coefs)
+
+        return None
+        return None
+
