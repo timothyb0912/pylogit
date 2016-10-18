@@ -190,7 +190,8 @@ def calc_log_likelihood(beta,
                         utility_transform,
                         intercept_params=None,
                         shape_params=None,
-                        ridge=None):
+                        ridge=None,
+                        weights=None:
     """
     Parameters
     ----------
@@ -235,6 +236,13 @@ def calc_log_likelihood(beta,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default = None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -252,8 +260,12 @@ def calc_log_likelihood(beta,
                                     shape_params=shape_params,
                                     return_long_probs=True)
 
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(choice_vector.shape[0])
+
     # Calculate the log likelihood
-    log_likelihood = choice_vector.dot(np.log(long_probs))
+    log_likelihood = choice_vector.dot(weights * np.log(long_probs))
 
     if ridge is None:
         return log_likelihood
