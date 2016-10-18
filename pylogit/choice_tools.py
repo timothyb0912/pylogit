@@ -1585,7 +1585,8 @@ def convert_wide_to_long(wide_data,
         msg_2 = "The shape of the dataframe should be {}".format((num_rows,
                                                                   num_cols))
         msg_3 = "Instead, the returned dataframe will have shape: {}"
-        print("\n".join([msg_1, msg_2, msg_3.format(final_long_df.shape)]))
+        total_msg = "\n".join([msg_1, msg_2, msg_3])
+        warnings.warn(total_msg.format(final_long_df.shape))
 
     # Return the wide format dataframe
     return final_long_df
