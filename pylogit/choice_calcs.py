@@ -191,7 +191,7 @@ def calc_log_likelihood(beta,
                         intercept_params=None,
                         shape_params=None,
                         ridge=None,
-                        weights=None:
+                        weights=None):
     """
     Parameters
     ----------
