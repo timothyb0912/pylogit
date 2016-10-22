@@ -631,7 +631,7 @@ def calc_nested_gradient(orig_nest_coefs,
         # like to specify the expected value of the nest coefficient to 1, but
         # that would make the logit of the nest parameter infinity. Instead I
         # use 20 as a close enough value-- (1 + exp(-20))**-1 is approx. 1.
-        params = np.concatenate(((nest_coefs - 20), index_coefs), axis=0)
+        params = np.concatenate(((20 - orig_nest_coefs), index_coefs), axis=0)
 
         gradient -= 2 * ridge * params
 
