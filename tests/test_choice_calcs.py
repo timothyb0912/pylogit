@@ -219,16 +219,27 @@ class ComputationalTests(GenericTestCase):
         # Perform the tests
         function_results = func(*args, **kwargs)
         self.assertAlmostEqual(expected_log_likelihood, function_results)
-        kwargs["ridge"] = self.ridge
-        function_results_2 = func(*args, **kwargs)
-        self.assertAlmostEqual(expected_log_likelihood_penalized,
-                               function_results_2)
 
-        # Test the function again, this time without intercepts
-        kwargs["intercept_params"] = None
+        # Test the weighted log-likelihood capability
+        weights = 2 * np.ones(self.fake_design.shape[0])
+        kwargs["weights"] = weights
+        function_results_2 = func(*args, **kwargs)
+        self.assertAlmostEqual(2 * expected_log_likelihood, function_results_2)
+        kwargs["weights"] = None
+
+        # Test the ridge regression calculations
+        kwargs["ridge"] = self.ridge
         function_results_3 = func(*args, **kwargs)
         self.assertAlmostEqual(expected_log_likelihood_penalized,
                                function_results_3)
+
+        # Test the function again, this time without intercepts
+        kwargs["intercept_params"] = None
+        function_results_4 = func(*args, **kwargs)
+        self.assertAlmostEqual(expected_log_likelihood_penalized,
+                               function_results_4)
+
+
 
         return None
 
