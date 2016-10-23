@@ -535,5 +535,272 @@ class ComputationalSetUp(unittest.TestCase):
 
         return None
 
+    def test_prep_vectors_for_gradient(self):
+        """
+        Ensure that the dictionary returned by this function contains the
+        desired arrays.
+        """
+        # List the keys that the returned dictionary should have.
+        expected_keys = ["long_nest_params",
+                         "scaled_y",
+                         "long_chosen_nest",
+                         "obs_to_chosen_nests",
+                         "p_tilde_given_nest",
+                         "long_probs",
+                         "prob_given_nest",
+                         "nest_choice_probs",
+                         "ind_sums_per_nest"]
+
+        # Calculate the arrays that should be returned for our test case.
+        # Create the index array for each alternative
+        index_array = self.model_obj.design.dot(self.fake_betas)
+        # Create an array of long, natural nest parameters
+        long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
+        # Exponentiate the index array
+        exp_scaled_index = np.exp(index_array / long_nests)
+        
+        # Calculate the sum of exp_scaled_index by obs by nest
+        # Note the resulting array will be num_obs by num_nests
+        exp_scaled_index_2d = exp_scaled_index[:, None]
+        interim_array = self.fake_rows_to_nests.multiply(exp_scaled_index_2d)
+        nest_sum = self.fake_rows_to_obs.T.dot(interim_array)
+        # Create a 1D array that notes the nest-sum for the given nest and
+        # observation that corresponds to a given row
+        long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
+        long_nest_sums = (self.fake_rows_to_nests
+                              .multiply(long_nest_sums)
+                              .sum(axis=1))
+        long_nest_sums = np.asarray(long_nest_sums).ravel()
+
+        # Get the probability of each individual choosing each available
+        # alternative, given the alternative's nest.
+        prob_alt_given_nest = exp_scaled_index / long_nest_sums
+
+        # Get the probability of each individual choosing a given nest
+        # Note that this array will be num_obs by num_nests
+        nest_probs_numerator = np.power(nest_sum,
+                                        self.natural_nest_coefs[None, :])
+        nest_probs_denominator = nest_probs_numerator.sum(axis=1)
+        nest_probs = nest_probs_numerator / nest_probs_denominator
+
+        # Get the probability of each alternative being chosen
+        args = [self.natural_nest_coefs,
+                self.fake_betas,
+                self.model_obj.design,
+                self.fake_rows_to_obs,
+                self.fake_rows_to_nests]
+        kwargs = {"return_type": "long_probs"}
+        long_probs = nlc.calc_nested_probs(*args, **kwargs)
+
+        # Create an expected dictionary that containing the same keys and
+        # hopefully the same falues ans the function results.
+        expected_dict = {}
+        expected_dict["long_nest_params"] = long_nests
+        expected_dict["scaled_y"] = self.choice_array / long_nests
+        long_chosen_nest = np.array([1, 1, 0, 0, 1])
+        expected_dict["long_chosen_nest"] = long_chosen_nest
+        obs_to_chosen_nests = np.array([[1, 0], [0, 1]])
+        expected_dict["obs_to_chosen_nests"] = obs_to_chosen_nests
+        expected_dict["prob_given_nest"] = prob_alt_given_nest
+        expected_dict["nest_choice_probs"] = nest_probs
+        expected_dict["ind_sums_per_nest"] = nest_sum.A
+        expected_dict["long_probs"] = long_probs
+
+        expected_dict["p_tilde_given_nest"] = (prob_alt_given_nest *
+                                               long_chosen_nest /
+                                               long_nests)
+
+        # Alias the function being tested
+        func = nlc.prep_vectors_for_gradient
+
+        # Gather the necessary function arguments
+        args = [self.natural_nest_coefs,
+                self.fake_betas,
+                self.model_obj.design,
+                self.choice_array,
+                self.fake_rows_to_obs,
+                self.fake_rows_to_nests]
+        function_results = func(*args)
+
+        # Perform the desired tests
+        for key in expected_dict:
+            self.assertTrue(key in function_results)
+            self.assertIsInstance(function_results[key], np.ndarray)
+            npt.assert_allclose(function_results[key], expected_dict[key])
+
+        return None
+
+    def test_calc_bhhh_hessian_approximation(self):
+        """
+        Ensure that we return the correct BHHH matrix when passing correct
+        arguments to calc_bhhh_hessian_approximation(). For formulas used to
+        'hand'-calculate the gradient of each observation, see page 34 of 
+        "Estimation of multinomial logit models in R : The mlogit Packages"
+        """
+        # Get the logit of the natural nest coefficients
+        nest_coefs = np.log(self.natural_nest_coefs /
+                            (1 - self.natural_nest_coefs))
+
+        #####
+        # Calculate what the gradient should be for the observations in the
+        # test case.
+        #####
+        # Create the index array for each alternative
+        index_array = self.fake_design.dot(self.fake_betas)
+        # Create an array of long, natural nest parameters
+        long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
+        # Exponentiate the index array
+        exp_scaled_index = np.exp(index_array / long_nests)
+        
+        # Calculate the sum of exp_scaled_index by obs by nest
+        # Note the resulting array will be num_obs by num_nests
+        exp_scaled_index_2d = exp_scaled_index[:, None]
+        interim_array = self.fake_rows_to_nests.multiply(exp_scaled_index_2d)
+        nest_sum = self.fake_rows_to_obs.T.dot(interim_array)
+        # Create a 1D array that notes the nest-sum for the given nest and
+        # observation that corresponds to a given row
+        long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
+        long_nest_sums = (self.fake_rows_to_nests
+                              .multiply(long_nest_sums)
+                              .sum(axis=1))
+        long_nest_sums = np.asarray(long_nest_sums).ravel()
+
+        # Get the probability of each individual choosing each available
+        # alternative, given the alternative's nest.
+        prob_alt_given_nest = exp_scaled_index / long_nest_sums
+
+        # Get the probability of each individual choosing a given nest
+        # Note that this array will be num_obs by num_nests
+        nest_probs_numerator = np.power(nest_sum,
+                                        self.natural_nest_coefs[None, :])
+        nest_probs_denominator = nest_probs_numerator.sum(axis=1)
+        nest_probs = nest_probs_numerator / nest_probs_denominator
+
+        # Get the "average" value of the design matrix, in the chosen nests for
+        # each observation. Note that observation 1 chosen nest 1 and
+        # observation 2 chose nest 2.
+        prob_by_design = prob_alt_given_nest[:, None] * self.fake_design
+        x_bar_obs_1_nest_1 = prob_by_design[0:2, :].sum(axis=0)
+        x_bar_obs_1_nest_2 = prob_by_design[2, :]
+        x_bar_array = np.concatenate([x_bar_obs_1_nest_1[None, :],
+                                      x_bar_obs_1_nest_2[None, :]],
+                                     axis=0)
+        x_bar_obs_1 = (nest_probs[0, :][:, None] * x_bar_array)
+
+        x_bar_obs_2_nest_1 = prob_by_design[3, :]
+        x_bar_obs_2_nest_2 = prob_by_design[4, :]
+        x_bar_array_2 = np.concatenate([x_bar_obs_2_nest_1[None, :],
+                                        x_bar_obs_2_nest_2[None, :]],
+                                       axis=0)
+        x_bar_obs_2 = (nest_probs[1, :][:, None] * x_bar_array_2)
+
+        index_bar_obs_1_nest_1 = (prob_alt_given_nest * index_array)[:2].sum()
+        index_bar_obs_1_nest_2 = index_array[2]
+        index_bar_obs_2_nest_1 = index_array[3]
+        index_bar_obs_2_nest_2 = index_array[4]
+
+        # Note that the order of the gradient will be nest coef 1, nest coef 2,
+        # then the index coefficients.
+        obs_1_gradient = np.zeros(self.fake_all_params.shape[0])
+        obs_2_gradient = np.zeros(self.fake_all_params.shape[0])
+
+        # Calculate the gradient for observation 1
+        term_1 = index_array[1]
+        term_2 = (self.natural_nest_coefs[0]**2 * 
+                  (1 - nest_probs[0, 0]) *
+                  np.log(nest_sum[0, 0]))
+        term_3 = ((1 - self.natural_nest_coefs[0] * (1 - nest_probs[0, 0])) *
+                  index_bar_obs_1_nest_1)
+        obs_1_gradient[0] = (-1 * self.natural_nest_coefs[0]**-2 *
+                             (term_1 - term_2 - term_3))
+
+        term_4 = nest_probs[0, 1] / self.natural_nest_coefs[1]
+        term_5 = index_bar_obs_1_nest_2
+        term_6 = self.natural_nest_coefs[1] * np.log(nest_sum[0, 1])
+        obs_1_gradient[1] = term_4 * (term_5 - term_6)
+
+        term_7 = 1.0 / self.natural_nest_coefs[0]
+        term_8 = self.fake_design[1]
+        term_9 = (1 - self.natural_nest_coefs[0]) * x_bar_obs_1_nest_1
+        term_10 = x_bar_obs_1
+        obs_1_gradient[2:] = term_7 * (term_8 - term_9) - term_10
+
+        # Calculate the gradient for observation 2
+        term_1 = index_array[4]
+        term_2 = (self.natural_nest_coefs[1]**2 * 
+                  (1 - nest_probs[1, 1]) *
+                  np.log(nest_sum[1, 1]))
+        term_3 = ((1 - self.natural_nest_coefs[1] * (1 - nest_probs[1, 1])) *
+                  index_bar_obs_2_nest_2)
+        # Note the calculates above are for the chosen nest which is nest 2
+        # for this observation
+        obs_2_gradient[1] = (-1 * self.natural_nest_coefs[1]**-2 *
+                             (term_1 - term_2 - term_3))
+
+        term_4 = nest_probs[1, 0] / self.natural_nest_coefs[0]
+        term_5 = index_bar_obs_2_nest_1
+        term_6 = self.natural_nest_coefs[0] * np.log(nest_sum[1, 0])
+        obs_2_gradient[0] = term_4 * (term_5 - term_6)
+
+        term_7 = 1.0 / self.natural_nest_coefs[1]
+        term_8 = self.fake_design[4]
+        term_9 = (1 - self.natural_nest_coefs[1]) * x_bar_obs_2_nest_2
+        term_10 = x_bar_obs_2
+        obs_2_gradient[2:] = term_7 * (term_8 - term_9) - term_10
+
+        # Calculate the overall gradient
+        stacked_gradient = np.concatenate([obs_1_gradient[None, :],
+                                           obs_2_gradient[None, :]], axis=0)
+        # Don't forget to account for the jacobian
+        jacobian = self.natural_nest_coefs * (1.0 - self.natural_nest_coefs)
+        stacked_gradient[:, :2] *= jacobian[None, :]
+
+        # Calculate the BHHH matrix that we expect to be returned
+        # Note the -1 is because the bhhh should approximate the hessian, and
+        # the hessian should be negative (think downward opening parabola) in
+        # order for the log-likelihood to achieve a maximum.
+        expected_bhhh = -1 * (np.outer(stacked_gradient[0, :], 
+                                       stacked_gradient[0, :]) +
+                              np.outer(stacked_gradient[1, :], 
+                                       stacked_gradient[1, :]))
+
+        # Get the arguments necessary for the nested gradient function
+        args = [nest_coefs,
+                self.fake_betas,
+                self.fake_design,
+                self.choice_array,
+                self.fake_rows_to_obs,
+                self.fake_rows_to_nests]
+
+        # Alias the function being tested
+        func = nlc.calc_bhhh_hessian_approximation
+
+        # Get the function results
+        func_results = func(*args)
+
+        # Test the returned results
+        self.assertIsInstance(func_results, np.ndarray)
+        self.assertEqual(len(func_results.shape), 2)
+        self.assertEqual(func_results.shape, expected_bhhh.shape)
+        npt.assert_allclose(func_results, expected_bhhh)
+
+        # Ensure the function works when using a ridge penalty
+        # Note we have to create an adjusted array for penalization because we
+        # have reparameterized the nest coefficients
+        ridge_penalty = 2 * self.ridge
+        penalized_bhhh = expected_bhhh - ridge_penalty
+
+        kwargs = {"ridge": self.ridge}
+        new_func_results = func(*args, **kwargs)
+
+        # Test the returned results
+        self.assertIsInstance(new_func_results, np.ndarray)
+        self.assertEqual(len(new_func_results.shape), 2)
+        self.assertEqual(new_func_results.shape, penalized_bhhh.shape)
+        npt.assert_allclose(new_func_results, penalized_bhhh)
+
+        return None
+
+
 
 
