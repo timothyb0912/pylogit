@@ -262,7 +262,7 @@ def calc_log_likelihood(beta,
 
     # Calculate the weights for the sample
     if weights is None:
-        weights = np.ones(choice_vector.shape[0])
+        weights = 1
 
     # Calculate the log likelihood
     log_likelihood = choice_vector.dot(weights * np.log(long_probs))
