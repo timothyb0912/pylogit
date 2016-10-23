@@ -348,7 +348,8 @@ def prep_vectors_for_gradient(nest_coefs,
         have 1 column for each set of nesting coefficients being used to
         predict the probabilities of each alternative being chosen. There
         should be one row per nesting coefficient. Elements denote the inverse
-        of the scale coefficients for each of the lower level nests.
+        of the scale coefficients for each of the lower level nests. Note, this
+        is NOT THE LOGIT of the inverse of the scale coefficients.
     index_coefs : 1D or 2D ndarray.
         All elements should by ints, floats, or longs. If 1D, should have 1
         element for each utility coefficient being estimated
@@ -648,7 +649,7 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
                                     rows_to_obs,
                                     rows_to_nests,
                                     ridge=None,
-                                    use_jacobian=False,
+                                    use_jacobian=True,
                                     *args,
                                     **kwargs):
     """
@@ -805,8 +806,8 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     # Compute and return the outer product of each row of the gradient
     # with itself. Then sum these individual matrices together.
     #####
-#    fisher_matrix = (gradient_vec[:, :, np.newaxis] *
-#                     gradient_vec[:, np.newaxis, :]).sum(axis=0)
+    # fisher_matrix = (gradient_vec[:, :, np.newaxis] *
+    #                  gradient_vec[:, np.newaxis, :]).sum(axis=0)
     # The next five lines replicate the procedure accomplished in two
     # lines by the vectorized code above. However, when the design
     # matrix is large, the vectorized code will cause memory problems
@@ -819,12 +820,16 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
                                 gradient_matrix[row_idx])
 
     if ridge is not None:
-        # The rational behind subtracting 2 * ridge is that the information
+        # The rational behind adding 2 * ridge is that the information
         # matrix should approximate the hessian and in the hessian we subtract
-        # 2 * ridge at the end. I don't know if this is the correct way to
-        # calculate the Fisher Information Matrix in ridge regression models.
-        bhhh_matrix -= 2 * ridge
+        # 2 * ridge at the end. We add 2 * ridge here, since we will multiply
+        # by negative one afterwards. I don't know if this is the correct way
+        # to calculate the Fisher Information Matrix in ridge regression
+        # models.
+        bhhh_matrix += 2 * ridge
 
     # Note the "-1" is because we are approximating the Fisher information
     # matrix which has a negative one in the front of it?
+    # Note that if we were using the bhhh_matrix to calculate the robust
+    # covariance matrix, then we would not multiply by negative one here.
     return -1 * bhhh_matrix
