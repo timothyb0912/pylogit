@@ -48,6 +48,35 @@ model_type_to_class_name = {"MNL": "MNL",
                             "Nested Logit": "NestedLogit",
                             "Mixed Logit": "MixedLogit"}
 
+# Store the names of the model_type kwargs that are valid.
+valid_model_types = model_type_to_class.keys()
+
+
+# Create a function that checks the user's model type and ensures its validity
+def ensure_valid_model_type(specified_type, model_type_list):
+    """
+    Checks to make sure that `specified_type` is in `model_type_list` and
+    raises a helpful error if this is not the case.
+
+    Parameters
+    ----------
+    specified_type : str.
+        Denotes the user-specified model type that is to be checked.
+    model_type_list : list of strings.
+        Contains all of the model types that are acceptable kwarg values.
+
+    Returns
+    -------
+    None.
+    """
+    if specified_type not in model_type_list:
+        msg_1 = "The specified model_type was not valid."
+        msg_2 = "Valid model-types are {}".format(model_type_list)
+        msg_3 = "The passed model-type was: {}".format(specified_type)
+        total_msg = "\n".join([msg_1, msg_2, msg_3])
+        raise ValueError(total_msg)
+    return None
+
 
 def create_choice_model(data,
                         alt_id_col,
@@ -82,23 +111,21 @@ def create_choice_model(data,
         Should denote the column in data which contains the ones and zeros
         that denote whether or not the given row corresponds to the chosen
         alternative for the given individual.
-    specification : OrderedDict. Keys are a proper subset of the
-                        columns in long_form_df. Values are either a list
-                        or a single string, "all_diff" or "all_same". If a
-                        list, the elements should be:
-                        1) single objects that are within the alternative
-                           ID column of long_form_df
-                        2) lists of objects that are within the alternative
-                           ID column of long_form_df.
-                        For each single object in the list, a unique column
-                        will be created (i.e. there will be a unique
-                        coefficient for that variable in the corresponding
-                        utility equation of the corresponding alternative).
-                        For lists within the specification_dict values, a
-                        single column will be created for all the
-                        alternatives within iterable (i.e. there will be
-                        one common coefficient for the variables in the
-                        iterable).
+    specification : OrderedDict.
+        Keys are a proper subset of the columns in `long_form_df`. Values are
+        either a list or a single string, `all_diff` or `all_same`. If a list,
+        the elements should be:
+            1) single objects that are within the alternative ID column of
+               `long_form_df`
+            2) lists of objects that are within the alternative ID column of
+               `long_form_df`. For each single object in the list, a unique
+                column will be created (i.e. there will be a unique
+                coefficient for that variable in the corresponding utility
+                equation of the corresponding alternative). For lists within
+                the `specification_dict` values, a single column will be
+                created for all the alternatives within iterable (i.e. there
+                will be one common coefficient for the variables in the
+                iterable).
     model_type : string.
         Denotes the model type of the choice_model being instantiated.
         Should be one of the following values:
@@ -175,6 +202,9 @@ def create_choice_model(data,
         object will have been instantiated with the arguments passed to
         this function.
     """
+    # Make sure the model type is valid
+    ensure_valid_model_type(model_type, valid_model_types)
+
     # Carry out the appropriate instantiation process for the chosen
     # choice model
     model_kwargs = {"intercept_ref_pos": intercept_ref_pos,

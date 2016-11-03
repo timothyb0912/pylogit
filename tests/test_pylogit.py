@@ -259,3 +259,31 @@ class ConstructorTests(unittest.TestCase):
                                  model_obj.__getattribute__(attr))
 
         return None
+
+    def test_ensure_valid_model_type(self):
+        """
+        Ensure that the desired message is raised when an invalid type is
+        passed, and that None is returned otherwise
+        """
+        # Note the "valid" type strings for our test
+        test_types = ["bar", "foo", "Sreeta", "Feras"]
+        # Note a set of invalid type strings for the test
+        bad_types = ["Tim", "Sam"]
+
+        # Alias the function to be tested
+        func = pylogit.pylogit.ensure_valid_model_type
+
+        # Make note of part of the error message that should be raised
+        partial_error_msg = "The specified model_type was not valid."
+
+        # Perform the requisite tests
+        for good_example in test_types:
+            self.assertIsNone(func(good_example, test_types))
+        for bad_example in bad_types:
+            self.assertRaisesRegexp(ValueError,
+                                    partial_error_msg,
+                                    func,
+                                    bad_example,
+                                    test_types)
+
+        return None
