@@ -67,6 +67,7 @@ class EstimationObj(object):
         # Store pointers to needed objects
         self.alt_id_vector = model_obj.alt_IDs
         self.choice_vector = model_obj.choices
+        self.obs_id_vector = model_obj.data[model_obj.obs_id_col].values
         self.design = model_obj.design
         self.intercept_ref_pos = model_obj.intercept_ref_position
         self.shape_ref_pos = model_obj.shape_ref_position
@@ -80,6 +81,8 @@ class EstimationObj(object):
 
         # Perform necessary checking of ridge parameter here!
         ensure_ridge_is_scalar_or_none(ridge)
+        # Ensure the dataset has contiguity in rows with the same obs_id
+        ensure_contiguity_in_observation_rows(self.obs_id_vector)
 
         # Store the ridge parameter
         self.ridge = ridge
