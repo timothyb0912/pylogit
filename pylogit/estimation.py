@@ -10,6 +10,7 @@ from scipy.optimize import minimize
 import choice_calcs as cc
 from choice_calcs import create_matrix_block_indices
 from choice_tools import ensure_ridge_is_scalar_or_none
+from choice_tools import ensure_contiguity_in_observation_rows
 
 
 class EstimationObj(object):
