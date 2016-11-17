@@ -66,16 +66,6 @@ def get_dataframe_from_data(data):
 # variables--one per utility equation-- where the variable == 0 if the
 # alternative does not correspond to the beta for that variable.
 
-##########
-# Amend create_design_matrix to also function with binary discrete outcomes
-
-# EDIT: The function will work as desired, provided that the long format
-#       dataframe has rows for both of the alternatives for each observation
-#       that is capable of being associated with both alternatives. The
-#       fundamental need is to construct binary long form dataframes from wide
-#       format data, but that is a completely different and as of yet
-#       unwritten function.
-#########
 
 def ensure_object_is_ordered_dict(item, title):
     """
@@ -1314,6 +1304,39 @@ def ensure_all_wide_alt_ids_are_chosen(choice_col,
         raise ValueError(msg.format(problem_type) + msg_2.format(problem_ids))
 
     return None
+
+
+def ensure_contiguity_in_observation_rows(obs_id_vector):
+    """
+    Ensures that all rows pertaining to a given choice situation are located
+    next to one another. Raises a helpful ValueError otherwise. This check is
+    needed because the hessian calculation function requires the design matrix
+    to have contiguity in rows with the same observation id.
+
+    Parameters
+    ----------
+    rows_to_obs : 2D scipy sparse array.
+        Should map each row of the long format dataferame to the unique
+        observations in the dataset.
+    obs_id_vector : 1D ndarray of ints.
+        Should contain the id (i.e. a unique integer) that corresponds to each
+        choice situation in the dataset.
+
+    Returns
+    -------
+    None.
+    """
+    # Check that the choice situation id for each row is larger than or equal
+    # to the choice situation id of the preceding row.
+    contiguity_check_array = (obs_id_vector[1:] - obs_id_vector[:-1]) >= 0
+    if not contiguity_check_array.all():
+        problem_ids = obs_id_vector[np.where(~contiguity_check_array)]
+        msg_1 = "All rows pertaining to a given choice situation must be "
+        msg_2 = "contiguous. \nRows pertaining to the following observation "
+        msg_3 = "id's are not contiguous: \n{}"
+        raise ValueError(msg_1 + msg_2 + msg_3.format(problem_ids.tolist()))
+    else:
+        return None
 
 
 def convert_wide_to_long(wide_data,
