@@ -739,3 +739,32 @@ class ArgumentValidationTests(GenericTestCase):
             self.assertRaises(ValueError, func, *args)
 
         return None
+
+    def test_ensure_contiguity_in_observation_rows(self):
+        """
+        Ensures that we correctly catch and raise a ValueError when users try
+        to use a dataset where the rows pertaining to a given choice situation
+        id are not contiguous. Ensures that no error is raised otherwise.
+        """
+        # Note that this corresponds to a setup where there are two
+        # observations and two alternatives
+
+        # Create the various observation ids for testing
+        bad_obs_ids = np.array([1, 2, 1, 2])
+        good_obs_ids = np.array([1, 1, 2, 2])
+
+        # Alias the function to be tested
+        func = ct.ensure_contiguity_in_observation_rows
+
+        # Perform the tests
+        self.assertIsNone(func(good_obs_ids))
+        self.assertRaisesRegexp(ValueError,
+                                "are not contiguous:",
+                                func,
+                                bad_obs_ids)
+        self.assertRaisesRegexp(ValueError,
+                                "[2]",
+                                func,
+                                bad_obs_ids)
+
+        return None
