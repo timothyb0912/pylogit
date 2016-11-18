@@ -513,6 +513,35 @@ def check_dimensional_equality_of_param_list_arrays(param_list):
     return None
 
 
+def check_for_choice_col_based_on_return_long_probs(return_long_probs,
+                                                    choice_col):
+    """
+    Ensure that if return_long_probs is False then choice_col is not None.
+    Raise a helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    return_long_probs : bool.
+            Indicates whether or not the long format probabilites (a 1D numpy
+            array with one element per observation per available alternative)
+            should be returned.
+    choice_col : str or None.
+        Denotes the column in `data` which contains a one if the
+        alternative pertaining to the given row was the observed outcome
+        for the observation pertaining to the given row and a zero
+        otherwise.
+
+    Returns
+    -------
+    None.
+    """
+    if not return_long_probs and choice_col is None:
+        msg = "If return_long_probs == False, then choice_col cannote be None."
+        raise ValueError(msg)
+    else:
+        return None
+
+
 # Create a basic class that sets the structure for the discrete outcome models
 # to be specified later. MNDC stands for MultiNomial Discrete Choice.
 class MNDC_Model(object):
@@ -1666,6 +1695,10 @@ class MNDC_Model(object):
 
         # If param_list is passed, check the validity of its elements
         self.check_param_list_validity(param_list)
+
+        # Check validity of the return_long_probs and choice_col kwargs
+        check_for_choice_col_based_on_return_long_probs(return_long_probs,
+                                                        choice_col)
 
         # Get the new column of alternative IDs and get the new design matrix
         new_alt_IDs = dataframe[self.alt_id_col].values
