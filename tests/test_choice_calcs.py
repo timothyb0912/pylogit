@@ -4,7 +4,6 @@ Tests for the choice_calcs.py file.
 import unittest
 import warnings
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
@@ -22,10 +21,12 @@ import pylogit.choice_calcs as cc
 np.seterr(all='warn')
 warnings.simplefilter("always")
 
+
 class GenericTestCase(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -143,6 +144,7 @@ class ComputationalTests(GenericTestCase):
     expected results.
     """
     # Store a utility transformation function for the tests
+
     def utility_transform(self,
                           sys_utilities,
                           alt_IDs,
@@ -182,11 +184,12 @@ class ComputationalTests(GenericTestCase):
         parameters.
         """
         # Create a utility transformation function for testing
-        test_utility_transform = lambda x, *args: x
+        def test_utility_transform(x, *args):
+            return x
         # Calculate the index for each alternative for each individual
         test_index = self.fake_design.dot(self.fake_betas)
         # Exponentiate each index value
-        exp_test_index  = np.exp(test_index)
+        exp_test_index = np.exp(test_index)
         # Calculate the denominator for each probability
         interim_dot_product = self.fake_rows_to_obs.T.dot(exp_test_index)
         test_denoms = self.fake_rows_to_obs.dot(interim_dot_product)
@@ -238,8 +241,6 @@ class ComputationalTests(GenericTestCase):
         function_results_4 = func(*args, **kwargs)
         self.assertAlmostEqual(expected_log_likelihood_penalized,
                                function_results_4)
-
-
 
         return None
 
@@ -551,6 +552,7 @@ class ComputationalTests(GenericTestCase):
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
         dh_dv = diags(np.ones(self.fake_design.shape[0]), 0, format='csr')
+
         def transform_deriv_v(*args):
             return dh_dv
 
@@ -623,12 +625,14 @@ class ComputationalTests(GenericTestCase):
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
         dh_dv = diags(np.ones(self.fake_design.shape[0]), 0, format='csr')
+
         def transform_deriv_v(*args):
             return dh_dv
 
         # Designate functions that calculate the partial derivative of the
         # transformed index values, with respect to shape and index parameters
         dh_d_intercept = self.fake_rows_to_alts[:, 1:]
+
         def transform_deriv_intercepts(*args):
             return dh_d_intercept
 
@@ -691,6 +695,7 @@ class ComputationalTests(GenericTestCase):
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
         dh_dv = diags(np.ones(self.fake_design.shape[0]), 0, format='csr')
+
         def transform_deriv_v(*args):
             return dh_dv
 
@@ -701,6 +706,7 @@ class ComputationalTests(GenericTestCase):
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
         dh_d_shape = self.fake_rows_to_alts[:, 1:].multiply(fake_deriv)
+
         def transform_deriv_shapes(*args):
             return dh_d_shape
 
@@ -760,17 +766,20 @@ class ComputationalTests(GenericTestCase):
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
         dh_dv = diags(np.ones(self.fake_design.shape[0]), 0, format='csr')
+
         def transform_deriv_v(*args):
             return dh_dv
 
         # Designate functions that calculate the partial derivative of the
         # transformed index values, with respect to shape and index parameters
         dh_d_intercept = self.fake_rows_to_alts[:, 1:]
+
         def transform_deriv_intercepts(*args):
             return dh_d_intercept
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
         dh_d_shape = self.fake_rows_to_alts[:, 1:].multiply(fake_deriv)
+
         def transform_deriv_shapes(*args):
             return dh_d_shape
 
@@ -930,7 +939,7 @@ class ComputationalTests(GenericTestCase):
                           np.outer(long_probs[3:], long_probs[3:]))
         # Assuming that no probabilities should actually be zero or one,
         # the underflow guard would set the last value to a very small,
-        # positive number 
+        # positive number
         matrix_block_2[-1, -1] = cc.min_comp_value
 
         # Create a list of the expected results
@@ -1044,6 +1053,7 @@ class ComputationalTests(GenericTestCase):
             return None
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
+
         def transform_deriv_shapes(sys_utilities,
                                    alt_IDs,
                                    rows_to_alts,
@@ -1199,6 +1209,7 @@ class ComputationalTests(GenericTestCase):
             return rows_to_alts[:, 1:]
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
+
         def transform_deriv_shapes(sys_utilities,
                                    alt_IDs,
                                    rows_to_alts,
@@ -1386,12 +1397,12 @@ class ComputationalTests(GenericTestCase):
             return rows_to_alts[:, 1:]
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
+
         def transform_deriv_shapes(sys_utilities,
                                    alt_IDs,
                                    rows_to_alts,
                                    shape_params):
             return rows_to_alts[:, 1:].multiply(fake_deriv)
-
 
         # Collect the arguments for the hessian function being tested
         hessian_args = [self.fake_betas,
@@ -1519,7 +1530,6 @@ class ComputationalTests(GenericTestCase):
                                    shape_params):
             return None
 
-
         # Collect the arguments for the hessian function being tested
         hessian_args = [self.fake_betas,
                         self.fake_design,
@@ -1614,12 +1624,12 @@ class ComputationalTests(GenericTestCase):
             return None
 
         fake_deriv = np.exp(self.fake_shapes)[None, :]
+
         def transform_deriv_shapes(sys_utilities,
                                    alt_IDs,
                                    rows_to_alts,
                                    shape_params):
             return rows_to_alts[:, 1:].multiply(fake_deriv)
-
 
         # Collect the arguments for the hessian function being tested
         hessian_args = [self.fake_betas,

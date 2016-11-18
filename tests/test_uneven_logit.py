@@ -25,6 +25,7 @@ class GenericTestCase(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -122,6 +123,7 @@ class ChoiceObjectTests(GenericTestCase):
     Defines the tests for the Uneven Logit model's `__init__` function and
     its class methods.
     """
+
     def test_shape_ignore_msg_in_constructor(self):
         """
         Ensures that a UserWarning is raised when the 'shape_ref_pos' keyword
@@ -351,6 +353,7 @@ class HelperFuncTests(GenericTestCase):
     Defines tests for the 'helper' functions for estimating the Uneven Logit
     model.
     """
+
     def test_split_param_vec_with_intercepts(self):
         """
         Ensures that split_param_vec returns (shapes, intercepts, index_coefs)
@@ -471,12 +474,12 @@ class HelperFuncTests(GenericTestCase):
         # Create 2d array of shapes
         shapes_2d = np.concatenate([self.fake_shapes[:, None],
                                     self.fake_shapes[:, None]],
-                                    axis=1)
+                                   axis=1)
 
         # Create 2d array of intercepts
         intercepts_2d = np.concatenate([self.fake_intercepts[:, None],
                                         self.fake_intercepts[:, None]],
-                                        axis=1)
+                                       axis=1)
 
         # Crerate the array of expected results
         intercept_1 = self.fake_intercepts[0]
@@ -559,7 +562,7 @@ class HelperFuncTests(GenericTestCase):
             shape = np.exp(self.fake_shapes[i])
             index_val = test_index[i]
             correct_derivatives[i] = ((1 + np.exp(-index_val))**-1 +
-                                       shape / (1 + np.exp(shape * index_val)))
+                                      shape / (1 + np.exp(shape * index_val)))
 
         self.assertIsInstance(derivative, type(test_output))
         self.assertEqual(len(derivative.shape), 2)

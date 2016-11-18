@@ -11,7 +11,6 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 from scipy.sparse import csr_matrix
-from scipy.sparse import diags
 
 import pylogit.choice_tools as ct
 import pylogit.base_multinomial_cm_v2 as base_cm
@@ -98,7 +97,7 @@ class GenericTestCase(unittest.TestCase):
         self.fake_nest_spec["Nest 1"] = [1, 3]
         self.fake_nest_spec["Nest 2"] = [2]
 
-         # Bundle args and kwargs used to construct the choice model.
+        # Bundle args and kwargs used to construct the choice model.
         self.constructor_args = [self.fake_df,
                                  self.alt_id_col,
                                  self.obs_id_col,
@@ -259,7 +258,7 @@ class ArgumentValidationTests(GenericTestCase):
         bad_names_4 = deepcopy(self.fake_names)
         bad_names_4["x"] = [23]
 
-        for bad_names in [bad_names_1, 
+        for bad_names in [bad_names_1,
                           bad_names_2,
                           bad_names_3,
                           bad_names_4]:
@@ -275,7 +274,7 @@ class ArgumentValidationTests(GenericTestCase):
 
         new_spec_2 = deepcopy(self.fake_specification)
         new_spec_2["x"] = "all_diff"
-        
+
         bad_names_6 = deepcopy(self.fake_names)
         bad_names_6["x"] = False
 
@@ -701,7 +700,6 @@ class ArgumentValidationTests(GenericTestCase):
         wide_df = pd.DataFrame(wide_data)
 
         # Create needed arguments
-        ind_vars = ["m", 'intercept']
         alt_specific_vars = {"x": {1: "x_1",
                                    2: "x_2",
                                    3: "x_3"},

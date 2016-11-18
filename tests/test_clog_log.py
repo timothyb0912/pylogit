@@ -24,6 +24,7 @@ class GenericTestCase(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # Create the betas to be used during the tests
         self.fake_betas = np.array([-0.6])
@@ -106,6 +107,7 @@ class HelperFuncTests(GenericTestCase):
     """
     Defines tests for the 'helper' functions for estimating the Clog-log model.
     """
+
     def test_split_param_vec_with_intercepts(self):
         """
         Ensures that split_param_vec returns (None, intercepts, index_coefs)
@@ -323,6 +325,7 @@ class ChoiceObjectTests(GenericTestCase):
     Defines the tests for the Clog-log model object's `__init__` function and
     its other methods.
     """
+
     def test_shape_ignore_msg_in_constructor(self):
         """
         Ensures that a UserWarning is raised when the 'shape_ref_pos' or

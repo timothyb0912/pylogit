@@ -21,6 +21,7 @@ class ConstructorTests(unittest.TestCase):
     """
     Contains the tests of the choice model construction function.
     """
+
     def setUp(self):
         """
         Create the input data needed to test the choice model constructor.

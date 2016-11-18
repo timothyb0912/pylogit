@@ -18,6 +18,7 @@ class HelperFuncTests(unittest.TestCase):
     """
     Defines the tests for the 'helper' functions for estimating the MNL model.
     """
+
     def setUp(self):
         # Set up the fake arguments
         self.fake_beta = np.arange(3)
@@ -101,6 +102,7 @@ class ChoiceObjectTests(unittest.TestCase):
     Defines the tests for the MNL model object's `__init__` function and its
     other methods.
     """
+
     def setUp(self):
         # Create fake versions of the needed arguments for the MNL constructor
         self.fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3],
@@ -270,10 +272,10 @@ class ChoiceObjectTests(unittest.TestCase):
         zero_vector = np.zeros(1)
         split_params = mnl.split_param_vec
         mnl_estimator = mnl.MNLEstimator(base_mnl,
-                                        mapping_res,
-                                        ridge,
-                                        zero_vector,
-                                        split_params)
+                                         mapping_res,
+                                         ridge,
+                                         zero_vector,
+                                         split_params)
 
         # Alias the function to be checked
         func = mnl_estimator.check_length_of_initial_values

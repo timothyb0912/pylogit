@@ -4,7 +4,6 @@ Tests for the nested_choice_calcs.py file.
 import unittest
 import warnings
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -24,6 +23,7 @@ class ComputationalSetUp(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # Create the betas to be used during the tests
         self.fake_betas = np.array([0.3, -0.6, 0.2])
@@ -129,7 +129,7 @@ class ComputationalSetUp(unittest.TestCase):
 
         # Get the arguments needed for the function. These are not the
         # legitimate arguments, but we just need a set of arrays to get to the
-        # first argument check. 
+        # first argument check.
         args = [np.arange(5) for x in range(5)]
 
         # Note the error message that should be raised.
@@ -393,7 +393,7 @@ class ComputationalSetUp(unittest.TestCase):
         long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
         # Exponentiate the index array
         exp_scaled_index = np.exp(index_array / long_nests)
-        
+
         # Calculate the sum of exp_scaled_index by obs by nest
         # Note the resulting array will be num_obs by num_nests
         exp_scaled_index_2d = exp_scaled_index[:, None]
@@ -448,7 +448,7 @@ class ComputationalSetUp(unittest.TestCase):
 
         # Calculate the gradient for observation 1
         term_1 = index_array[1]
-        term_2 = (self.natural_nest_coefs[0]**2 * 
+        term_2 = (self.natural_nest_coefs[0]**2 *
                   (1 - nest_probs[0, 0]) *
                   np.log(nest_sum[0, 0]))
         term_3 = ((1 - self.natural_nest_coefs[0] * (1 - nest_probs[0, 0])) *
@@ -469,7 +469,7 @@ class ComputationalSetUp(unittest.TestCase):
 
         # Calculate the gradient for observation 2
         term_1 = index_array[4]
-        term_2 = (self.natural_nest_coefs[1]**2 * 
+        term_2 = (self.natural_nest_coefs[1]**2 *
                   (1 - nest_probs[1, 1]) *
                   np.log(nest_sum[1, 1]))
         term_3 = ((1 - self.natural_nest_coefs[1] * (1 - nest_probs[1, 1])) *
@@ -520,7 +520,7 @@ class ComputationalSetUp(unittest.TestCase):
         # Note we have to create an adjusted array for penalization because we
         # have reparameterized the nest coefficients
         params_for_penalty = np.concatenate([(20 - nest_coefs),
-                                              self.fake_betas], axis=0)
+                                             self.fake_betas], axis=0)
         ridge_penalty = 2 * self.ridge * params_for_penalty
         penalized_gradient = expected_gradient - ridge_penalty
 
@@ -540,17 +540,6 @@ class ComputationalSetUp(unittest.TestCase):
         Ensure that the dictionary returned by this function contains the
         desired arrays.
         """
-        # List the keys that the returned dictionary should have.
-        expected_keys = ["long_nest_params",
-                         "scaled_y",
-                         "long_chosen_nest",
-                         "obs_to_chosen_nests",
-                         "p_tilde_given_nest",
-                         "long_probs",
-                         "prob_given_nest",
-                         "nest_choice_probs",
-                         "ind_sums_per_nest"]
-
         # Calculate the arrays that should be returned for our test case.
         # Create the index array for each alternative
         index_array = self.model_obj.design.dot(self.fake_betas)
@@ -558,7 +547,7 @@ class ComputationalSetUp(unittest.TestCase):
         long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
         # Exponentiate the index array
         exp_scaled_index = np.exp(index_array / long_nests)
-        
+
         # Calculate the sum of exp_scaled_index by obs by nest
         # Note the resulting array will be num_obs by num_nests
         exp_scaled_index_2d = exp_scaled_index[:, None]
@@ -634,7 +623,7 @@ class ComputationalSetUp(unittest.TestCase):
         """
         Ensure that we return the correct BHHH matrix when passing correct
         arguments to calc_bhhh_hessian_approximation(). For formulas used to
-        'hand'-calculate the gradient of each observation, see page 34 of 
+        'hand'-calculate the gradient of each observation, see page 34 of
         "Estimation of multinomial logit models in R : The mlogit Packages"
         """
         # Get the logit of the natural nest coefficients
@@ -651,7 +640,7 @@ class ComputationalSetUp(unittest.TestCase):
         long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
         # Exponentiate the index array
         exp_scaled_index = np.exp(index_array / long_nests)
-        
+
         # Calculate the sum of exp_scaled_index by obs by nest
         # Note the resulting array will be num_obs by num_nests
         exp_scaled_index_2d = exp_scaled_index[:, None]
@@ -706,7 +695,7 @@ class ComputationalSetUp(unittest.TestCase):
 
         # Calculate the gradient for observation 1
         term_1 = index_array[1]
-        term_2 = (self.natural_nest_coefs[0]**2 * 
+        term_2 = (self.natural_nest_coefs[0]**2 *
                   (1 - nest_probs[0, 0]) *
                   np.log(nest_sum[0, 0]))
         term_3 = ((1 - self.natural_nest_coefs[0] * (1 - nest_probs[0, 0])) *
@@ -727,7 +716,7 @@ class ComputationalSetUp(unittest.TestCase):
 
         # Calculate the gradient for observation 2
         term_1 = index_array[4]
-        term_2 = (self.natural_nest_coefs[1]**2 * 
+        term_2 = (self.natural_nest_coefs[1]**2 *
                   (1 - nest_probs[1, 1]) *
                   np.log(nest_sum[1, 1]))
         term_3 = ((1 - self.natural_nest_coefs[1] * (1 - nest_probs[1, 1])) *
@@ -759,9 +748,9 @@ class ComputationalSetUp(unittest.TestCase):
         # Note the -1 is because the bhhh should approximate the hessian, and
         # the hessian should be negative (think downward opening parabola) in
         # order for the log-likelihood to achieve a maximum.
-        expected_bhhh = -1 * (np.outer(stacked_gradient[0, :], 
+        expected_bhhh = -1 * (np.outer(stacked_gradient[0, :],
                                        stacked_gradient[0, :]) +
-                              np.outer(stacked_gradient[1, :], 
+                              np.outer(stacked_gradient[1, :],
                                        stacked_gradient[1, :]))
 
         # Get the arguments necessary for the nested gradient function
@@ -800,7 +789,3 @@ class ComputationalSetUp(unittest.TestCase):
         npt.assert_allclose(new_func_results, penalized_bhhh)
 
         return None
-
-
-
-

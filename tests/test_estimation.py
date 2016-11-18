@@ -4,7 +4,6 @@ Use this file to test methods and classes in test_estimation.py
 import warnings
 import unittest
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
@@ -23,6 +22,7 @@ class GenericTestCase(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -121,10 +121,12 @@ class GenericTestCase(unittest.TestCase):
 
         return None
 
+
 class EstimationObjTests(GenericTestCase):
     """
     Store the tests for the basic methods in the EstimationObj class.
     """
+
     def test_constructor(self):
         # Create a zero vector
         zero_vector = np.zeros(self.fake_all_params.shape[0])
@@ -257,23 +259,3 @@ class EstimationObjTests(GenericTestCase):
                                     None)
 
         return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

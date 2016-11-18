@@ -261,7 +261,7 @@ class MixedLogitCalculations(unittest.TestCase):
         # Store the results of split_param_vec()
         split_results = mixed_logit.split_param_vec(self.fake_betas,
                                                     return_all_types=True)
-                # Check for expected results.
+        # Check for expected results.
         self.assertIsNone(split_results[0])
         self.assertIsNone(split_results[1])
         self.assertIsNone(split_results[2])
@@ -343,11 +343,11 @@ class MixedLogitCalculations(unittest.TestCase):
     def test_shape_ignore_msg_in_constructor(self):
         """
         Ensures that a UserWarning is raised when the 'shape_ref_pos' or
-        'shape_names' keyword arguments are passed to the MNL model
+        'shape_names' keyword arguments are passed to the Mixed Logit model
         constructor. This warns people against expecting the MNL to work with
-        shape parameters, and alerts them to the fact they are using an MNL
-        model when they might have been expecting to instantiate a different
-        choice model.
+        shape parameters, and alerts them to the fact they are using an Mixed
+        Logit model when they might have been expecting to instantiate a
+        different choice model.
         """
         # Create a variable for the standard arguments to this function.
         fake_specification = OrderedDict()
@@ -394,7 +394,8 @@ class MixedLogitCalculations(unittest.TestCase):
                 # Check that the warning has been created.
                 self.assertEqual(len(context), pos + 1)
                 self.assertIsInstance(context[-1].category, type(UserWarning))
-                self.assertIn(mixed_logit._shape_ignore_msg, str(context[-1].message))
+                self.assertIn(mixed_logit._shape_ignore_msg,
+                              str(context[-1].message))
 
         return None
 
@@ -781,7 +782,7 @@ class MixedLogitCalculations(unittest.TestCase):
         predictive_df = pd.DataFrame({"x": new_design[:, 2],
                                       self.alt_id_column: new_alt_ids,
                                       self.situation_id_column:
-                                                             new_situation_ids,
+                                          new_situation_ids,
                                       self.obs_id_column: new_obs_ids,
                                       self.choice_column: new_choices})
         predictive_df["intercept"] = 1
@@ -998,49 +999,6 @@ class MixedLogitCalculations(unittest.TestCase):
                           **kwarg_map)
         return None
 
-    def test_shape_ignore_msg_in_constructor(self):
-        """
-        Ensures that a UserWarning is raised when the 'shape_ref_pos' or
-        'shape_names' keyword arguments are passed to the Mixed Logit model
-        constructor. This warns people against expecting the Mixed Logit to
-        work with shape parameters, and alerts them to the fact they are using
-        a Mixed Logit model when they might have been expecting to instantiate
-        a different choice model.
-        """
-        # Create a variable for the standard arguments to this function.
-        standard_args = [self.fake_old_df,
-                         self.alt_id_column,
-                         self.situation_id_column,
-                         self.choice_column,
-                         self.fake_spec]
-
-        # Create a variable for the kwargs being passed to the constructor
-        kwarg_map = {"names": self.fake_names,
-                     "mixing_id_col": self.obs_id_column,
-                     "mixing_vars": self.fake_mixing_vars}
-        kwarg_map_1 = {"shape_ref_pos": 2}
-        kwarg_map_1.update(kwarg_map)
-        kwarg_map_2 = {"shape_names": OrderedDict([("x", ["foo"])])}
-        kwarg_map_2.update(kwarg_map)
-
-        # Test to ensure that the shape ignore message is printed when using
-        # either of these two kwargs
-        with warnings.catch_warnings(record=True) as context:
-            # Use this filter to always trigger the  UserWarnings
-            warnings.simplefilter('always', UserWarning)
-
-            for pos, bad_kwargs in enumerate([kwarg_map_1, kwarg_map_2]):
-                # Create a Mixed Logit model object with the irrelevant kwargs.
-                # This should trigger a UserWarning
-                mixl_obj = mixed_logit.MixedLogit(*standard_args, **bad_kwargs)
-                # Check that the warning has been created.
-                self.assertEqual(len(context), pos + 1)
-                self.assertIsInstance(context[-1].category, type(UserWarning))
-                self.assertIn(mixed_logit._shape_ignore_msg,
-                              str(context[-1].message))
-
-        return None
-
     def test_mixl_estimator_constructor(self):
         """
         Ensure that we can instantiate the mixed logit estimator object.
@@ -1106,7 +1064,6 @@ class MixedLogitCalculations(unittest.TestCase):
         constrained_idx = 1
         self.estimator.constrained_pos = [constrained_idx]
 
-
         # Alias the function that is being tested
         func = self.estimator.convenience_calc_hessian
 
@@ -1145,7 +1102,7 @@ class MixedLogitCalculations(unittest.TestCase):
         """
         init_vals = np.zeros(self.fake_betas_ext.shape[0])
         num_draws = 2
-        seed=1
+        seed = 1
 
         self.mixl_obj.fit_mle(init_vals, num_draws, seed=seed)
 

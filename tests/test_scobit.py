@@ -25,6 +25,7 @@ class GenericTestCase(unittest.TestCase):
     """
     Defines the common setUp method used for the different type of tests.
     """
+
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -122,6 +123,7 @@ class ChoiceObjectTests(GenericTestCase):
     Defines the tests for the Scobit model object's `__init__` function and
     its class methods.
     """
+
     def test_shape_ignore_msg_in_constructor(self):
         """
         Ensures that a UserWarning is raised when the 'shape_ref_pos' keyword
@@ -348,6 +350,7 @@ class HelperFuncTests(GenericTestCase):
     """
     Defines tests for the 'helper' functions for estimating the Scobit model.
     """
+
     def test_split_param_vec_with_intercepts(self):
         """
         Ensures that split_param_vec returns (shapes, intercepts, index_coefs)
@@ -615,8 +618,8 @@ class HelperFuncTests(GenericTestCase):
         # Calculate 'by hand' what the correct results should be
         for i in [0, 2]:
             shape = np.exp(self.fake_shapes[i])
-            numerator = (shape * 
-                         np.exp(-test_index[i]) * 
+            numerator = (shape *
+                         np.exp(-test_index[i]) *
                          np.power(1 + np.exp(-test_index[i]), shape - 1))
             denominator = np.power(1 + np.exp(-test_index[i]), shape) - 1
             correct_derivatives[i] = numerator / denominator
@@ -707,8 +710,8 @@ class HelperFuncTests(GenericTestCase):
         # Calculate 'by hand' what the correct results should be for the third
         # index value
         shape = np.exp(test_shapes[2])
-        numerator = (-shape * 
-                     np.log1p(np.exp(-test_index[2])) * 
+        numerator = (-shape *
+                     np.log1p(np.exp(-test_index[2])) *
                      np.power(1 + np.exp(-test_index[2]), shape))
         denominator = np.power(1 + np.exp(-test_index[2]), shape) - 1
         correct_derivatives[2] = numerator / denominator
