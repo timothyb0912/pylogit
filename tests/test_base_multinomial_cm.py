@@ -101,7 +101,7 @@ class GenericTestCase(unittest.TestCase):
         self.fake_nest_spec["Nest 1"] = [1, 3]
         self.fake_nest_spec["Nest 2"] = [2]
 
-         # Bundle args and kwargs used to construct the Asymmetric Logit model.
+        # Bundle args and kwargs used to construct the Asymmetric Logit model.
         self.constructor_args = [self.fake_df,
                                  self.alt_id_col,
                                  self.obs_id_col,
@@ -128,6 +128,7 @@ class InitializationTests(GenericTestCase):
     This suite of tests should ensure that the logic in the initialization
     process is correctly executed.
     """
+
     def test_column_presence_in_data(self):
         """
         Ensure that the check for the presence of key columns works.
@@ -201,7 +202,7 @@ class InitializationTests(GenericTestCase):
                      np.array([1, 2, np.inf, 0.5, 0.9]),
                      np.array([1, 2, -np.inf, 0.5, 0.9]),
                      np.array([1, 'foo', -np.inf, 0.5, 0.9])]
-        
+
         fake_df = deepcopy(self.fake_df)
 
         for bad_array in bad_exogs:
@@ -328,7 +329,7 @@ class InitializationTests(GenericTestCase):
                            "Nest_2": [None]}
 
         for bad_spec in [new_nest_spec_1, new_nest_spec_2]:
-            list_elements = reduce(lambda x, y: x + y, 
+            list_elements = reduce(lambda x, y: x + y,
                                    [bad_spec[key] for key in bad_spec])
 
             self.assertRaises(ValueError,
@@ -344,7 +345,7 @@ class InitializationTests(GenericTestCase):
         new_nest_spec = {"Nest_1": [1, 2],
                          "Nest_2": [2, 3]}
 
-        list_elements = reduce(lambda x, y: x + y, 
+        list_elements = reduce(lambda x, y: x + y,
                                [new_nest_spec[key] for key in new_nest_spec])
 
         self.assertRaises(ValueError,
@@ -360,7 +361,7 @@ class InitializationTests(GenericTestCase):
         new_nest_spec = {"Nest_1": [1],
                          "Nest_2": [3]}
 
-        list_elements = reduce(lambda x, y: x + y, 
+        list_elements = reduce(lambda x, y: x + y,
                                [new_nest_spec[key] for key in new_nest_spec])
 
         all_ids = [1, 2, 3]
@@ -379,7 +380,7 @@ class InitializationTests(GenericTestCase):
         new_nest_spec = {"Nest_1": [1, 2],
                          "Nest_2": [3, 4]}
 
-        list_elements = reduce(lambda x, y: x + y, 
+        list_elements = reduce(lambda x, y: x + y,
                                [new_nest_spec[key] for key in new_nest_spec])
 
         all_ids = [1, 2, 3]
@@ -417,6 +418,7 @@ class PredictHelperTests(GenericTestCase):
     This suite tests the behavior of `check_param_list_validity()` and the
     functions called by this method.
     """
+
     def test_check_num_rows_of_parameter_array(self):
         """
         Ensure a ValueError is raised if the number of rows in an array is
@@ -573,11 +575,39 @@ class PredictHelperTests(GenericTestCase):
 
         return None
 
+    def test_check_for_choice_col_based_on_return_long_probs(self):
+        """
+        Ensure that function appropriately raises a ValueError if choice_col
+        is None and return_long_probs is False. Ensure that the function
+        returns None otherwise.
+        """
+        # Alias the function being tested
+        func = base_cm.check_for_choice_col_based_on_return_long_probs
+
+        # Create a "good" and a "bad" set of arguments
+        good_args = [[True, None], [False, "choice"]]
+        bad_args = [False, None]
+
+        # Note the error message that should be raised.
+        msg = "If return_long_probs == False, then choice_col cannote be None."
+
+        # Perform the tests
+        for arg_set in good_args:
+            self.assertIsNone(func(*arg_set))
+
+        self.assertRaisesRegexp(ValueError,
+                                msg,
+                                func,
+                                *bad_args)
+
+        return None
+
 
 class BaseModelMethodTests(GenericTestCase):
     """
     This suite tests the behavior of various methods for the base MNDC_Model.
     """
+
     def test_fit_mle_error(self):
         """
         Ensures that NotImplementedError is raised if someone tries to call the
@@ -604,7 +634,7 @@ class BaseModelMethodTests(GenericTestCase):
 
         # Use the function to be sure that the desired file gets created.
         self.model_obj.to_pickle(good_filepath)
-        
+
         self.assertTrue(os.path.exists(good_filepath + ".pkl"))
 
         # Remove the newly created file to avoid needlessly creating files.
@@ -684,6 +714,7 @@ class PostEstimationTests(GenericTestCase):
     """
     # The functions remaining to be tested include:
     # [_store_generic_inference_results]
+
     def setUp(self):
         """
         Perform additional setup materials needed to test the store estimation
@@ -759,7 +790,7 @@ class PostEstimationTests(GenericTestCase):
         self.fake_nest_spec["Nest 1"] = [1, 3]
         self.fake_nest_spec["Nest 2"] = [2]
 
-         # Bundle args and kwargs used to construct the Asymmetric Logit model.
+        # Bundle args and kwargs used to construct the Asymmetric Logit model.
         self.constructor_args = [self.fake_df,
                                  self.alt_id_col,
                                  self.obs_id_col,
@@ -919,8 +950,8 @@ class PostEstimationTests(GenericTestCase):
                                "df_model": self.fake_all_params.shape[0],
                                "df_resid": self.fitted_probs.shape[0] -
                                            self.fake_all_params.shape[0],
-                                "llf": self.log_likelihood,
-                                "bse": attr_to_values["standard_errors"]}
+                               "llf": self.log_likelihood,
+                               "bse": attr_to_values["standard_errors"]}
 
         # Check that the desired attributes are all set when we call the
         # function with all of the needed inputs
@@ -1009,8 +1040,8 @@ class PostEstimationTests(GenericTestCase):
         # Create the necessary arguments
         index_names = ["feras", "sreeta", "tim", "mustapha"]
         attribute_name = "phd"
-        series_name="doctoral"
-        column_names=["club", "116", "1st", "floor"]
+        series_name = "doctoral"
+        column_names = ["club", "116", "1st", "floor"]
 
         # Alias the function being tested
         func = self.model_obj._store_inferential_results
@@ -1064,7 +1095,7 @@ class PostEstimationTests(GenericTestCase):
         default_name_str = "ASC {}"
         param_attr_name = "intercepts"
         series_name = "intercepts"
-        
+
         # Alias the function being tested
         func = self.model_obj._store_optional_parameters
 
@@ -1117,8 +1148,8 @@ class PostEstimationTests(GenericTestCase):
         for key in dataframe.columns:
             setattr(self.model_obj, key, dataframe[key])
         # Alias the function that is to be tested
-        func =\
-        self.model_obj._adjust_inferential_results_for_parameter_constraints
+        model_obj = self.model_obj
+        func = model_obj._adjust_inferential_results_for_parameter_constraints
 
         # Set the constraints
         constraints = [0]
@@ -1139,12 +1170,6 @@ class PostEstimationTests(GenericTestCase):
         Ensure that we can correctly store the given variables that are common
         to all inferential procedures after model estimation.
         """
-        # Record the keys that are needed
-        needed_keys = ["utility_coefs",
-                       "final_gradient",
-                       "final_hessian",
-                       "fisher_info"]
-
         # Set a random seed for reproducibility
         np.random.seed(0)
         # Create the data needed for the various inferential results
@@ -1208,8 +1233,7 @@ class PostEstimationTests(GenericTestCase):
                 0.5 * np.ones(needed_dict["utility_coefs"].shape[0])]
         npt.assert_allclose(*args)
 
-        expected_t_stats = (needed_dict["utility_coefs"] /
-                        0.5 * np.ones(needed_dict["utility_coefs"].shape[0]))
+        expected_t_stats = (needed_dict["utility_coefs"] / 0.5)
         args = [self.model_obj.tvalues.values, expected_t_stats]
         npt.assert_allclose(*args)
 
@@ -1281,9 +1305,9 @@ class PostEstimationTests(GenericTestCase):
                                        name="standard_errors")
         self.model_obj.standard_errors = self.model_obj.bse.copy()
         self.model_obj.tvalues = self.model_obj.params / self.model_obj.bse
-        self.model_obj.pvalues = pd.Series(2 *\
-                           scipy.stats.norm.sf(np.abs(self.model_obj.tvalues)),
-                           index=self.fake_names["x"], name="p_values")
+        self.model_obj.pvalues =\
+            pd.Series(2 * scipy.stats.norm.sf(np.abs(self.model_obj.tvalues)),
+                      index=self.fake_names["x"], name="p_values")
 
         # Alias the function that will be tested
         func = self.model_obj.get_statsmodels_summary
@@ -1294,7 +1318,7 @@ class PostEstimationTests(GenericTestCase):
             # Handle the different ways of accessing the StringIO module in
             # different python versions.
             import sys
-            if sys.version_info[0] < 3: 
+            if sys.version_info[0] < 3:
                 from StringIO import StringIO
             else:
                 from io import StringIO

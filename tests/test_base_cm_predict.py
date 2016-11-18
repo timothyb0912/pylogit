@@ -22,6 +22,7 @@ class PredictFunctionTestsMixl(unittest.TestCase):
     Make sure that, at least sometimes, we return expected results when using
     the predict function with a mixed logit model.
     """
+
     def setUp(self):
         """
         Set up a mixed logit model
@@ -202,11 +203,13 @@ class PredictFunctionTestsMixl(unittest.TestCase):
 
         return None
 
+
 class PredictFunctionTestLogitType(unittest.TestCase):
     """
     Make sure that, at least sometimes, we return expected results when using
     the predict function with a logit-type model.
     """
+
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -372,6 +375,7 @@ class PredictFunctionTestNestedLogit(unittest.TestCase):
     Ensure that, at least sometimes, we return expected results when using the
     predict function with a nested logit model.
     """
+
     def setUp(self):
         # Create the betas to be used during the tests
         self.fake_betas = np.array([0.3, -0.6, 0.2])
@@ -456,6 +460,7 @@ class PredictFunctionTestNestedLogit(unittest.TestCase):
         self.model_obj.coefs = pd.Series(self.fake_betas)
         self.model_obj.intercepts = None
         self.model_obj.shapes = None
+
         def logit(x):
             return np.log(x / (1 - x))
         self.model_obj.nests = pd.Series(logit(self.natural_nest_coefs))
@@ -507,5 +512,15 @@ class PredictFunctionTestNestedLogit(unittest.TestCase):
         self.assertIsInstance(func_results_2, np.ndarray)
         self.assertEqual(func_results_2.shape, expected_results.shape)
         npt.assert_allclose(func_results_2, expected_results)
+
+        # Test the function when only asking for chosen_probs
+        kwargs["return_long_probs"] = False
+        kwargs["choice_col"] = self.choice_col
+        func_results_3 = func(*args, **kwargs)
+        self.assertIsInstance(func_results_3, np.ndarray)
+        self.assertEqual(func_results_3.shape,
+                         (self.choice_array.sum(),))
+        npt.assert_allclose(func_results_3,
+                            expected_results[np.where(self.choice_array)])
 
         return None
