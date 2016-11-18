@@ -1375,9 +1375,12 @@ class MNDC_Model(object):
 
         return None
 
-    # Note this function is called when creating the statsmodels summary.
     def conf_int(self, alpha=0.05, coefs=None, return_df=False):
         """
+        Creates the dataframe or array of lower and upper bounds for the
+        (1-alpha)% confidence interval of the estimated parameters. Used when
+        creating the statsmodels summary.
+
         Parameters
         ----------
         alpha : float, optional.
@@ -1611,7 +1614,7 @@ class MNDC_Model(object):
             array with one element per observation per available alternative)
             should be returned. Default == True.
         choice_col : str, optional.
-            Denotes the column in `long_form` which contains a one if the
+            Denotes the column in `data` which contains a one if the
             alternative pertaining to the given row was the observed outcome
             for the observation pertaining to the given row and a zero
             otherwise. Default == None.
@@ -1707,13 +1710,21 @@ class MNDC_Model(object):
         if self.model_type == "Nested Logit Model":
             # Get the 'natural' nest coefficients for prediction
             new_natural_nests = naturalize_nest_coefs(new_nest_coefs)
+            # Determine the return string for the nested logit model
+            if return_long_probs:
+                return_string = "long_probs"
+            else:
+                return_string = "chosen_probs"
             # This condition accounts for the fact that we have a different
             # functional interface for nested vs non-nested models
             return calc_nested_probs(new_natural_nests,
                                      new_index_coefs,
                                      new_design,
                                      new_rows_to_obs,
-                                     new_rows_to_nests)
+                                     new_rows_to_nests,
+                                     chosen_row_to_obs=new_chosen_to_obs,
+                                     return_type=return_string)
+
         elif self.model_type == "Mixed Logit Model":
             ##########
             # This condition accounts for the fact that Mixed Logit models have
@@ -1745,6 +1756,7 @@ class MNDC_Model(object):
                            "return_long_probs": return_long_probs}
             prob_array = calc_probabilities(*prob_args, **prob_kwargs)
             return prob_array.mean(axis=1)
+
         else:
             return calc_probabilities(new_index_coefs,
                                       new_design,
