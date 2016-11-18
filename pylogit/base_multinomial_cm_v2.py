@@ -1599,16 +1599,17 @@ class MNDC_Model(object):
             model, with the sole exception of the "intercept" column. If needed
             the "intercept" column will be dynamically created.
         param_list : list, optional.
-            Contains four elements, each being a numpy array. Either all of the
-            arrays should be 1D or all of the arrays should be 2D. If 2D, the
-            arrays should have the same number of columns. Each column being a
-            particular set of parameter values that one wants to predict with.
-            The first element in the list should contain the index
-            coefficients. The second element should contain the 'outside'
-            intercept parameters if there are any, or None otherwise. The third
-            element should contain the shape parameters if there are any or
-            None otherwise. The fourth element should contain the nest
-            coefficients if there are any or None otherwise. Default == None.
+            Contains four elements, each being a numpy array or None. Either
+            all of the arrays should be 1D or all of the arrays should be 2D.
+            If 2D, the arrays should have the same number of columns. Each
+            column should be a particular set of parameter values that one
+            wants to predict with. The first element in the list should
+            contain the index coefficients. The second element should contain
+            the 'outside' intercept parameters if there are any, or None
+            otherwise. The third element should contain the shape parameters
+            if there are any or None otherwise. The fourth element should
+            contain the nest coefficients if there are any or None otherwise.
+            Default == None.
         return_long_probs : bool, optional.
             Indicates whether or not the long format probabilites (a 1D numpy
             array with one element per observation per available alternative)
