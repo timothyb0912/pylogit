@@ -34,6 +34,7 @@ from nested_choice_calcs import naturalize_nest_coefs
 import mixed_logit_calcs as mlc
 
 # Create a list of the necesssary result dictionary keys
+# that are expected from the estimation routines
 needed_result_keys = ["final_log_likelihood",
                       "chosen_probs",
                       "long_probs",
@@ -542,6 +543,59 @@ def check_for_choice_col_based_on_return_long_probs(return_long_probs,
         return None
 
 
+def ensure_all_mixing_vars_are_in_the_name_dict(mixing_vars,
+                                                name_dict,
+                                                ind_var_names):
+    """
+    Ensures that all of the variables listed in `mixing_vars` are present in
+    `ind_var_names`. Raises a helpful ValueError if otherwise.
+
+    Parameters
+    ----------
+    mixing_vars : list of strings, or None.
+        Each string denotes a parameter to be treated as a random variable.
+    name_dict : OrderedDict or None.
+        Contains the specification relating column headers in one's data (i.e.
+        the keys of the OrderedDict) to the index coefficients to be estimated
+        based on this data (i.e. the values of each key).
+    ind_var_names : list of strings.
+        Each string denotes an index coefficient (i.e. a beta) to be estimated.
+
+    Returns
+    -------
+    None.
+    """
+    if mixing_vars is None:
+        return None
+
+    # Determine the strings in mixing_vars that are missing from ind_var_names
+    problem_names = [variable_name for variable_name in mixing_vars
+                     if variable_name not in ind_var_names]
+
+    # Create error messages for the case where we have a name dictionary and
+    # the case where we do not have a name dictionary.
+    msg_0 = "The following parameter names were not in the values of the "
+    msg_1 = "passed name dictionary: \n{}"
+    msg_with_name_dict = msg_0 + msg_1.format(problem_names)
+
+    msg_2 = "The following paramter names did not match any of the default "
+    msg_3 = "names generated for the parameters to be estimated: \n{}"
+    msg_4 = "The default names that were generated were: \n{}"
+    msg_without_name_dict = (msg_2 +
+                             msg_3.format(problem_names) +
+                             msg_4.format(ind_var_names))
+
+    # Raise a helpful ValueError if any mixing_vars were missing from
+    # ind_var_names
+    if problem_names != []:
+        if name_dict:
+            raise ValueError(msg_with_name_dict)
+        else:
+            raise ValueError(msg_without_name_dict)
+    
+    return None
+
+
 # Create a basic class that sets the structure for the discrete outcome models
 # to be specified later. MNDC stands for MultiNomial Discrete Choice.
 class MNDC_Model(object):
@@ -730,6 +784,14 @@ class MNDC_Model(object):
                                           specification,
                                           alt_id_col,
                                           names=names)
+
+        ##########
+        # Make sure that the passed mixing variables are valid.
+        # Note that design_res[1] contains the index variable names.
+        ##########
+        ensure_all_mixing_vars_are_in_the_name_dict(mixing_vars,
+                                                    names,
+                                                    design_res[1])
         ##########
         # Store needed data
         ##########

@@ -413,6 +413,60 @@ class InitializationTests(GenericTestCase):
         return None
 
 
+    def test_ensure_all_mixing_vars_are_in_the_name_dict(self):
+        """
+        Ensures that, when using the
+        `ensure_all_mixing_vars_are_in_the_name_dict` function, ValueErrors
+        are raised when invalid mixing_vars arguments are used, and that None
+        is returned otherwise.
+        """
+        # Create 'good' and 'bad' mixing_vars arguments
+        good_mixing_vars = ["Tim", "Sreeta"]
+        bad_mixing_vars = ["Tim", "Sreeta", "Feras"]
+
+        # Create a name_dict for testing purposes
+        name_dict = OrderedDict()
+        name_dict["x"] = ["Tim", "Sreeta"]
+
+        # Create a list of ind_var_names for testing_purposes
+        independent_variable_names = name_dict["x"]
+
+        # Alias the function to be tested
+        func = base_cm.ensure_all_mixing_vars_are_in_the_name_dict
+
+        # Record part of the msgs that one expects to see with and without
+        # the name_dict
+        msg_with_name_dict = "passed name dictionary: "
+        msg_without_name_dict = "The default names that were generated were"
+
+        # Perform the requisite tests
+        self.assertIsNone(func(good_mixing_vars,
+                               name_dict,
+                               independent_variable_names))
+        self.assertIsNone(func(None,
+                               name_dict,
+                               independent_variable_names))
+        self.assertRaises(ValueError,
+                          func,
+                          bad_mixing_vars,
+                          name_dict,
+                          independent_variable_names)
+        self.assertRaisesRegexp(ValueError,
+                                msg_with_name_dict,
+                                func,
+                                bad_mixing_vars,
+                                name_dict,
+                                independent_variable_names)
+        self.assertRaisesRegexp(ValueError,
+                                msg_without_name_dict,
+                                func,
+                                bad_mixing_vars,
+                                None,
+                                independent_variable_names)
+
+        return None
+
+
 class PredictHelperTests(GenericTestCase):
     """
     This suite tests the behavior of `check_param_list_validity()` and the
@@ -712,9 +766,6 @@ class PostEstimationTests(GenericTestCase):
     This suite of tests should ensure that the logic in the store_fit_results
     function is correctly executed.
     """
-    # The functions remaining to be tested include:
-    # [_store_generic_inference_results]
-
     def setUp(self):
         """
         Perform additional setup materials needed to test the store estimation
