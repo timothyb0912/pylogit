@@ -68,10 +68,9 @@ def split_param_vec(beta, return_all_types=False, *args, **kwargs):
 
     Note
     ----
-    If `return_all_types == True` then the function will return a tuple of four
-    objects. In order, these objects will either be None or the arrays
-    representing the arrays corresponding to the nest, shape, intercept, and
-    index parameters.
+    If `return_all_types == True` then the function will return a tuple of
+    `(None, None, None, beta)`. These values represent the nest, shape, outside
+    intercept, and index coefficients for the mixed logit model.
     """
     if return_all_types:
         return None, None, None, beta
