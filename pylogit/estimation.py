@@ -246,6 +246,11 @@ class LogitTypeEstimator(EstimationObj):
         coefficients. For each of these arrays, if this model does not contain
         the particular type of parameter, the callable should place a `None` in
         its place in the tuple.
+    constrained_pos : list or None, optional.
+        Denotes the positions of the array of estimated parameters that are
+        not to change from their initial values. If a list is passed, the
+        elements are to be integers where no such integer is greater than
+        `num_params` Default == None.
 
     Attributes
     ----------
@@ -258,13 +263,16 @@ class LogitTypeEstimator(EstimationObj):
                  mapping_dict,
                  ridge,
                  zero_vector,
-                 split_params):
+                 split_params,
+                 constrained_pos=None):
 
+    	kwargs = {"constrained_pos": constrained_pos}
         super(LogitTypeEstimator, self).__init__(model_obj,
                                                  mapping_dict,
                                                  ridge,
                                                  zero_vector,
-                                                 split_params)
+                                                 split_params,
+                                                 **kwargs)
 
         return None
 
@@ -377,24 +385,6 @@ class LogitTypeEstimator(EstimationObj):
                 self.ridge]
 
         return cc.calc_fisher_info_matrix(*args)
-
-    def calc_neg_log_likelihood_and_neg_gradient(self, params):
-        """
-        Calculates and returns the negative of the log-likelihood and the
-        negative of the gradient. This function is used as the objective
-        function in scipy.optimize.minimize.
-        """
-        neg_log_likelihood = -1 * self.convenience_calc_log_likelihood(params)
-        neg_gradient = -1 * self.convenience_calc_gradient(params)
-
-        return neg_log_likelihood, neg_gradient
-
-    def calc_neg_hessian(self, params):
-        """
-        Calculate and return the negative of the hessian for this model and
-        dataset.
-        """
-        return -1 * self.convenience_calc_hessian(params)
 
 
 def calc_individual_chi_squares(residuals,
