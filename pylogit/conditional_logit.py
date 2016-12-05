@@ -296,6 +296,7 @@ class MNL(base_mcm.MNDC_Model):
                 gradient_tol=1e-06,
                 maxiter=1000,
                 ridge=None,
+                constrained_pos=None,
                 **kwargs):
         """
         Parameters
@@ -322,6 +323,11 @@ class MNL(base_mcm.MNDC_Model):
             Determines whether or not ridge regression is performed. If a
             scalar is passed, then that scalar determines the ridge penalty for
             the optimization. Default `== None`.
+        constrained_pos : list or None, optional.
+            Denotes the positions of the array of estimated parameters that are
+            not to change from their initial values. If a list is passed, the
+            elements are to be integers where no such integer is greater than
+            `init_vals.size.` Default == None.
 
         Returns
         -------
@@ -353,7 +359,8 @@ class MNL(base_mcm.MNDC_Model):
                                      mapping_res,
                                      ridge,
                                      zero_vector,
-                                     split_param_vec)
+                                     split_param_vec,
+                                     constrained_pos=constrained_pos)
         # Set the derivative functions for estimation
         mnl_estimator.set_derivatives()
 

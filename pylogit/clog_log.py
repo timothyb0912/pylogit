@@ -599,6 +599,7 @@ class MNCL(base_mcm.MNDC_Model):
                 gradient_tol=1e-06,
                 maxiter=1000,
                 ridge=None,
+                constrained_pos=None,
                 **kwargs):
         """
         Parameters
@@ -645,6 +646,11 @@ class MNCL(base_mcm.MNDC_Model):
             scalar is passed, then that scalar determines the ridge penalty for
             the optimization. The scalar should be greater than or equal to
             zero. Default `== None`.
+        constrained_pos : list or None, optional.
+            Denotes the positions of the array of estimated parameters that are
+            not to change from their initial values. If a list is passed, the
+            elements are to be integers where no such integer is greater than
+            `init_values.size.` Default == None.
 
         Returns
         -------
@@ -705,7 +711,8 @@ class MNCL(base_mcm.MNDC_Model):
                                        mapping_res,
                                        ridge,
                                        zero_vector,
-                                       split_param_vec)
+                                       split_param_vec,
+                                       constrained_pos=constrained_pos)
         # Set the derivative functions for estimation
         clog_estimator.set_derivatives()
 
