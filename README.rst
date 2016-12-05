@@ -29,7 +29,7 @@ Where to get it
 Available from PyPi::
     pip install pylogit
 
-    https://pypi.python.org/pypi/pylogit/0.1.1
+    https://pypi.python.org/pypi/pylogit/0.1.2
 
 Available through Anaconda::
     conda install -c timothyb0912 pylogit
