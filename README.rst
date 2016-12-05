@@ -46,3 +46,54 @@ If PyLogit (or its constituent models) is useful in your research or work, pleas
 License
 =======
 Modified BSD (3-clause)
+
+Changelog
+=========
+
+0.1.2 (December 4th, 2016)
+--------------------------
+- Added support to all logit-type models for parameter constraints during model estimation. All models now support the use of the constrained_pos keyword argument.
+
+- Added new argument checks to provide user-friendly error messages.
+
+- Created more than 175 tests, bringing statement coverage to 99%.
+
+- Added new example notebooks demonstrating prediction, mixed logit, and converting long-format datasets to wide-format.
+
+- Edited docstrings for clarity throughout the library.
+
+- Extensively refactored codebase.
+
+- Updated the underflow and overflow protections to make use of L’Hopital’s rule where appropriate.
+
+- Fixed bugs with the nested logit model. In particular, the predict function, the BHHH approximation to the Fisher Information Matrix, and the ridge regression penalty in the log-likelihood, gradient, and hessian functions have been fixed.
+
+0.1.1 (August 30th, 2016)
+-------------------------
+- Added python notebook examples demonstrating how to estimate the asymmetric choice models and the nested logit model.
+
+- Corrected the docstrings in various places.
+
+- Added new datasets to the github repo.
+
+0.1.0 (August 29th, 2016)
+-------------------------
+- Added asymmetric choice models.
+
+- Added nested logit and mixed logit models.
+
+- Added tests for mixed logit models.
+
+- Fixed typos in library documentation.
+
+- Made print statements compatible with python3.
+
+- Changed documentation to numpy doctoring standard.
+
+- Internal refactoring.
+
+- Added an example notebook demonstrating how to estimate the mixed logit model.
+
+0.0.0 (March 15th, 2016)
+-------------------------
+- Initial package release with support for the conditional logit (MNL) model.
