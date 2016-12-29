@@ -412,7 +412,6 @@ class InitializationTests(GenericTestCase):
 
         return None
 
-
     def test_ensure_all_mixing_vars_are_in_the_name_dict(self):
         """
         Ensures that, when using the
