@@ -1,10 +1,11 @@
 This project has been assisted by numerous individuals and organizations.
 
-Akshay Vij contributed code that was the basis for the conditional logit code, and he provided the
-motivation and guidance behind the use of "mapping matrices" that is standard throughout PyLogit.
+Dr. Akshay Vij contributed code that was the basis for the conditional logit
+code, and he provided the motivation and guidance behind the use of "mapping
+matrices" that is standard throughout PyLogit.
 
-John Canny advised Akshay Vij on optimizing the code used for the conditional logit, and as such
-he also helped the development of this package.
+Professor John Canny advised Vij on optimizing the code used for the
+conditional logit, and as such he also helped the development of this package.
 
-Paul Waddell has graciously provided the financial support that helped ensure continued progress on
-this package.
+Professor Paul Waddell has graciously provided the financial support that
+helped ensure continued progress on this package.
