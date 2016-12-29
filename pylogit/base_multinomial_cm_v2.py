@@ -8,7 +8,6 @@ Created on Tues Feb 22 09:30:44 2016
          quantities of interest such as probabilities, log-likelihoods,
          gradients, and hessians. This code is based on an earlier multinomial
          logit implementation by Akshay Vij which made use of such mappings.
-
          This version differs from version 1 by partitioning the parameters to
          be estimated, theta, as shape parameters, intercept parameters, and
          index coefficients.
@@ -379,19 +378,7 @@ def add_intercept_to_dataframe(specification, dataframe):
 
     Parameters
     ----------
-    specification : OrderedDict.
-        Keys are a proper subset of the columns in `data`. Values are either a
-        list or a single string, "all_diff" or "all_same". If a list, the
-        elements should be:
-            - single objects that are in the alternative ID column of `data`
-            - lists of objects that are within the alternative ID column of
-              `data`. For each single object in the list, a unique column will
-              be created (i.e. there will be a unique coefficient for that
-              variable in the corresponding utility equation of the
-              corresponding alternative). For lists within the
-              `specification` values, a single column will be created for all
-              the alternatives within the iterable (i.e. there will be one
-              common coefficient for the variables in the iterable).
+    specification : an iterable that has a `__contains__` method.
     dataframe : pandas DataFrame.
         Dataframe containing the data for the choice model to be estimated.
 
@@ -709,7 +696,9 @@ class MNDC_Model(object):
         # Make sure all necessary columns are in the dataframe
         ##########
         ensure_columns_are_in_dataframe([alt_id_col, obs_id_col, choice_col],
-                                        dataframe)
+                                        dataframe,
+                                        '[alt_id_col, obs_id_col, choice_col]',
+                                        'data')
 
         ##########
         # Make sure the various 'name' arguments are of the correct lengths
@@ -975,7 +964,7 @@ class MNDC_Model(object):
 
     def _create_fit_summary(self):
         """
-        Create and store a pandas series that will display to useres the
+        Create and store a pandas series that will display to users the
         various statistics/values that indicate how well the estimated model
         fit the given dataset.
 
