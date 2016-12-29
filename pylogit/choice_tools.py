@@ -71,8 +71,37 @@ def ensure_object_is_ordered_dict(item, title):
     """
     Checks that the item is an OrderedDict. If not, raises ValueError.
     """
+    assert isinstance(title, str)
+
     if not isinstance(item, OrderedDict):
         msg = "{} must be an OrderedDict. {} passed instead."
+        raise TypeError(msg.format(title, type(item)))
+
+    return None
+
+
+def ensure_object_is_string(item, title):
+    """
+    Checks that the item is a string. If not, raises ValueError.
+    """
+    assert isinstance(title, str)
+
+    if not isinstance(item, str):
+        msg = "{} must be a string. {} passed instead."
+        raise TypeError(msg.format(title, type(item)))
+
+    return None
+
+
+def ensure_object_is_ndarray(item, title):
+    """
+    Ensures that a given mapping matrix is a dense numpy array. Raises a
+    helpful TypeError if otherwise.
+    """
+    assert isinstance(title, str)
+
+    if not isinstance(item, np.ndarray):
+        msg = "{} must be a np.ndarray. {} passed instead."
         raise TypeError(msg.format(title, type(item)))
 
     return None

@@ -766,3 +766,49 @@ class ArgumentValidationTests(GenericTestCase):
                                 bad_obs_ids)
 
         return None
+
+    def test_ensure_object_is_string(self):
+        """
+        Ensures that a TypeError is raised if and only if the tested object is
+        not a string and that the error message is useful.
+        """
+        good_obj = "Human"
+        bad_objects = [123, None, np.array(["string_array"])]
+
+        # Alias the function to be tested
+        func = ct.ensure_object_is_string
+
+        # Perform the requisite testing using a 'good' object and various
+        # 'bad' objects.
+        self.assertIsNone(func(good_obj, "test_object"))
+        for bad_obj in bad_objects:
+            self.assertRaisesRegexp(TypeError,
+                                    "must be a string.",
+                                    func,
+                                    bad_obj,
+                                    "test_object")
+
+        return None
+
+    def test_ensure_object_is_ndarray(self):
+        """
+        Ensures that a TypeError is raised if and only if the tested object is
+        not a numpy ndarray and that the error message is useful.
+        """
+        good_obj = np.array(["string_array"])
+        bad_objects = [123, None, "Human"]
+
+        # Alias the function to be tested
+        func = ct.ensure_object_is_ndarray
+
+        # Perform the requisite testing using a 'good' object and various
+        # 'bad' objects.
+        self.assertIsNone(func(good_obj, "test_object"))
+        for bad_obj in bad_objects:
+            self.assertRaisesRegexp(TypeError,
+                                    "must be a np.ndarray.",
+                                    func,
+                                    bad_obj,
+                                    "test_object")
+
+        return None
