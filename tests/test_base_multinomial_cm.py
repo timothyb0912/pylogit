@@ -9,6 +9,7 @@ import unittest
 import os
 from collections import OrderedDict
 from copy import deepcopy
+from functools import reduce
 
 import numpy as np
 import numpy.testing as npt
