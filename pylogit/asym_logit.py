@@ -30,7 +30,7 @@ from .display_names import model_type_to_display_name as display_name_dict
 try:
     # in Python 3 range returns an iterator instead of list
     # to maintain backwards compatibility use "old" version of range
-    from past.builtins import range
+    from past.builtins import xrange, range
 except ImportError:
     pass
 

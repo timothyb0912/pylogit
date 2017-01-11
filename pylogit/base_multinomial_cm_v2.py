@@ -17,6 +17,7 @@ from __future__ import absolute_import
 
 import pickle
 from copy import deepcopy
+from functools import reduce
 
 import scipy.linalg
 import scipy.stats
