@@ -10,6 +10,7 @@ Created on Mon Feb 22 08:32:48 2016
 """
 import warnings
 from collections import OrderedDict
+from numbers import Number
 
 import numpy as np
 import pandas as pd
@@ -542,7 +543,7 @@ def ensure_ridge_is_scalar_or_none(ridge):
     -------
     None.
     """
-    if (ridge is not None) and not isinstance(ridge, (int, float, long)):
+    if (ridge is not None) and not isinstance(ridge, Number):
         msg_1 = "ridge should be None or an int, float, or long."
         msg_2 = "The passed value of ridge had type: {}".format(type(ridge))
         raise TypeError(msg_1 + msg_2)
