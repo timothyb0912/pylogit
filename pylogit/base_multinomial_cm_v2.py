@@ -1233,7 +1233,7 @@ class MNDC_Model(object):
                                range(1, num_elements + 1)]
 
         # Store the names of the optional parameters in all_names
-        all_names = parameter_names + all_names
+        all_names = list(parameter_names) + list(all_names)
         # Store the values of the optional parameters in all_params
         all_params.insert(0, optional_params)
 
