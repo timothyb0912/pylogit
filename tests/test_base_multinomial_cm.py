@@ -177,7 +177,8 @@ class InitializationTests(GenericTestCase):
         bad_specification_col = "foo"
         bad_spec_1 = deepcopy(self.fake_specification)
 
-        good_col = self.fake_specification.keys()[0]
+        # to support Python 2 and 3 convert keys explicitly to list
+        good_col = list(self.fake_specification.keys())[0]
         bad_spec_1[bad_specification_col] = bad_spec_1[good_col]
 
         # Create a second bad specification dictionary by simply using a dict
