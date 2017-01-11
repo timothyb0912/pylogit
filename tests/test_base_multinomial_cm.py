@@ -3,6 +3,8 @@ Tests for the base_multinomial_cm_v2.py file. These tests do not include tests
 of the functions that perform the mathematical calculations necessary to
 estimate the predict function.
 """
+from __future__ import print_function
+
 import unittest
 import os
 from collections import OrderedDict
@@ -1266,7 +1268,7 @@ class PostEstimationTests(GenericTestCase):
         # Perform the tests
         func(needed_dict, all_params, all_names)
         for attr_name in expected_attributes:
-            print attr_name
+            print(attr_name)
             self.assertTrue(hasattr(self.model_obj, attr_name))
             self.assertTrue(isinstance(getattr(self.model_obj, attr_name),
                                        (pd.Series, pd.DataFrame)))
