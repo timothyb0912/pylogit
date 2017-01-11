@@ -177,7 +177,7 @@ class ConstructorTests(unittest.TestCase):
                 nest_name_dict[key] = None
                 nest_spec_dict[key] = None
             else:
-                nest_name_dict[key] = self.fake_nest_spec.keys()
+                nest_name_dict[key] = list(self.fake_nest_spec.keys())
                 nest_spec_dict[key] = self.fake_nest_spec
 
         # Create dictionaries for the mixing_id_col, mixing_vars, and

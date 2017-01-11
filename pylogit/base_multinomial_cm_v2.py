@@ -813,7 +813,8 @@ class MNDC_Model(object):
         self.intercept_names = intercept_names
         self.shape_ref_position = shape_ref_pos
         self.intercept_ref_position = intercept_ref_pos
-        self.nest_names = nest_spec.keys() if nest_spec is not None else None
+        self.nest_names = (list(nest_spec.keys())
+                           if nest_spec is not None else None)
         self.nest_spec = nest_spec
         self.mixing_id_col = mixing_id_col
         self.mixing_vars = mixing_vars
