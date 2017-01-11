@@ -22,6 +22,13 @@ from .estimation import LogitTypeEstimator
 from .estimation import estimate
 from .display_names import model_type_to_display_name as display_name_dict
 
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import range
+except ImportError:
+    pass
+
 # Define the boundary values which are not to be exceeded during computation
 max_comp_value = 1e300
 min_comp_value = 1e-300

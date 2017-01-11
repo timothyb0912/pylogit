@@ -17,6 +17,12 @@ from scipy.sparse import diags
 
 import pylogit.asym_logit as asym
 
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import range
+except ImportError:
+    pass
 
 class GenericTestCase(unittest.TestCase):
     """
