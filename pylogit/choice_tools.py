@@ -1066,7 +1066,7 @@ def convert_long_to_wide(long_data,
     #####
     # For each alternative specific variable, create a wide format dataframe
     alt_specific_dfs = []
-    for col in alt_specific_vars + subset_specific_vars.keys():
+    for col in alt_specific_vars + list(subset_specific_vars.keys()):
         obs_to_var = row_to_obs.T.dot(row_to_alt.multiply(
                                               long_data[col].values[:, None]))
         obs_to_var = obs_to_var.astype(float)
