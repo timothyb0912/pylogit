@@ -1509,7 +1509,8 @@ def convert_wide_to_long(wide_data,
     # Create the observation id column,
     #####
     # Determine the various availability values for each observation
-    wide_availability_values = wide_data[availability_vars.values()].values
+    wide_availability_values = wide_data[list(
+        availability_vars.values())].values
     new_obs_id_col = (wide_availability_values *
                       wide_data[obs_id_col].values[:, None]).ravel()
     # Make sure the observation id column has an integer data type
@@ -1581,7 +1582,7 @@ def convert_wide_to_long(wide_data,
                            alt_id_column_name,
                            choice_col] +
                           ind_vars +
-                          alt_specific_vars.keys())
+                          list(alt_specific_vars.keys()))
 
     # Create a 'record array' of the final dataframe's columns
     # Note that record arrays are constructed from a list of 1D
