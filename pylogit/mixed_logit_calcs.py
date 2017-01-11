@@ -25,6 +25,13 @@ import scipy.stats
 import numpy as np
 from . import choice_calcs as cc
 
+try:
+    # Python 3.x does support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
+
+
 # Define the boundary values which are not to be exceeded ducing computation
 min_exponent_val = -700
 max_exponent_val = 700

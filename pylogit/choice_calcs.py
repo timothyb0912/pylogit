@@ -14,6 +14,12 @@ import scipy.linalg
 from scipy.linalg import block_diag
 from scipy.sparse import hstack
 
+try:
+    # Python 3.x does support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
+
 # Define the boundary values which are not to be exceeded during computation
 min_exponent_val = -700
 max_exponent_val = 700
