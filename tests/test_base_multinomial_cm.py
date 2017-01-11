@@ -20,6 +20,12 @@ import scipy.stats
 import pylogit.base_multinomial_cm_v2 as base_cm
 import pylogit.choice_calcs as choice_calcs
 
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import range
+except ImportError:
+    pass
 
 # Create a generic TestCase class so that we can define a single setUp method
 # that is used by all the test suites.
