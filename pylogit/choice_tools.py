@@ -1257,7 +1257,8 @@ def ensure_each_wide_obs_chose_an_available_alternative(obs_id_col,
     None
     """
     # Determine the various availability values for each observation
-    wide_availability_values = wide_data[availability_vars.values()].values
+    wide_availability_values = wide_data[list(
+        availability_vars.values())].values
 
     # Isolate observations for whom one or more alternatives are unavailable
     unavailable_condition = ((wide_availability_values == 0).sum(axis=1)
