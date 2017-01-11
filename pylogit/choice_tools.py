@@ -10,6 +10,7 @@ Created on Mon Feb 22 08:32:48 2016
 """
 import warnings
 from collections import OrderedDict
+from collections import Iterable
 from numbers import Number
 
 import numpy as np
@@ -104,7 +105,7 @@ def ensure_columns_are_in_dataframe(columns,
     None.
     """
     # Make sure columns is an iterable
-    assert hasattr(columns, "__getitem__")
+    assert isinstance(columns, Iterable)
     # Make sure dataframe is a pandas dataframe
     assert isinstance(dataframe, pd.DataFrame)
     # Make sure title is a string
