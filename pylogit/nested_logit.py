@@ -11,11 +11,11 @@ Created on Sun Jul  3 11:26:33 2016
 import warnings
 import numpy as np
 
-import nested_choice_calcs as nc
-import base_multinomial_cm_v2 as base_mcm
-from display_names import model_type_to_display_name
-from estimation import EstimationObj
-from estimation import estimate
+from . import nested_choice_calcs as nc
+from . import base_multinomial_cm_v2 as base_mcm
+from .display_names import model_type_to_display_name
+from .estimation import EstimationObj
+from .estimation import estimate
 
 # Alias necessary functions from the base multinomial choice model module
 general_log_likelihood = nc.calc_nested_log_likelihood

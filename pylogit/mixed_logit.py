@@ -19,15 +19,15 @@ import warnings
 import numpy as np
 from scipy.sparse import csr_matrix
 
-import base_multinomial_cm_v2 as base_mcm
-import choice_calcs as cc
-import mixed_logit_calcs as mlc
-from choice_tools import get_dataframe_from_data
-from choice_tools import create_design_matrix
-from choice_tools import create_long_form_mappings
-from display_names import model_type_to_display_name
-from estimation import EstimationObj
-from estimation import estimate
+from . import base_multinomial_cm_v2 as base_mcm
+from . import choice_calcs as cc
+from . import mixed_logit_calcs as mlc
+from .choice_tools import get_dataframe_from_data
+from .choice_tools import create_design_matrix
+from .choice_tools import create_long_form_mappings
+from .display_names import model_type_to_display_name
+from .estimation import EstimationObj
+from .estimation import estimate
 
 # Alias necessary functions for model estimation
 general_calc_probabilities = cc.calc_probabilities

@@ -20,13 +20,13 @@ Created on Mon Feb 29 22:07:30 2016
              nested_logit.py
              mixed_logit.py]
 """
-import conditional_logit as mnl
-import asym_logit
-import uneven_logit
-import scobit
-import clog_log
-import nested_logit
-import mixed_logit
+from . import conditional_logit as mnl
+from . import asym_logit
+from . import uneven_logit
+from . import scobit
+from . import clog_log
+from . import nested_logit
+from . import mixed_logit
 
 # Create a dictionary relating the model type parameter to the class that
 # the general choice model should inherit from

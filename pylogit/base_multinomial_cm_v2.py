@@ -21,17 +21,17 @@ import scipy.stats
 import numpy as np
 import pandas as pd
 
-from choice_tools import create_design_matrix
-from choice_tools import create_long_form_mappings
-from choice_tools import convert_mixing_names_to_positions
-from choice_tools import get_dataframe_from_data
-from choice_tools import ensure_specification_cols_are_in_dataframe
-from choice_tools import ensure_object_is_ordered_dict
-from choice_tools import ensure_columns_are_in_dataframe
-from choice_calcs import calc_probabilities, calc_asymptotic_covariance
-from nested_choice_calcs import calc_nested_probs
-from nested_choice_calcs import naturalize_nest_coefs
-import mixed_logit_calcs as mlc
+from .choice_tools import create_design_matrix
+from .choice_tools import create_long_form_mappings
+from .choice_tools import convert_mixing_names_to_positions
+from .choice_tools import get_dataframe_from_data
+from .choice_tools import ensure_specification_cols_are_in_dataframe
+from .choice_tools import ensure_object_is_ordered_dict
+from .choice_tools import ensure_columns_are_in_dataframe
+from .choice_calcs import calc_probabilities, calc_asymptotic_covariance
+from .nested_choice_calcs import calc_nested_probs
+from .nested_choice_calcs import naturalize_nest_coefs
+from . import mixed_logit_calcs as mlc
 
 # Create a list of the necesssary result dictionary keys
 # that are expected from the estimation routines

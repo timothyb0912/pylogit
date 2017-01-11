@@ -7,10 +7,10 @@ import time
 import numpy as np
 from scipy.optimize import minimize
 
-import choice_calcs as cc
-from choice_calcs import create_matrix_block_indices
-from choice_tools import ensure_ridge_is_scalar_or_none
-from choice_tools import ensure_contiguity_in_observation_rows
+from . import choice_calcs as cc
+from .choice_calcs import create_matrix_block_indices
+from .choice_tools import ensure_ridge_is_scalar_or_none
+from .choice_tools import ensure_contiguity_in_observation_rows
 
 
 class EstimationObj(object):
@@ -266,7 +266,7 @@ class LogitTypeEstimator(EstimationObj):
                  split_params,
                  constrained_pos=None):
 
-    	kwargs = {"constrained_pos": constrained_pos}
+        kwargs = {"constrained_pos": constrained_pos}
         super(LogitTypeEstimator, self).__init__(model_obj,
                                                  mapping_dict,
                                                  ridge,

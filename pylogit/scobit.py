@@ -16,10 +16,10 @@ import warnings
 import numpy as np
 from scipy.sparse import diags
 
-import base_multinomial_cm_v2 as base_mcm
-from estimation import LogitTypeEstimator
-from estimation import estimate
-from display_names import model_type_to_display_name as display_name_dict
+from . import base_multinomial_cm_v2 as base_mcm
+from .estimation import LogitTypeEstimator
+from .estimation import estimate
+from .display_names import model_type_to_display_name as display_name_dict
 
 # Define the boundary values which are not to be exceeded during computation
 max_comp_value = 1e300

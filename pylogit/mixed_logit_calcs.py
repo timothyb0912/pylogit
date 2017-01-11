@@ -21,7 +21,7 @@ Current Assumptions (to be relaxed later):
 """
 import scipy.stats
 import numpy as np
-import choice_calcs as cc
+from . import choice_calcs as cc
 
 # Define the boundary values which are not to be exceeded ducing computation
 min_exponent_val = -700
