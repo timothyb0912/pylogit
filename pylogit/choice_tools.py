@@ -1406,7 +1406,9 @@ def convert_wide_to_long(wide_data,
         all_alt_specific_cols.extend(var_dict.values())
 
     vars_accounted_for = set(ind_vars +
-                             availability_vars.values() +
+                             # converto list explicitly to support
+                             # both python 2 and 3
+                             list(availability_vars.values()) +
                              [obs_id_col, choice_col] +
                              all_alt_specific_cols)
     num_vars_accounted_for = len(vars_accounted_for)
