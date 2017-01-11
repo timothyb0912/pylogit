@@ -16,6 +16,7 @@ Created on Thu Feb 25 08:02:45 2016
             parameters as opposed to the shape, index coefficient partitioning
             scheme of version 1.
 """
+from __future__ import absolute_import
 
 from functools import partial
 import warnings

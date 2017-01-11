@@ -2,6 +2,8 @@
 This module provides a general "estimate" function and EstimationObj class for
 pylogit's logit-type models.
 """
+from __future__ import absolute_import
+
 import sys
 import time
 import numpy as np

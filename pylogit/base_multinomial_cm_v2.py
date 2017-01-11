@@ -13,6 +13,8 @@ Created on Tues Feb 22 09:30:44 2016
          be estimated, theta, as shape parameters, intercept parameters, and
          index coefficients.
 """
+from __future__ import absolute_import
+
 import pickle
 from copy import deepcopy
 

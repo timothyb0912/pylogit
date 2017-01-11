@@ -8,6 +8,8 @@ Created on Sun Jul  3 11:26:33 2016
 @summary:   Contains functions necessary for estimating nested logit models
             (with the help of the "base_multinomial_cm.py" file).
 """
+from __future__ import absolute_import
+
 import warnings
 import numpy as np
 

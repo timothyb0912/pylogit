@@ -20,6 +20,8 @@ Created on Mon Feb 29 22:07:30 2016
              nested_logit.py
              mixed_logit.py]
 """
+from __future__ import absolute_import
+
 from . import conditional_logit as mnl
 from . import asym_logit
 from . import uneven_logit

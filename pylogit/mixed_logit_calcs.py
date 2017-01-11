@@ -19,6 +19,8 @@ Current Assumptions (to be relaxed later):
     - It is assumed that individuals are the units being mixed over
       (i.e. parameters are randomly distributed over observations).
 """
+from __future__ import absolute_import
+
 import scipy.stats
 import numpy as np
 from . import choice_calcs as cc

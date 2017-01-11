@@ -10,6 +10,8 @@ Created on Thu Feb 25 07:19:49 2016
             index coefficient partitioning of estimated parameters as opposed
             to the shape, index coefficient partitioning scheme of version 1.
 """
+from __future__ import absolute_import
+
 import warnings
 import numpy as np
 from scipy.sparse import diags

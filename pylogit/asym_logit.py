@@ -13,6 +13,7 @@ Created on Sun Feb 28 20:16:35 2016
             theta = (shape | intercept | beta) instead of
             theta = (shape | beta).
 """
+from __future__ import absolute_import
 
 from functools import partial
 import warnings

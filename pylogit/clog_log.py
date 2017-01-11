@@ -10,6 +10,7 @@ Created on Sun Feb 28 15:45:08 2016
             parameter estimates, theta, into (shape, intercept, index)
             parameters.
 """
+from __future__ import absolute_import
 
 from functools import partial
 import warnings

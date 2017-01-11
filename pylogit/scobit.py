@@ -10,6 +10,7 @@ Created on Sun Feb 28 19:06:41 2016
             index coefficient partitioning of estimated parameters as opposed
             to the shape, index coefficient partitioning scheme of version 1.
 """
+from __future__ import absolute_import
 
 from functools import partial
 import warnings

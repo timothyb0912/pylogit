@@ -14,6 +14,7 @@ General References
 Train, K., 2009. Discrete Choice Models With Simulation. 2 ed., Cambridge
     University Press, New York, NY, USA.
 """
+from __future__ import absolute_import
 
 import warnings
 import numpy as np
