@@ -3,14 +3,19 @@ python:
   - "2.7"
 
 # command to install dependencies
-install:
+before_install:
  - "pip install --upgrade pip setuptools wheel"
  - "pip install --only-binary=numpy,scipy numpy scipy"
  - "pip install pandas"
+ - "pip install coveralls"
 
 # command to execute test suite
 script: py.test tests/
 branches:
   only:
     - master
+
+# Send results of tests to coveralls
+after_success:
+ - coveralls
 
