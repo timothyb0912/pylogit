@@ -8,9 +8,10 @@ before_install:
  - "pip install --only-binary=numpy,scipy numpy scipy"
  - "pip install pandas"
  - "pip install coveralls"
+ - "pip install pytest-cov"
 
 # command to execute test suite
-script: py.test tests/
+script: py.test --cov-report= --cov=pylogit/ tests/
 branches:
   only:
     - master
