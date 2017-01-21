@@ -1,5 +1,7 @@
 .. image:: https://travis-ci.org/timothyb0912/pylogit.svg?branch=master
     :target: https://travis-ci.org/timothyb0912/pylogit
+.. image:: https://coveralls.io/repos/github/timothyb0912/pylogit/badge.svg?branch=master
+:target: https://coveralls.io/github/timothyb0912/pylogit?branch=master
 
 What PyLogit is
 ===============
