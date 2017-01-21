@@ -61,19 +61,7 @@ def ensure_valid_nums_in_specification_cols(specification, dataframe):
 
     Parameters
     ----------
-    specification : OrderedDict.
-        Keys are a proper subset of the columns in `data`. Values are either a
-        list or a single string, "all_diff" or "all_same". If a list, the
-        elements should be:
-            - single objects that are in the alternative ID column of `data`
-            - lists of objects that are within the alternative ID column of
-              `data`. For each single object in the list, a unique column will
-              be created (i.e. there will be a unique coefficient for that
-              variable in the corresponding utility equation of the
-              corresponding alternative). For lists within the
-              `specification` values, a single column will be created for all
-              the alternatives within the iterable (i.e. there will be one
-              common coefficient for the variables in the iterable).
+    specification : iterable of column headers in `dataframe`.
     dataframe : pandas DataFrame.
         Dataframe containing the data for the choice model to be estimated.
 
@@ -96,7 +84,7 @@ def ensure_valid_nums_in_specification_cols(specification, dataframe):
             problem_cols.append(col)
 
     if problem_cols != []:
-        msg = "The following columns contain either +/- inifinity values "
+        msg = "The following columns contain either +/- inifinity values, "
         msg_2 = "NaN values, or values that are not real numbers "
         msg_3 = "(e.g. strings):\n{}"
         total_msg = msg + msg_2 + msg_3
@@ -579,7 +567,41 @@ def ensure_all_mixing_vars_are_in_the_name_dict(mixing_vars,
             raise ValueError(msg_with_name_dict)
         else:
             raise ValueError(msg_without_name_dict)
-    
+
+    return None
+
+
+def ensure_all_alternatives_are_chosen(alt_id_col, choice_col, dataframe):
+    """
+    Ensures that all of the available alternatives in the dataset are chosen at
+    least once (for model identification). Raises a ValueError otherwise.
+
+    Parameters
+    ----------
+    alt_id_col : str.
+        Should denote the column in `dataframe` that contains the alternative
+        identifiers for each row.
+    choice_col : str.
+        Should denote the column in `dataframe` that contains the ones and
+        zeros that denote whether or not the given row corresponds to the
+        chosen alternative for the given individual.
+    dataframe : pandas dataframe.
+        Should contain the data being used to estimate the model, as well as
+        the headers denoted by `alt_id_col` and `choice_col`.
+
+    Returns
+    -------
+    None.
+    """
+    all_ids = set(dataframe[alt_id_col].unique())
+    chosen_ids = set(dataframe.loc[dataframe[choice_col] == 1,
+                                   alt_id_col].unique())
+    non_chosen_ids = all_ids.difference(chosen_ids)
+    if len(non_chosen_ids) != 0:
+        msg = ("The following alternative ID's were not chosen in any choice "
+               "situation: \n{}")
+        raise ValueError(msg.format(non_chosen_ids))
+
     return None
 
 
@@ -705,6 +727,12 @@ class MNDC_Model(object):
         ##########
         # Get a sorted array of all possible alternative ids in the dataset
         all_ids = np.sort(dataframe[alt_id_col].unique())
+
+        # For model identification, ensure that the number of chosen
+        # alternatives equals the total number of alternatives available in the
+        # dataset. Currently commented out because many tests need to be
+        # rewritten to handle the fact that this constraint is being made explicit.
+        # ensure_all_alternatives_are_chosen(alt_id_col, choice_col, dataframe)
 
         # Check for correct length of shape_names and intercept_names
         name_and_ref_args = [(shape_names, shape_ref_pos, "shape_names"),
