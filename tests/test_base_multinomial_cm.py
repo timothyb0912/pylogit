@@ -465,6 +465,35 @@ class InitializationTests(GenericTestCase):
 
         return None
 
+    def test_ensure_all_alternatives_are_chosen(self):
+        """
+        Ensures that a ValueError is raised if and only if some alternatives
+        that were available in the dataset were not chosen in any choice
+        situations.
+        """
+        # Create fake dataframes for the test.
+        good_df = pd.DataFrame({"obs_id": [1, 1, 2, 2],
+                                "alt_id": [1, 2, 1, 2],
+                               "choice": [0, 1, 1, 0]})
+
+        bad_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2, 2],
+                               "alt_id": [1, 2, 3, 1, 2, 3],
+                               "choice": [0, 1, 0, 1, 0, 0]})
+
+        # Alias the function to be tested
+        func = base_cm.ensure_all_alternatives_are_chosen
+
+        # Perform the requisite tests
+        self.assertIsNone(func("alt_id", "choice", good_df))
+        self.assertRaisesRegexp(ValueError,
+                                "The following alternative ID's were not"
+                                " chosen in any choice situation:",
+                                func,
+                                "alt_id",
+                                "choice",
+                                bad_df)
+
+        return None
 
 class PredictHelperTests(GenericTestCase):
     """
