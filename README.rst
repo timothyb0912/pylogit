@@ -3,7 +3,7 @@
 
 What PyLogit is
 ===============
-PyLogit is a Python package for performing maximum likelihood estimation of conditional logit models and similar logit-like models.
+PyLogit is a Python package for performing maximum likelihood estimation of conditional logit models and similar discrete choice models.
 
 Main Features
 =============
