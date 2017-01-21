@@ -712,6 +712,36 @@ def create_design_matrix(long_form,
     return design_matrix, var_names
 
 
+def get_original_order_unique_ids(id_array):
+    """
+    Get the unique id's of id_array, in their original order of appearance.
+
+    Parameters
+    ----------
+    id_array : 1D ndarray.
+        Should contain the ids that we want to extract the unique values from.
+
+    Returns
+    -------
+    original_order_unique_ids : 1D ndarray.
+        Contains the unique ids from `id_array`, in their original order of
+        appearance.
+    """
+    assert isinstance(id_array, np.ndarray)
+    assert len(id_array.shape) == 1
+
+    # Get the indices of the unique IDs in their order of appearance
+    # Note the [1] is because the np.unique() call will return both the sorted
+    # unique IDs and the indices
+    original_unique_id_indices = np.sort(np.unique(id_array,
+                                                   return_index=True)[1])
+
+    # Get the unique ids, in their original order of appearance
+    original_order_unique_ids = id_array[original_unique_id_indices]
+
+    return original_order_unique_ids
+
+
 def create_row_to_some_id_col_mapping(id_array):
     """
     Parameters
@@ -728,14 +758,8 @@ def create_row_to_some_id_col_mapping(id_array):
         values of `id_array`, in the order of appearance for each of these
         unique values.
     """
-    # Get the indices of the unique IDs in their order of appearance
-    # Note the [1] is because the np.unique() call will return both the sorted
-    # unique IDs and the indices
-    original_unique_id_indices = np.sort(np.unique(id_array,
-                                                   return_index=True)[1])
-
     # Get the unique ids, in their original order of appearance
-    original_order_unique_ids = id_array[original_unique_id_indices]
+    original_order_unique_ids = get_original_order_unique_ids(id_array)
 
     # Create a matrix with the same number of rows as id_array but a single
     # column for each of the unique IDs. This matrix will associate each row
