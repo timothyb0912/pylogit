@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/timothyb0912/pylogit.svg?branch=master
+    :target: https://travis-ci.org/timothyb0912/pylogit
+
 What PyLogit is
 ===============
 PyLogit is a Python package for performing maximum likelihood estimation of conditional logit models and similar logit-like models.
