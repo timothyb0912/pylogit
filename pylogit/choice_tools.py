@@ -10,6 +10,8 @@ Created on Mon Feb 22 08:32:48 2016
 """
 import warnings
 from collections import OrderedDict
+from collections import Iterable
+from numbers import Number
 
 import numpy as np
 import pandas as pd
@@ -132,7 +134,7 @@ def ensure_columns_are_in_dataframe(columns,
     None.
     """
     # Make sure columns is an iterable
-    assert hasattr(columns, "__getitem__")
+    assert isinstance(columns, Iterable)
     # Make sure dataframe is a pandas dataframe
     assert isinstance(dataframe, pd.DataFrame)
     # Make sure title is a string
@@ -571,7 +573,7 @@ def ensure_ridge_is_scalar_or_none(ridge):
     -------
     None.
     """
-    if (ridge is not None) and not isinstance(ridge, (int, float, long)):
+    if (ridge is not None) and not isinstance(ridge, Number):
         msg_1 = "ridge should be None or an int, float, or long."
         msg_2 = "The passed value of ridge had type: {}".format(type(ridge))
         raise TypeError(msg_1 + msg_2)
@@ -1117,7 +1119,7 @@ def convert_long_to_wide(long_data,
     #####
     # For each alternative specific variable, create a wide format dataframe
     alt_specific_dfs = []
-    for col in alt_specific_vars + subset_specific_vars.keys():
+    for col in alt_specific_vars + list(subset_specific_vars.keys()):
         obs_to_var = row_to_obs.T.dot(row_to_alt.multiply(
                                               long_data[col].values[:, None]))
         obs_to_var = obs_to_var.astype(float)
@@ -1308,7 +1310,8 @@ def ensure_each_wide_obs_chose_an_available_alternative(obs_id_col,
     None
     """
     # Determine the various availability values for each observation
-    wide_availability_values = wide_data[availability_vars.values()].values
+    wide_availability_values = wide_data[list(
+        availability_vars.values())].values
 
     # Isolate observations for whom one or more alternatives are unavailable
     unavailable_condition = ((wide_availability_values == 0).sum(axis=1)
@@ -1458,7 +1461,9 @@ def convert_wide_to_long(wide_data,
         all_alt_specific_cols.extend(var_dict.values())
 
     vars_accounted_for = set(ind_vars +
-                             availability_vars.values() +
+                             # converto list explicitly to support
+                             # both python 2 and 3
+                             list(availability_vars.values()) +
                              [obs_id_col, choice_col] +
                              all_alt_specific_cols)
     num_vars_accounted_for = len(vars_accounted_for)
@@ -1557,7 +1562,8 @@ def convert_wide_to_long(wide_data,
     # Create the observation id column,
     #####
     # Determine the various availability values for each observation
-    wide_availability_values = wide_data[availability_vars.values()].values
+    wide_availability_values = wide_data[list(
+        availability_vars.values())].values
     new_obs_id_col = (wide_availability_values *
                       wide_data[obs_id_col].values[:, None]).ravel()
     # Make sure the observation id column has an integer data type
@@ -1629,7 +1635,7 @@ def convert_wide_to_long(wide_data,
                            alt_id_column_name,
                            choice_col] +
                           ind_vars +
-                          alt_specific_vars.keys())
+                          list(alt_specific_vars.keys()))
 
     # Create a 'record array' of the final dataframe's columns
     # Note that record arrays are constructed from a list of 1D

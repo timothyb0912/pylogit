@@ -4,6 +4,7 @@ Use this file to test methods and classes in test_estimation.py
 import warnings
 import unittest
 from collections import OrderedDict
+from numbers import Number
 
 import numpy as np
 import numpy.testing as npt
@@ -189,8 +190,7 @@ class EstimationObjTests(GenericTestCase):
 
         # Ensure that the scalars are scalars with the correct values
         for attr in ["intercept_ref_pos", "shape_ref_pos", "ridge"]:
-            self.assertIsInstance(getattr(estimation_object, attr),
-                                  (int, float, long))
+            self.assertIsInstance(getattr(estimation_object, attr), Number)
         self.assertEqual(estimation_object.intercept_ref_pos,
                          self.model_obj.intercept_ref_position)
         self.assertEqual(estimation_object.shape_ref_pos,

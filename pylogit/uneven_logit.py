@@ -16,16 +16,24 @@ Created on Thu Feb 25 08:02:45 2016
             parameters as opposed to the shape, index coefficient partitioning
             scheme of version 1.
 """
+from __future__ import absolute_import
 
 from functools import partial
 import warnings
 import numpy as np
 from scipy.sparse import diags
 
-import base_multinomial_cm_v2 as base_mcm
-from estimation import LogitTypeEstimator
-from estimation import estimate
-from display_names import model_type_to_display_name as display_name_dict
+from . import base_multinomial_cm_v2 as base_mcm
+from .estimation import LogitTypeEstimator
+from .estimation import estimate
+from .display_names import model_type_to_display_name as display_name_dict
+
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import range
+except ImportError:
+    pass
 
 
 # Define the boundary values which are not to be exceeded during computation

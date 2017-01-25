@@ -12,25 +12,28 @@ Created on Tues Feb 22 09:30:44 2016
          be estimated, theta, as shape parameters, intercept parameters, and
          index coefficients.
 """
+from __future__ import absolute_import
+
 import pickle
 from copy import deepcopy
+from functools import reduce
 
 import scipy.linalg
 import scipy.stats
 import numpy as np
 import pandas as pd
 
-from choice_tools import create_design_matrix
-from choice_tools import create_long_form_mappings
-from choice_tools import convert_mixing_names_to_positions
-from choice_tools import get_dataframe_from_data
-from choice_tools import ensure_specification_cols_are_in_dataframe
-from choice_tools import ensure_object_is_ordered_dict
-from choice_tools import ensure_columns_are_in_dataframe
-from choice_calcs import calc_probabilities, calc_asymptotic_covariance
-from nested_choice_calcs import calc_nested_probs
-from nested_choice_calcs import naturalize_nest_coefs
-import mixed_logit_calcs as mlc
+from .choice_tools import create_design_matrix
+from .choice_tools import create_long_form_mappings
+from .choice_tools import convert_mixing_names_to_positions
+from .choice_tools import get_dataframe_from_data
+from .choice_tools import ensure_specification_cols_are_in_dataframe
+from .choice_tools import ensure_object_is_ordered_dict
+from .choice_tools import ensure_columns_are_in_dataframe
+from .choice_calcs import calc_probabilities, calc_asymptotic_covariance
+from .nested_choice_calcs import calc_nested_probs
+from .nested_choice_calcs import naturalize_nest_coefs
+from . import mixed_logit_calcs as mlc
 
 # Create a list of the necesssary result dictionary keys
 # that are expected from the estimation routines
@@ -827,7 +830,8 @@ class MNDC_Model(object):
         self.intercept_names = intercept_names
         self.shape_ref_position = shape_ref_pos
         self.intercept_ref_position = intercept_ref_pos
-        self.nest_names = nest_spec.keys() if nest_spec is not None else None
+        self.nest_names = (list(nest_spec.keys())
+                           if nest_spec is not None else None)
         self.nest_spec = nest_spec
         self.mixing_id_col = mixing_id_col
         self.mixing_vars = mixing_vars
@@ -1247,7 +1251,7 @@ class MNDC_Model(object):
                                range(1, num_elements + 1)]
 
         # Store the names of the optional parameters in all_names
-        all_names = parameter_names + all_names
+        all_names = list(parameter_names) + list(all_names)
         # Store the values of the optional parameters in all_params
         all_params.insert(0, optional_params)
 

@@ -3,10 +3,13 @@ Tests for the base_multinomial_cm_v2.py file. These tests do not include tests
 of the functions that perform the mathematical calculations necessary to
 estimate the predict function.
 """
+from __future__ import print_function
+
 import unittest
 import os
 from collections import OrderedDict
 from copy import deepcopy
+from functools import reduce
 
 import numpy as np
 import numpy.testing as npt
@@ -17,6 +20,12 @@ import scipy.stats
 import pylogit.base_multinomial_cm_v2 as base_cm
 import pylogit.choice_calcs as choice_calcs
 
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import range
+except ImportError:
+    pass
 
 # Create a generic TestCase class so that we can define a single setUp method
 # that is used by all the test suites.
@@ -174,7 +183,8 @@ class InitializationTests(GenericTestCase):
         bad_specification_col = "foo"
         bad_spec_1 = deepcopy(self.fake_specification)
 
-        good_col = self.fake_specification.keys()[0]
+        # to support Python 2 and 3 convert keys explicitly to list
+        good_col = list(self.fake_specification.keys())[0]
         bad_spec_1[bad_specification_col] = bad_spec_1[good_col]
 
         # Create a second bad specification dictionary by simply using a dict
@@ -1294,7 +1304,7 @@ class PostEstimationTests(GenericTestCase):
         # Perform the tests
         func(needed_dict, all_params, all_names)
         for attr_name in expected_attributes:
-            print attr_name
+            print(attr_name)
             self.assertTrue(hasattr(self.model_obj, attr_name))
             self.assertTrue(isinstance(getattr(self.model_obj, attr_name),
                                        (pd.Series, pd.DataFrame)))

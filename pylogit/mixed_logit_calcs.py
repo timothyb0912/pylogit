@@ -19,9 +19,18 @@ Current Assumptions (to be relaxed later):
     - It is assumed that individuals are the units being mixed over
       (i.e. parameters are randomly distributed over observations).
 """
+from __future__ import absolute_import
+
 import scipy.stats
 import numpy as np
-import choice_calcs as cc
+from . import choice_calcs as cc
+
+try:
+    # Python 3.x does support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
+
 
 # Define the boundary values which are not to be exceeded ducing computation
 min_exponent_val = -700

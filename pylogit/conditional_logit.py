@@ -10,15 +10,17 @@ Created on Thu Feb 25 07:19:49 2016
             index coefficient partitioning of estimated parameters as opposed
             to the shape, index coefficient partitioning scheme of version 1.
 """
+from __future__ import absolute_import
+
 import warnings
 import numpy as np
 from scipy.sparse import diags
 
-import choice_calcs as cc
-import base_multinomial_cm_v2 as base_mcm
-from estimation import LogitTypeEstimator
-from estimation import estimate
-from display_names import model_type_to_display_name
+from . import choice_calcs as cc
+from . import base_multinomial_cm_v2 as base_mcm
+from .estimation import LogitTypeEstimator
+from .estimation import estimate
+from .display_names import model_type_to_display_name
 
 # Create a variable that will be printed if there is a non-fatal error
 # in the MNL class construction
