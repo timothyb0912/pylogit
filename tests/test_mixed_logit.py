@@ -17,6 +17,13 @@ import numpy.testing as npt
 import pylogit.mixed_logit_calcs as mlc
 import pylogit.mixed_logit as mixed_logit
 
+try:
+    # in Python 3 range returns an iterator instead of list
+    # to maintain backwards compatibility use "old" version of range
+    from past.builtins import xrange
+except ImportError:
+    pass
+
 
 # Use the following to always show the warnings
 np.seterr(all='warn')
