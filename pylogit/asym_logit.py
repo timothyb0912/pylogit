@@ -156,7 +156,7 @@ def _convert_eta_to_c(eta, ref_position):
 
     # Get a list of all the indices (or row indices) corresponding to the
     # alternatives whose shape parameters are being estimated.
-    replace_list = range(eta.shape[0] + 1)
+    replace_list = list(range(eta.shape[0] + 1))
     replace_list.remove(ref_position)
 
     # Initialize an array for the vector of shape parameters, c
