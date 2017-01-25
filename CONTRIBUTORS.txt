@@ -9,3 +9,5 @@ conditional logit, and as such he also helped the development of this package.
 
 Professor Paul Waddell has graciously provided the financial support that
 helped ensure continued progress on this package.
+
+Oleksandr Lysenko ported PyLogit to Python >= 3.4.
