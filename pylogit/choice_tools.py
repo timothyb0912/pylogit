@@ -772,6 +772,59 @@ def create_row_to_some_id_col_mapping(id_array):
     return rows_to_ids
 
 
+def create_sparse_mapping(id_array, unique_ids=None):
+    """
+    Will create a scipy.sparse compressed-sparse-row matrix that maps
+    each row represented by an element in id_array to the corresponding
+    value of the unique ids in id_array.
+
+    Parameters
+    ----------
+    id_array : 1D ndarray of ints.
+        Each element should represent some id related to the corresponding row.
+    unique_ids : 1D ndarray of ints, or None, optional.
+        If not None, each element should be present in `id_array`. The elements
+        in `unique_ids` should be present in the order in which one wishes them
+        to appear in the columns of the resulting sparse array. For the
+        `row_to_obs` and `row_to_mixers` mappings, this should be the order of
+        appearance in `id_array`. If None, then the unique_ids will be created
+        from `id_array`, in the order of their appearance in `id_array`.
+
+    Returns
+    -------
+    mapping : 2D scipy.sparse CSR matrix.
+        Will contain only zeros and ones. `mapping[i, j] == 1` where
+        `id_array[i] == unique_ids[j]`. The id's corresponding to each column
+        are given by `unique_ids`. The rows correspond to the elements of
+        `id_array`.
+    """
+    # Create unique_ids if necessary
+    if unique_ids is None:
+        unique_ids = get_original_order_unique_ids(id_array)
+
+    # Check function arguments for validity
+    assert isinstance(unique_ids, np.ndarray)
+    assert isinstance(id_array, np.ndarray)
+    assert unique_ids.ndim == 1
+    assert id_array.ndim == 1
+
+    # Figure out the dimensions of the resulting sparse matrix
+    num_rows = id_array.size
+    num_cols = unique_ids.size
+    # Specify the non-zero values that will be present in the sparse matrix.
+    data = np.ones(num_rows, dtype=int)
+    # Specify which rows will have non-zero entries in the sparse matrix.
+    row_indices = np.arange(num_rows)
+    # Map the unique id's to their respective columns
+    unique_id_dict = dict(zip(unique_ids, np.arange(num_cols)))
+    # Figure out the column indices of the non-zero entries
+    col_indices = np.array([unique_id_dict[x] for x in id_array])
+
+    # Create and return the sparse matrix
+    return csr_matrix((data, (row_indices, col_indices)),
+                      shape=(num_rows, num_cols))
+
+
 ##########
 # Create a function to create the mapping matrices from long form rows to the
 # associated observations, from long form rows to alternative IDs, and
@@ -844,7 +897,7 @@ def create_long_form_mappings(long_form,
     # column for each of the unique IDs. This matrix will associate each row
     # as belonging to a particular observation using a one and using a zero to
     # show non-association.
-    rows_to_obs = create_row_to_some_id_col_mapping(obs_id_values)
+    rows_to_obs = create_sparse_mapping(obs_id_values)
 
     # Determine all of the unique alternative IDs
     all_alternatives = np.sort(np.unique(alt_id_values))
@@ -853,16 +906,16 @@ def create_long_form_mappings(long_form,
     # column for each of the unique alternatives. This matrix will associate
     # each row as belonging to a particular alternative using a one and using
     # a zero to show non-association.
-    rows_to_alts = (alt_id_values[:, None] ==
-                    all_alternatives[None, :]).astype(int)
+    rows_to_alts = create_sparse_mapping(alt_id_values,
+                                         unique_ids=all_alternatives)
 
     if choice_col is not None:
         # Create a matrix to associate each row with the same number of
         # rows as long_form but a 1 only if that row corresponds to an
         # alternative that a given observation (denoted by the columns)
         # chose.
-        chosen_row_to_obs = (rows_to_obs *
-                             long_form[choice_col].values[:, None])
+        chosen_row_to_obs = csr_matrix(rows_to_obs.multiply(
+                                long_form[choice_col].values[:, None]))
     else:
         chosen_row_to_obs = None
 
@@ -876,7 +929,7 @@ def create_long_form_mappings(long_form,
                 alt_id_to_nest_name[element] = key
 
         # Create a mapping between nest names and nest ids
-        nest_ids = range(1, num_nests + 1)
+        nest_ids = np.arange(1, num_nests + 1)
         nest_name_to_nest_id = dict(zip(nest_spec.keys(), nest_ids))
 
         # Create an array of the nest ids of each row
@@ -884,15 +937,16 @@ def create_long_form_mappings(long_form,
                                 for x in alt_id_values])
 
         # Create the mapping matrix between each row and the nests
-        rows_to_nests = (nest_id_vec[:, None] ==
-                         np.array(nest_ids)[None, :]).astype(int)
+        rows_to_nests = create_sparse_mapping(nest_id_vec, unique_ids=nest_ids)
+
     else:
         rows_to_nests = None
 
     if mix_id_col is not None:
         # Create a mapping matrix between each row and each 'mixing unit'
         mix_id_array = long_form[mix_id_col].values
-        rows_to_mixers = create_row_to_some_id_col_mapping(mix_id_array)
+        rows_to_mixers = create_sparse_mapping(mix_id_array)
+
     else:
         rows_to_mixers = None
 
@@ -905,14 +959,13 @@ def create_long_form_mappings(long_form,
     mapping_dict["rows_to_mixers"] = rows_to_mixers
 
     # Return the dictionary of mapping matrices.
-    # If desired, convert the mapping matrices to sparse matrices
+    # If desired, convert the mapping matrices to dense matrices
     if dense:
-        return mapping_dict
-    else:
         for key in mapping_dict:
             if mapping_dict[key] is not None:
-                mapping_dict[key] = csr_matrix(mapping_dict[key])
-        return mapping_dict
+                mapping_dict[key] = mapping_dict[key].A
+
+    return mapping_dict
 
 
 def convert_long_to_wide(long_data,

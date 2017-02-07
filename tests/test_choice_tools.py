@@ -10,7 +10,7 @@ from copy import deepcopy
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, isspmatrix_csr
 
 import pylogit.choice_tools as ct
 import pylogit.base_multinomial_cm_v2 as base_cm
@@ -810,5 +810,92 @@ class ArgumentValidationTests(GenericTestCase):
                                     func,
                                     bad_obj,
                                     "test_object")
+
+        return None
+
+
+    def test_create_sparse_mapping(self):
+        """
+        Ensure that the desired sparse mapping matrices are created.
+        """
+        # Create an id_array
+        id_array = np.array([1, 1, 3, 3, 3, 4, 4, 6, 6, 6, 5])
+        # Figure out the original order of appearance of the unique values
+        orig_order_unique = np.array([1, 3, 4, 6, 5])
+        # Get a generic sorted array of the unique values
+        sorted_unique_values = np.array([1, 3, 4, 5, 6])
+
+        # Get the dense version of the sparse matrices that should be created
+        orig_order_mapping = np.array([[1, 0, 0, 0, 0],
+                                       [1, 0, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 0, 1, 0, 0],
+                                       [0, 0, 1, 0, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 0, 1]])
+        sorted_mapping = np.array([[1, 0, 0, 0, 0],
+                                   [1, 0, 0, 0, 0],
+                                   [0, 1, 0, 0, 0],
+                                   [0, 1, 0, 0, 0],
+                                   [0, 1, 0, 0, 0],
+                                   [0, 0, 1, 0, 0],
+                                   [0, 0, 1, 0, 0],
+                                   [0, 0, 0, 0, 1],
+                                   [0, 0, 0, 0, 1],
+                                   [0, 0, 0, 0, 1],
+                                   [0, 0, 0, 1, 0]])
+
+        # Alias the function to be tested
+        func = ct.create_sparse_mapping
+
+        # Get the function results
+        orig_order_results = func(id_array)
+        sorted_results = func(id_array, unique_ids=sorted_unique_values)
+
+        # Check to make sure that sparse matrices were returned
+        self.assertTrue(isspmatrix_csr(orig_order_results))
+        self.assertTrue(isspmatrix_csr(sorted_results))
+
+        npt.assert_allclose(orig_order_mapping, orig_order_results.A)
+        npt.assert_allclose(sorted_mapping, sorted_results.A)
+
+        return None
+
+    def test_create_row_to_some_id_col_mapping(self):
+        """
+        Ensure that the correct mapping matrices are created.
+        """
+        # Create an id_array
+        id_array = np.array([1, 1, 3, 3, 3, 4, 4, 6, 6, 6, 5])
+        # Figure out the original order of appearance of the unique values
+        orig_order_unique = np.array([1, 3, 4, 6, 5])
+
+        # Get the dense version of the sparse matrices that should be created
+        orig_order_mapping = np.array([[1, 0, 0, 0, 0],
+                                       [1, 0, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 1, 0, 0, 0],
+                                       [0, 0, 1, 0, 0],
+                                       [0, 0, 1, 0, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 1, 0],
+                                       [0, 0, 0, 0, 1]])
+
+        # Alias the function to be tested
+        func = ct.create_row_to_some_id_col_mapping
+
+        # Get the function results
+        orig_order_results = func(id_array)
+
+        # Perform the required tests
+        self.assertIsInstance(orig_order_results, np.ndarray)
+        self.assertEqual(orig_order_results.ndim, 2)
+        npt.assert_allclose(orig_order_mapping, orig_order_results)
 
         return None
