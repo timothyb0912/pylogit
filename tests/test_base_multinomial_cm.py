@@ -10,6 +10,7 @@ import os
 from collections import OrderedDict
 from copy import deepcopy
 from functools import reduce
+from numbers import Number
 
 import numpy as np
 import numpy.testing as npt
@@ -1007,7 +1008,7 @@ class PostEstimationTests(GenericTestCase):
         # values
         np.random.seed(0)
         values = [self.fitted_probs,
-                  self.fake_all_params,
+                  pd.Series(self.fake_all_params),
                   self.log_likelihood,
                   np.random.uniform(size=self.fake_all_params.shape[0])]
         attr_to_values = dict(zip(needed_attributes, values))
@@ -1363,6 +1364,66 @@ class PostEstimationTests(GenericTestCase):
 
         return None
 
+    def test_compute_aic(self):
+        """
+        Ensure that the AIC is being computed as expected.
+        """
+        # Get values needed for calculation of the AIC
+        log_likelihood = self.log_likelihood
+        num_params = self.fake_betas.size
+
+        # Create the attributes that are needed on the model object
+        self.model_obj.log_likelihood = log_likelihood
+        self.model_obj.params = pd.Series(self.fake_betas,
+                                          index=self.fake_names["x"],
+                                          name="params")
+
+        # Alias the function being tested
+        func = base_cm.compute_aic
+
+        # Calculate what the value of the AIC should be
+        correct_aic = -2 * log_likelihood + 2 * num_params
+
+        # Get the functions results
+        aic_from_function = func(self.model_obj)
+
+        # Perform the needed tests
+        self.assertIsInstance(aic_from_function, Number)
+        self.assertEqual(aic_from_function, correct_aic)
+
+        return None
+
+    def test_compute_bic(self):
+        """
+        Ensure that the BIC is being computed as expected.
+        """
+        # Get values needed for calculation of the BIC
+        log_likelihood = self.log_likelihood
+        num_params = self.fake_betas.size
+        num_obs = self.fitted_probs.shape[0]
+
+        # Create the attributes that are needed on the model object
+        self.model_obj.log_likelihood = log_likelihood
+        self.model_obj.params = pd.Series(self.fake_betas,
+                                         index=self.fake_names["x"],
+                                         name="params")
+        self.model_obj.nobs = num_obs
+
+        # Alias the function being tested
+        func = base_cm.compute_bic
+
+        # Calculate what the value of the BIC should be
+        correct_bic = -2 * log_likelihood + np.log(num_obs) * num_params
+
+        # Get the functions results
+        bic_from_function = func(self.model_obj)
+
+        # Perform the needed tests
+        self.assertIsInstance(bic_from_function, Number)
+        self.assertEqual(bic_from_function, correct_bic)
+
+        return None
+
     def test_get_statsmodels_summary(self):
         """
         Ensure correct formatting and return of a statsmodels summary table.
@@ -1381,6 +1442,7 @@ class PostEstimationTests(GenericTestCase):
         self.model_obj.rho_squared = self.rho_squared
         self.model_obj.rho_bar_squared = self.rho_bar_squared
         self.model_obj.llf = self.log_likelihood
+        self.model_obj.log_likelihood = self.log_likelihood
         self.model_obj.null_log_likelihood = self.null_log_likelihood
 
         # Store the inferential results that will go into the table
@@ -1397,6 +1459,10 @@ class PostEstimationTests(GenericTestCase):
         self.model_obj.pvalues =\
             pd.Series(2 * scipy.stats.norm.sf(np.abs(self.model_obj.tvalues)),
                       index=self.fake_names["x"], name="p_values")
+
+        # Store the model comparison measures of goodness-of-fit
+        self.model_obj.aic = base_cm.compute_aic(self.model_obj)
+        self.model_obj.bic = base_cm.compute_bic(self.model_obj)
 
         # Alias the function that will be tested
         func = self.model_obj.get_statsmodels_summary
@@ -1417,9 +1483,22 @@ class PostEstimationTests(GenericTestCase):
             self.assertIsInstance(summary, Summary)
 
             # Convert the two tables of the summary into pandas dataframes
-            # table_1_buffer = StringIO(summary.tables[0].as_csv())
+            table_1_df = pd.DataFrame(summary.tables[0].data)
             table_2_buffer = StringIO(summary.tables[1].as_csv())
             table_2_df = pd.read_csv(table_2_buffer)
+
+            # Figure out the numerical values that are to be displayed in the
+            # top table of summary information
+            expected_top_left_values = np.array([self.model_obj.aic,
+                                                 self.model_obj.bic])
+            expected_top_right_values =\
+                np.array([self.model_obj.nobs,
+                          self.model_obj.df_resid,
+                          self.model_obj.df_model,
+                          self.model_obj.rho_squared,
+                          self.model_obj.rho_bar_squared,
+                          self.model_obj.log_likelihood,
+                          self.model_obj.null_log_likelihood])
 
             # Figure out the numerical values that should be displayed in the
             # table that is shown to users.
@@ -1435,6 +1514,20 @@ class PostEstimationTests(GenericTestCase):
             # intervals that are tested elsewhere).
             summary_vals = table_2_df.iloc[0, 1:-1].values.astype(np.float64)
             npt.assert_allclose(summary_vals, expected_values)
+
+            # Determine the numeric values in the top of the summary table.
+            top_left_summary_vals =\
+                table_1_df.iloc[-2:, 1].astype(float).values
+            top_right_summary_vals = table_1_df.iloc[:, 3].astype(float).values 
+            
+            # Test those values against the values that we expect them to be.
+            # Note we use rtol=1e-3 because the summary data is displayed without
+            # full numerical precision for ease of viewing.
+            npt.assert_allclose(top_left_summary_vals,
+                                expected_top_left_values,
+                                rtol=1e-3)
+            npt.assert_allclose(top_right_summary_vals,
+                                expected_top_right_values)
 
             return None
 

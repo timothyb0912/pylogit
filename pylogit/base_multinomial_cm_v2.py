@@ -17,6 +17,7 @@ from __future__ import absolute_import
 import pickle
 from copy import deepcopy
 from functools import reduce
+from numbers import Number
 
 import scipy.linalg
 import scipy.stats
@@ -608,6 +609,79 @@ def ensure_all_alternatives_are_chosen(alt_id_col, choice_col, dataframe):
     return None
 
 
+def compute_aic(model_object):
+    """
+    Compute the Akaike Information Criteria for an estimated model.
+
+    Parameters
+    ----------
+    model_object : an MNDC_Model (multinomial discrete choice model) instance.
+        The model should have already been estimated.
+        `model_object.log_likelihood` should be a number, and
+        `model_object.params` should be a pandas Series.
+
+    Returns
+    -------
+    aic : float.
+        The AIC for the estimated model.
+
+    Notes
+    -----
+    aic = -2 * log_likelihood + 2 * num_estimated_parameters
+
+    References
+    ----------
+    Akaike, H. (1974). 'A new look at the statistical identification model',
+        IEEE Transactions on Automatic Control 19, 6: 716-723.
+    """
+    assert isinstance(model_object.params, pd.Series)
+    assert isinstance(model_object.log_likelihood, Number)
+
+    return -2 * model_object.log_likelihood + 2 * model_object.params.size
+
+
+def compute_bic(model_object):
+    """
+    Compute the Bayesian Information Criteria for an estimated model.
+
+    Parameters
+    ----------
+    model_object : an MNDC_Model (multinomial discrete choice model) instance.
+        The model should have already been estimated.
+        `model_object.log_likelihood` and `model_object.nobs` should be a
+        number, and `model_object.params` should be a pandas Series.
+
+    Returns
+    -------
+    bic : float.
+        The BIC for the estimated model.
+
+    Notes
+    -----
+    bic = -2 * log_likelihood + log(num_observations) * num_parameters
+
+    The original BIC was introduced as (-1 / 2) times the formula above.
+    However, for model comparison purposes, it does not matter if the
+    goodness-of-fit measure is multiplied by a constant across all models being
+    compared. Moreover, the formula used above allows for a common scale
+    between measures such as the AIC, BIC, DIC, etc.
+
+    References
+    ----------
+    Schwarz, G. (1978), 'Estimating the dimension of a model', The Annals of
+        Statistics 6, 2: 461–464.
+    """
+    assert isinstance(model_object.params, pd.Series)
+    assert isinstance(model_object.log_likelihood, Number)
+    assert isinstance(model_object.nobs, Number)
+
+    log_likelihood = model_object.log_likelihood
+    num_obs = model_object.nobs
+    num_params = model_object.params.size
+
+    return -2 * log_likelihood + np.log(num_obs) * num_params
+
+
 # Create a basic class that sets the structure for the discrete outcome models
 # to be specified later. MNDC stands for MultiNomial Discrete Choice.
 class MNDC_Model(object):
@@ -991,6 +1065,9 @@ class MNDC_Model(object):
         self.llf = self.log_likelihood
         # This is just a repeat of the standard errors
         self.bse = self.standard_errors
+        # These are the penalized measures of fit used for model comparison
+        self.aic = compute_aic(self)
+        self.bic = compute_bic(self)
 
         return None
 
@@ -1585,7 +1662,8 @@ class MNDC_Model(object):
                     ('Method:', ['MLE']),
                     ('Date:', None),
                     ('Time:', None),
-                    ('converged:', [str(self.estimation_success)])
+                    ('AIC:', ["{:,.3f}".format(self.aic)]),
+                    ('BIC:', ["{:,.3f}".format(self.bic)])
                     ]
 
         top_right = [('No. Observations:', ["{:,}".format(self.nobs)]),
