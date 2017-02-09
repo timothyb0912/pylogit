@@ -1362,6 +1362,10 @@ class PostEstimationTests(GenericTestCase):
         # Perform the test
         self.assertEqual(self.model_obj.ind_var_names, expected_names)
 
+        # Add the variables once more, and then test again
+        self.model_obj._add_mixing_variable_names_to_individual_vars()
+        self.assertEqual(self.model_obj.ind_var_names, expected_names)
+
         return None
 
     def test_compute_aic(self):

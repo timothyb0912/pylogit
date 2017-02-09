@@ -1392,7 +1392,15 @@ class MNDC_Model(object):
         individual variables.
         """
         assert isinstance(self.ind_var_names, list)
-        if self.mixing_vars is not None:
+        # Note that if one estimates a mixed logit model, then the mixing
+        # variables will be added to individual vars. And if one estimates
+        # the model again (perhaps from different starting values), then
+        # an error will be raised when creating the coefs series because we
+        # will have added the mixing variables twice. The condition below
+        # should prevent this error.
+        already_included = any(["Sigma " in x for x in self.ind_var_names])
+
+        if self.mixing_vars is not None and not already_included:
             new_ind_var_names = ["Sigma " + x for x in self.mixing_vars]
             self.ind_var_names += new_ind_var_names
         return None
