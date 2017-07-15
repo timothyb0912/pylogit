@@ -66,7 +66,7 @@ setup(
 
     # What does your project relate to?
     keywords='conditional logit discrete choice econometrics',
-    
+
     # Is your project is safe to be zipped?
     zip_safe=True,
 
@@ -84,7 +84,8 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['pandas >= 0.16.2',
                       'numpy >= 1.10.2',
-                      'scipy >= 0.16.1'],
+                      'scipy >= 0.16.1',
+                      'future >= 0.16'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

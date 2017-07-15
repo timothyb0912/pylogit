@@ -1,3 +1,4 @@
 pandas >= 0.16.2
 numpy >= 1.10.2
 scipy >= 0.16.1
+future >= 0.16
