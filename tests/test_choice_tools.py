@@ -820,6 +820,8 @@ class ArgumentValidationTests(GenericTestCase):
         """
         # Create an id_array
         id_array = np.array([1, 1, 3, 3, 3, 4, 4, 6, 6, 6, 5])
+        # Create an id array that will contain a value not in the 'unique_ids'
+        null_id_array = np.concatenate([id_array, np.array([-1])], axis=0)
         # Figure out the original order of appearance of the unique values
         orig_order_unique = np.array([1, 3, 4, 6, 5])
         # Get a generic sorted array of the unique values
@@ -848,6 +850,8 @@ class ArgumentValidationTests(GenericTestCase):
                                    [0, 0, 0, 0, 1],
                                    [0, 0, 0, 0, 1],
                                    [0, 0, 0, 1, 0]])
+        null_id_mapping =\
+            np.concatenate([sorted_mapping, np.zeros((1, 5))], axis=0)
 
         # Alias the function to be tested
         func = ct.create_sparse_mapping
@@ -855,13 +859,16 @@ class ArgumentValidationTests(GenericTestCase):
         # Get the function results
         orig_order_results = func(id_array)
         sorted_results = func(id_array, unique_ids=sorted_unique_values)
+        null_results = func(null_id_array, unique_ids=sorted_unique_values)
 
         # Check to make sure that sparse matrices were returned
         self.assertTrue(isspmatrix_csr(orig_order_results))
         self.assertTrue(isspmatrix_csr(sorted_results))
+        self.assertTrue(isspmatrix_csr(null_results))
 
         npt.assert_allclose(orig_order_mapping, orig_order_results.A)
         npt.assert_allclose(sorted_mapping, sorted_results.A)
+        npt.assert_allclose(null_id_mapping, null_results.A)
 
         return None
 

@@ -808,17 +808,23 @@ def create_sparse_mapping(id_array, unique_ids=None):
     assert unique_ids.ndim == 1
     assert id_array.ndim == 1
 
+    # Figure out which ids in id_array are represented in unique_ids
+    represented_ids = np.in1d(id_array, unique_ids)
+    # Determine the number of rows in id_array that are in unique_ids
+    num_non_zero_rows = represented_ids.sum()
     # Figure out the dimensions of the resulting sparse matrix
     num_rows = id_array.size
     num_cols = unique_ids.size
     # Specify the non-zero values that will be present in the sparse matrix.
-    data = np.ones(num_rows, dtype=int)
+    data = np.ones(num_non_zero_rows, dtype=int)
     # Specify which rows will have non-zero entries in the sparse matrix.
-    row_indices = np.arange(num_rows)
+    row_indices = np.arange(num_rows)[represented_ids]
     # Map the unique id's to their respective columns
     unique_id_dict = dict(zip(unique_ids, np.arange(num_cols)))
-    # Figure out the column indices of the non-zero entries
-    col_indices = np.array([unique_id_dict[x] for x in id_array])
+    # Figure out the column indices of the non-zero entries, and do so in a way
+    # that avoids a key error (i.e. only look up ids that are represented)
+    col_indices =\
+        np.array([unique_id_dict[x] for x in id_array[represented_ids]])
 
     # Create and return the sparse matrix
     return csr_matrix((data, (row_indices, col_indices)),
