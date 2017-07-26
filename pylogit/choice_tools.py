@@ -735,8 +735,8 @@ def get_original_order_unique_ids(id_array):
     # Get the indices of the unique IDs in their order of appearance
     # Note the [1] is because the np.unique() call will return both the sorted
     # unique IDs and the indices
-    original_unique_id_indices = np.sort(np.unique(id_array,
-                                                   return_index=True)[1])
+    original_unique_id_indices =\
+        np.sort(np.unique(id_array, return_index=True)[1])
 
     # Get the unique ids, in their original order of appearance
     original_order_unique_ids = id_array[original_unique_id_indices]
