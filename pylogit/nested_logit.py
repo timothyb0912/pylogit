@@ -435,6 +435,7 @@ class NestedLogit(base_mcm.MNDC_Model):
                 gradient_tol=1e-06,
                 maxiter=1000,
                 ridge=None,
+                just_point=False,
                 **kwargs):
         """
         Parameters
@@ -469,6 +470,11 @@ class NestedLogit(base_mcm.MNDC_Model):
             Determines whether ridge regression is performed. If a scalar is
             passed, then that scalar determines the ridge penalty for the
             optimization. Default `== None`.
+        just_point : bool, optional.
+            Determines whether (True) or not (False) calculations that are non-
+            critical for obtaining the maximum likelihood point estimate will
+            be performed. If True, this function will return the results
+            dictionary from scipy.optimize. Default == False.
 
         Returns
         -------
@@ -527,9 +533,13 @@ class NestedLogit(base_mcm.MNDC_Model):
                                   gradient_tol,
                                   maxiter,
                                   print_res,
-                                  use_hessian=False)
+                                  use_hessian=False,
+                                  just_point=just_point)
 
-        # Store the estimation results
-        self.store_fit_results(estimation_res)
+        if not just_point:
+            # Store the estimation results
+            self.store_fit_results(estimation_res)
 
-        return None
+            return None
+        else:
+            return estimation_res

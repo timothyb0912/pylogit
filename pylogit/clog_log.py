@@ -608,6 +608,7 @@ class MNCL(base_mcm.MNDC_Model):
                 maxiter=1000,
                 ridge=None,
                 constrained_pos=None,
+                just_point=False,
                 **kwargs):
         """
         Parameters
@@ -659,6 +660,11 @@ class MNCL(base_mcm.MNDC_Model):
             not to change from their initial values. If a list is passed, the
             elements are to be integers where no such integer is greater than
             `init_values.size.` Default == None.
+        just_point : bool, optional.
+            Determines whether (True) or not (False) calculations that are non-
+            critical for obtaining the maximum likelihood point estimate will
+            be performed. If True, this function will return the results
+            dictionary from scipy.optimize. Default == False.
 
         Returns
         -------
@@ -734,9 +740,13 @@ class MNCL(base_mcm.MNDC_Model):
                                   loss_tol,
                                   gradient_tol,
                                   maxiter,
-                                  print_res)
+                                  print_res,
+                                  just_point=just_point)
 
-        # Store the estimation results
-        self.store_fit_results(estimation_res)
+        if not just_point:
+            # Store the estimation results
+            self.store_fit_results(estimation_res)
 
-        return None
+            return None
+        else:
+            return estimation_res

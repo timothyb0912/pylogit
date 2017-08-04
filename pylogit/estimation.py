@@ -559,6 +559,7 @@ def estimate(init_values,
              maxiter,
              print_results,
              use_hessian=True,
+             just_point=False,
              **kwargs):
     """
     Estimate the given choice model that is defined by `estimator`.
@@ -595,6 +596,10 @@ def estimate(init_values,
         Logit) use a rather crude (i.e. the BHHH) approximation to the Fisher
         Information Matrix, and users may prefer to not use this approximation
         for the hessian during estimation.
+    just_point : bool, optional.
+        Determines whether or not calculations that are non-critical for
+        obtaining the maximum likelihood point estimate will be performed.
+        Default == False.
 
     Return
     ------
@@ -618,20 +623,23 @@ def estimate(init_values,
           - "final_hessian"
           - "fisher_info"
     """
-    # Perform preliminary calculations
-    log_likelihood_at_zero =\
-        estimator.convenience_calc_log_likelihood(estimator.zero_vector)
+    if not just_point:
+        # Perform preliminary calculations
+        log_likelihood_at_zero =\
+            estimator.convenience_calc_log_likelihood(estimator.zero_vector)
 
-    initial_log_likelihood =\
-        estimator.convenience_calc_log_likelihood(init_values)
+        initial_log_likelihood =\
+            estimator.convenience_calc_log_likelihood(init_values)
 
-    if print_results:
-        # Print the log-likelihood at zero
-        print("Log-likelihood at zero: {:,.4f}".format(log_likelihood_at_zero))
+        if print_results:
+            # Print the log-likelihood at zero
+            null_msg = "Log-likelihood at zero: {:,.4f}"
+            print(null_msg.format(log_likelihood_at_zero))
 
-        # Print the log-likelihood at the starting values
-        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
-        sys.stdout.flush()
+            # Print the log-likelihood at the starting values
+            init_msg = "Initial Log-likelihood: {:,.4f}"
+            print(init_msg.format(initial_log_likelihood))
+            sys.stdout.flush()
 
     # Get the hessian fucntion for this estimation process
     hess_func = estimator.calc_neg_hessian if use_hessian else None
@@ -649,22 +657,25 @@ def estimate(init_values,
                                 "maxiter": maxiter},
                        **kwargs)
 
-    # Stop timing the estimation process and report the timing results
-    end_time = time.time()
-    if print_results:
-        elapsed_sec = (end_time - start_time)
-        elapsed_min = elapsed_sec / 60.0
-        if elapsed_min > 1.0:
-            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
-        else:
-            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
-        print("Final log-likelihood: {:,.4f}".format(-1 * results["fun"]))
-        sys.stdout.flush()
+    if not just_point:
+        if print_results:
+            # Stop timing the estimation process and report the timing results
+            end_time = time.time()
+            elapsed_sec = (end_time - start_time)
+            elapsed_min = elapsed_sec / 60.0
+            if elapsed_min > 1.0:
+                msg = "Estimation Time for Point Estimation: {:.2f} minutes."
+                print(msg.format(elapsed_min))
+            else:
+                msg = "Estimation Time for Point Estimation: {:.2f} seconds."
+                print(msg.format(elapsed_sec))
+            print("Final log-likelihood: {:,.4f}".format(-1 * results["fun"]))
+            sys.stdout.flush()
 
-    # Store the log-likelihood at zero
-    results["log_likelihood_null"] = log_likelihood_at_zero
+        # Store the log-likelihood at zero
+        results["log_likelihood_null"] = log_likelihood_at_zero
 
-    # Calculate and store the post-estimation results
-    results = calc_and_store_post_estimation_results(results, estimator)
+        # Calculate and store the post-estimation results
+        results = calc_and_store_post_estimation_results(results, estimator)
 
     return results
