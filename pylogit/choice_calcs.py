@@ -15,7 +15,7 @@ from scipy.linalg import block_diag
 from scipy.sparse import hstack
 
 try:
-    # Python 3.x does support xrange
+    # Python 3.x does not natively support xrange
     from past.builtins import xrange
 except ImportError:
     pass
