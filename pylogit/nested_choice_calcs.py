@@ -149,7 +149,7 @@ def calc_nested_probs(nest_coefs,
 
     # Calculate the log-sum for each nest, for each observation. Note that the
     # "*" is used to compute the dot produce between the mapping matrix which
-    # is a scipy.sparse matrix and the second term which is a dense numpy
+    # is a scipy.sparse matrix and the second term which is a scipy sparse
     # matrix. Note the dimensions of ind_log_sums_per_nest are (obs, nests).
     # Calculates sum _{j \in C_m} exp(V_{ij} / \lambda_m) for each nest m.
     ind_exp_sums_per_nest = (rows_to_obs.T *
@@ -166,7 +166,9 @@ def calc_nested_probs(nest_coefs,
     # be the log-sum for each nest, for the individual associated with the
     # given row. The "*" is used to perform the dot product since rows_to_obs
     # is a sparse matrix & ind_exp_sums_per_nest is a dense numpy matrix.
-    long_exp_sums_per_nest = rows_to_obs * ind_exp_sums_per_nest
+    long_exp_sums_per_nest = rows_to_obs.dot(ind_exp_sums_per_nest)
+    if issparse(long_exp_sums_per_nest):
+        long_exp_sums_per_nest = long_exp_sums_per_nest.toarray()
 
     # Get the relevant log-sum for each row of the long-format data
     # Note the .A converts the numpy matrix into a numpy array
@@ -188,8 +190,13 @@ def calc_nested_probs(nest_coefs,
     zero_idx = (ind_denom == 0)
     ind_denom[zero_idx] = min_comp_value
 
-    # Get the long format denominators
-    long_denom = rows_to_obs.dot(ind_denom).A.ravel()
+    # Get the long format denominators.
+    long_denom = rows_to_obs.dot(ind_denom)
+    # Ensure long_denom is an ndarray.
+    if issparse(long_denom):
+        long_denom = long_denom.toarray()
+    # Ensure that long_denom is 1D.
+    long_denom.ravel()
 
     # Get the long format numerators
     long_numerators = (exp_scaled_index *
