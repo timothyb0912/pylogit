@@ -9,6 +9,7 @@ Created on Thu Jun 30 11:57:29 2016
             choice probabilities and for estimating the 'nested' choice models.
 """
 import numpy as np
+from scipy.sparse import issparse
 
 # Define the boundary values which are not to be exceeded ducing computation
 min_exponent_val = -700
@@ -153,6 +154,9 @@ def calc_nested_probs(nest_coefs,
     # Calculates sum _{j \in C_m} exp(V_{ij} / \lambda_m) for each nest m.
     ind_exp_sums_per_nest = (rows_to_obs.T *
                              rows_to_nests.multiply(exp_scaled_index[:, None]))
+    # Ensure that ind_exp_sums_per_nest is an ndarray
+    if issparse(ind_exp_sums_per_nest):
+        ind_exp_sums_per_nest = ind_exp_sums_per_nest.toarray()
     # Guard against overflow
     inf_idx = np.isposinf(ind_exp_sums_per_nest)
     ind_exp_sums_per_nest[inf_idx] = max_comp_value
