@@ -448,7 +448,7 @@ def prep_vectors_for_gradient(nest_coefs,
     desired_arrays["long_probs"] = prob_dict["long_probs"]
     desired_arrays["prob_given_nest"] = prob_dict["prob_given_nest"]
     desired_arrays["nest_choice_probs"] = prob_dict["nest_choice_probs"]
-    desired_arrays["ind_sums_per_nest"] = prob_dict["ind_sums_per_nest"].A
+    desired_arrays["ind_sums_per_nest"] = prob_dict["ind_sums_per_nest"]
 
     return desired_arrays
 
