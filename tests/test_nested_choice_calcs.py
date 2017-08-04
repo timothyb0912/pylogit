@@ -8,6 +8,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix
+from scipy.sparse import issparse
 import numpy.testing as npt
 
 import pylogit.nested_choice_calcs as nlc
@@ -405,7 +406,9 @@ class ComputationalSetUp(unittest.TestCase):
         long_nest_sums = (self.fake_rows_to_nests
                               .multiply(long_nest_sums)
                               .sum(axis=1))
-        long_nest_sums = np.asarray(long_nest_sums).ravel()
+        if issparse(long_nest_sums):
+            long_nest_sums = long_nest_sums.toarray()
+        long_nest_sums = long_nest_sums.ravel()
 
         # Get the probability of each individual choosing each available
         # alternative, given the alternative's nest.
@@ -559,7 +562,9 @@ class ComputationalSetUp(unittest.TestCase):
         long_nest_sums = (self.fake_rows_to_nests
                               .multiply(long_nest_sums)
                               .sum(axis=1))
-        long_nest_sums = np.asarray(long_nest_sums).ravel()
+        if issparse(long_nest_sums):
+            long_nest_sums = long_nest_sums.toarray()
+        long_nest_sums = long_nest_sums.ravel()
 
         # Get the probability of each individual choosing each available
         # alternative, given the alternative's nest.
@@ -652,7 +657,9 @@ class ComputationalSetUp(unittest.TestCase):
         long_nest_sums = (self.fake_rows_to_nests
                               .multiply(long_nest_sums)
                               .sum(axis=1))
-        long_nest_sums = np.asarray(long_nest_sums).ravel()
+        if issparse(long_nest_sums):
+            long_nest_sums = long_nest_sums.toarray()
+        long_nest_sums = long_nest_sums.ravel()
 
         # Get the probability of each individual choosing each available
         # alternative, given the alternative's nest.

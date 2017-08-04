@@ -253,13 +253,16 @@ def calc_nested_probs(nest_coefs,
         nest_choice_probs = (np.power(ind_exp_sums_per_nest,
                                       nest_coefs[None, :]) /
                              ind_denom)
+        # Ensure that nest_choice_probs is an ndarray.
+        if issparse(nest_choice_probs):
+            nest_choice_probs = nest_choice_probs.A
         # Guard against underflow
         zero_idx = (nest_choice_probs == 0)
         nest_choice_probs[zero_idx] = min_comp_value
         # Return dictionary.
         # Note the ".A" converts the numpy matrix into a numpy array
         prob_dict["prob_given_nest"] = prob_given_nest
-        prob_dict["nest_choice_probs"] = nest_choice_probs.A
+        prob_dict["nest_choice_probs"] = nest_choice_probs
         prob_dict["ind_sums_per_nest"] = ind_exp_sums_per_nest
 
         return prob_dict
