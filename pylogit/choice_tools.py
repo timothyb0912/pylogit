@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.sparse import csr_matrix
+from scipy.sparse import issparse
 
 
 def get_dataframe_from_data(data):
@@ -1179,9 +1180,16 @@ def convert_long_to_wide(long_data,
     # For each alternative specific variable, create a wide format dataframe
     alt_specific_dfs = []
     for col in alt_specific_vars + list(subset_specific_vars.keys()):
-        obs_to_var = row_to_obs.T.dot(row_to_alt.multiply(
-                                              long_data[col].values[:, None]))
+        # Get the relevant values from the long format dataframe
+        relevant_vals = long_data[col].values[:, None]
+        # Create an wide format array of the relevant values
+        obs_to_var = row_to_obs.T.dot(row_to_alt.multiply(relevant_vals))
+        # Ensure that the wide format array is an ndarray with of dtype float
+        if issparse(obs_to_var):
+            obs_to_var = obs_to_var.toarray()
+        # Ensure that obs_to_var has a float dtype
         obs_to_var = obs_to_var.astype(float)
+
 
         # Place a null value in columns where the alternative is not available
         # to a given observation
