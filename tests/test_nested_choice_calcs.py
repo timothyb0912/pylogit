@@ -651,6 +651,8 @@ class ComputationalSetUp(unittest.TestCase):
         exp_scaled_index_2d = exp_scaled_index[:, None]
         interim_array = self.fake_rows_to_nests.multiply(exp_scaled_index_2d)
         nest_sum = self.fake_rows_to_obs.T.dot(interim_array)
+        if issparse(nest_sum):
+            nest_sum = nest_sum.toarray()
         # Create a 1D array that notes the nest-sum for the given nest and
         # observation that corresponds to a given row
         long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
