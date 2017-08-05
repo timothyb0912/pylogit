@@ -9,6 +9,7 @@ Created on Thu Jun 30 11:57:29 2016
             choice probabilities and for estimating the 'nested' choice models.
 """
 import numpy as np
+from scipy.sparse import issparse
 
 # Define the boundary values which are not to be exceeded ducing computation
 min_exponent_val = -700
@@ -147,12 +148,17 @@ def calc_nested_probs(nest_coefs,
     exp_scaled_index[zero_idx] = min_comp_value
 
     # Calculate the log-sum for each nest, for each observation. Note that the
-    # "*" is used to compute the dot produce between the mapping matrix which
-    # is a scipy.sparse matrix and the second term which is a dense numpy
+    # "*" is used to compute the dot product between the mapping matrix which
+    # is a scipy.sparse matrix and the second term which is a scipy sparse
     # matrix. Note the dimensions of ind_log_sums_per_nest are (obs, nests).
     # Calculates sum _{j \in C_m} exp(V_{ij} / \lambda_m) for each nest m.
     ind_exp_sums_per_nest = (rows_to_obs.T *
                              rows_to_nests.multiply(exp_scaled_index[:, None]))
+    # Ensure that ind_exp_sums_per_nest is an ndarray
+    if isinstance(ind_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
+        ind_exp_sums_per_nest = np.asarray(ind_exp_sums_per_nest)
+    elif issparse(ind_exp_sums_per_nest):
+        ind_exp_sums_per_nest = ind_exp_sums_per_nest.toarray()
     # Guard against overflow
     inf_idx = np.isposinf(ind_exp_sums_per_nest)
     ind_exp_sums_per_nest[inf_idx] = max_comp_value
@@ -162,7 +168,9 @@ def calc_nested_probs(nest_coefs,
     # be the log-sum for each nest, for the individual associated with the
     # given row. The "*" is used to perform the dot product since rows_to_obs
     # is a sparse matrix & ind_exp_sums_per_nest is a dense numpy matrix.
-    long_exp_sums_per_nest = rows_to_obs * ind_exp_sums_per_nest
+    long_exp_sums_per_nest = rows_to_obs.dot(ind_exp_sums_per_nest)
+    if isinstance(long_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
+        long_exp_sums_per_nest = np.asarray(long_exp_sums_per_nest)
 
     # Get the relevant log-sum for each row of the long-format data
     # Note the .A converts the numpy matrix into a numpy array
@@ -171,7 +179,6 @@ def calc_nested_probs(nest_coefs,
     long_exp_sums = (rows_to_nests.multiply(long_exp_sums_per_nest)
                                   .sum(axis=1)
                                   .A).ravel()
-
 
     # Get the denominators for each individual
     ind_denom = (np.power(ind_exp_sums_per_nest,
@@ -184,8 +191,10 @@ def calc_nested_probs(nest_coefs,
     zero_idx = (ind_denom == 0)
     ind_denom[zero_idx] = min_comp_value
 
-    # Get the long format denominators
-    long_denom = rows_to_obs.dot(ind_denom).A.ravel()
+    # Get the long format denominators.
+    long_denom = rows_to_obs.dot(ind_denom)
+    # Ensure that long_denom is 1D.
+    long_denom.ravel()
 
     # Get the long format numerators
     long_numerators = (exp_scaled_index *
@@ -241,14 +250,14 @@ def calc_nested_probs(nest_coefs,
         # shape (num_obs, 1) so no need to explicitly broadcast
         nest_choice_probs = (np.power(ind_exp_sums_per_nest,
                                       nest_coefs[None, :]) /
-                             ind_denom)
+                             ind_denom[:, None])
         # Guard against underflow
         zero_idx = (nest_choice_probs == 0)
         nest_choice_probs[zero_idx] = min_comp_value
         # Return dictionary.
         # Note the ".A" converts the numpy matrix into a numpy array
         prob_dict["prob_given_nest"] = prob_given_nest
-        prob_dict["nest_choice_probs"] = nest_choice_probs.A
+        prob_dict["nest_choice_probs"] = nest_choice_probs
         prob_dict["ind_sums_per_nest"] = ind_exp_sums_per_nest
 
         return prob_dict
@@ -434,7 +443,7 @@ def prep_vectors_for_gradient(nest_coefs,
     desired_arrays["long_probs"] = prob_dict["long_probs"]
     desired_arrays["prob_given_nest"] = prob_dict["prob_given_nest"]
     desired_arrays["nest_choice_probs"] = prob_dict["nest_choice_probs"]
-    desired_arrays["ind_sums_per_nest"] = prob_dict["ind_sums_per_nest"].A
+    desired_arrays["ind_sums_per_nest"] = prob_dict["ind_sums_per_nest"]
 
     return desired_arrays
 
@@ -725,15 +734,14 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     ##########
     # Calculate d_log_likelihood_d_nest_params
     ##########
-    # Calculate the term that onlny depends on nest level values
+    # Calculate the term that only depends on nest level values
     log_exp_sums = np.log(vector_dict["ind_sums_per_nest"])
     # Guard against overflow
     log_exp_sums[np.isneginf(log_exp_sums)] = -1 * max_comp_value
 
     # Calculate the first term of the derivative of the log-liikelihood
-    # with respect to the nest parameters. Note we do not sum this object
-    # because we want the values at the 'individual' level, which they already
-    # are
+    # with respect to the nest parameters. Note we do not sum this object since
+    # we want the values at the 'individual' level, which they already are.
     nest_gradient_term_1 = ((vector_dict["obs_to_chosen_nests"] -
                              vector_dict["nest_choice_probs"]) *
                             log_exp_sums)
@@ -755,8 +763,10 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     nest_gradient_term_3a = (choice_vec -
                              vector_dict["long_chosen_nest"] *
                              vector_dict["prob_given_nest"])
+
     nest_gradient_term_3b = ((-1 * nest_gradient_term_3a * long_w) /
                              vector_dict["long_nest_params"])
+
     # Guard against overflow
     inf_idx = np.isposinf(nest_gradient_term_3b)
     nest_gradient_term_3b[inf_idx] = max_comp_value
@@ -766,11 +776,11 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
 
     # Get the nest-wide version of this piece of the gradient
     spread_out_term_3b = rows_to_nests.multiply(nest_gradient_term_3b[:, None])
-    nest_gradient_term_3 = rows_to_obs.transpose().dot(spread_out_term_3b)
+    nest_gradient_term_3 = rows_to_obs.transpose().dot(spread_out_term_3b).A
 
-    # Combine the two terms. Note the "nest_coefs * (1 - nest_coefs)" is due to
-    # the fact that we're estimating the logit of the nest coefficients instead
-    # of the nest coefficient itself. We therefore need to multiply by
+    # Combine the terms. Note the "nest_coefs * (1 - nest_coefs)" is due to the
+    # fact that we're estimating the logit of the nest coefficients instead of
+    # the nest coefficient itself. We therefore need to multiply by
     # d_nest_coef_d_estimated_variable to get the correct gradient.
     # d_nest_coef_d_estimated_variable == nest_coefs * (1 - nest_coefs).
     # As with the various nest_gradient_terms, the nest_gradient should be of
@@ -779,9 +789,10 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
         jacobian = (nest_coefs * (1.0 - nest_coefs))[None, :]
     else:
         jacobian = 1
+
     nest_gradient = ((nest_gradient_term_1 +
                       nest_gradient_term_2 +
-                      nest_gradient_term_3).A *
+                      nest_gradient_term_3) *
                      jacobian)
 
     ##########
