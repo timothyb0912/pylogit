@@ -148,7 +148,7 @@ def calc_nested_probs(nest_coefs,
     exp_scaled_index[zero_idx] = min_comp_value
 
     # Calculate the log-sum for each nest, for each observation. Note that the
-    # "*" is used to compute the dot produce between the mapping matrix which
+    # "*" is used to compute the dot product between the mapping matrix which
     # is a scipy.sparse matrix and the second term which is a scipy sparse
     # matrix. Note the dimensions of ind_log_sums_per_nest are (obs, nests).
     # Calculates sum _{j \in C_m} exp(V_{ij} / \lambda_m) for each nest m.
@@ -260,10 +260,12 @@ def calc_nested_probs(nest_coefs,
         # shape (num_obs, 1) so no need to explicitly broadcast
         nest_choice_probs = (np.power(ind_exp_sums_per_nest,
                                       nest_coefs[None, :]) /
-                             ind_denom)
+                             ind_denom[:, None])
         # Ensure that nest_choice_probs is an ndarray.
         if issparse(nest_choice_probs):
-            nest_choice_probs = nest_choice_probs.A
+            nest_choice_probs = nest_choice_probs.toarray()
+        elif isinstance(nest_choice_probs, np.matrixlib.defmatrix.matrix):
+            nest_choice_probs = np.asarray(nest_choice_probs)
         # Guard against underflow
         zero_idx = (nest_choice_probs == 0)
         nest_choice_probs[zero_idx] = min_comp_value

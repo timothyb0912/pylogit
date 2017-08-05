@@ -398,13 +398,13 @@ class ComputationalSetUp(unittest.TestCase):
         # Calculate the sum of exp_scaled_index by obs by nest
         # Note the resulting array will be num_obs by num_nests
         exp_scaled_index_2d = exp_scaled_index[:, None]
-        assert exp_scaled_index_2d.shape == (self.fake_design.shape[0], 1)
         interim_array = self.fake_rows_to_nests.multiply(exp_scaled_index_2d)
         nest_sum = self.fake_rows_to_obs.T.dot(interim_array)
         if issparse(nest_sum):
             nest_sum = nest_sum.toarray()
         elif isinstance(nest_sum, np.matrixlib.defmatrix.matrix):
             nest_sum = np.asarray(nest_sum)
+
         # Create a 1D array that notes the nest-sum for the given nest and
         # observation that corresponds to a given row
         long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
@@ -426,7 +426,7 @@ class ComputationalSetUp(unittest.TestCase):
         nest_probs_numerator = np.power(nest_sum,
                                         self.natural_nest_coefs[None, :])
         nest_probs_denominator = nest_probs_numerator.sum(axis=1)
-        nest_probs = nest_probs_numerator / nest_probs_denominator
+        nest_probs = nest_probs_numerator / nest_probs_denominator[:, None]
 
         # Get the "average" value of the design matrix, in the chosen nests for
         # each observation. Note that observation 1 chosen nest 1 and
@@ -438,6 +438,7 @@ class ComputationalSetUp(unittest.TestCase):
                                       x_bar_obs_1_nest_2[None, :]],
                                      axis=0)
         x_bar_obs_1 = nest_probs[0, :][None, :].dot(x_bar_array).ravel()
+        # x_bar_obs_1 = nest_probs[0, :][:, None] * x_bar_array
 
         x_bar_obs_2_nest_1 = prob_by_design[3, :]
         x_bar_obs_2_nest_2 = prob_by_design[4, :]
@@ -445,6 +446,7 @@ class ComputationalSetUp(unittest.TestCase):
                                         x_bar_obs_2_nest_2[None, :]],
                                        axis=0)
         x_bar_obs_2 = nest_probs[1, :][None, :].dot(x_bar_array_2).ravel()
+        # x_bar_obs_2 = (nest_probs[1, :][:, None] * x_bar_array_2)
 
         index_bar_obs_1_nest_1 = (prob_alt_given_nest * index_array)[:2].sum()
         index_bar_obs_1_nest_2 = index_array[2]
@@ -567,6 +569,7 @@ class ComputationalSetUp(unittest.TestCase):
             nest_sum = nest_sum.toarray()
         elif isinstance(nest_sum, np.matrixlib.defmatrix.matrix):
             nest_sum = np.asarray(nest_sum)
+
         # Create a 1D array that notes the nest-sum for the given nest and
         # observation that corresponds to a given row
         long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
@@ -588,7 +591,7 @@ class ComputationalSetUp(unittest.TestCase):
         nest_probs_numerator = np.power(nest_sum,
                                         self.natural_nest_coefs[None, :])
         nest_probs_denominator = nest_probs_numerator.sum(axis=1)
-        nest_probs = nest_probs_numerator / nest_probs_denominator
+        nest_probs = nest_probs_numerator / nest_probs_denominator[:, None]
 
         # Get the probability of each alternative being chosen
         args = [self.natural_nest_coefs,
@@ -654,13 +657,12 @@ class ComputationalSetUp(unittest.TestCase):
         #####
         # Create the index array for each alternative
         index_array = self.fake_design.dot(self.fake_betas)
-        assert index_array.shape == (self.fake_design.shape[0],)
+
         # Create an array of long, natural nest parameters
         long_nests = self.fake_rows_to_nests.dot(self.natural_nest_coefs)
-        assert long_nests.shape == (self.fake_rows_to_nests.shape[0],)
+
         # Exponentiate the index array
         exp_scaled_index = np.exp(index_array / long_nests)
-        assert exp_scaled_index.shape == (self.fake_design.shape[0],)
 
         # Calculate the sum of exp_scaled_index by obs by nest
         # Note the resulting array will be num_obs by num_nests
@@ -671,8 +673,7 @@ class ComputationalSetUp(unittest.TestCase):
             nest_sum = nest_sum.toarray()
         elif isinstance(nest_sum, np.matrixlib.defmatrix.matrix):
             nest_sum = np.asarray(nest_sum)
-        assert nest_sum.shape == (self.fake_rows_to_obs.shape[1],
-                                  self.fake_rows_to_nests.shape[1])
+
         # Create a 1D array that notes the nest-sum for the given nest and
         # observation that corresponds to a given row
         long_nest_sums = self.fake_rows_to_obs.dot(nest_sum)
@@ -686,12 +687,10 @@ class ComputationalSetUp(unittest.TestCase):
             long_nest_sums = np.asarray(long_nest_sums)
         # Ensure long_nest_sums is 1D
         long_nest_sums = long_nest_sums.ravel()
-        assert long_nest_sums.shape == (self.fake_design.shape[0],)
 
         # Get the probability of each individual choosing each available
         # alternative, given the alternative's nest.
         prob_alt_given_nest = exp_scaled_index / long_nest_sums
-        assert prob_alt_given_nest.shape == (self.fake_design.shape[0],)
 
         # Get the probability of each individual choosing a given nest
         # Note that this array will be num_obs by num_nests
@@ -699,21 +698,18 @@ class ComputationalSetUp(unittest.TestCase):
                                         self.natural_nest_coefs[None, :])
         nest_probs_denominator = nest_probs_numerator.sum(axis=1)[:, None]
         nest_probs = nest_probs_numerator / nest_probs_denominator
-        assert nest_probs.shape == (self.fake_rows_to_obs.shape[1],
-                                    self.fake_rows_to_nests.shape[1])
 
         # Get the "average" value of the design matrix, in the chosen nests for
         # each observation. Note that observation 1 chosen nest 1 and
         # observation 2 chose nest 2.
         prob_by_design = prob_alt_given_nest[:, None] * self.fake_design
-        assert prob_by_design.shape == self.fake_design.shape
+
         x_bar_obs_1_nest_1 = prob_by_design[0:2, :].sum(axis=0)
         x_bar_obs_1_nest_2 = prob_by_design[2, :]
         x_bar_array = np.concatenate([x_bar_obs_1_nest_1[None, :],
                                       x_bar_obs_1_nest_2[None, :]],
                                      axis=0)
         x_bar_obs_1 = nest_probs[0, :][None, :].dot(x_bar_array).ravel()
-        assert x_bar_obs_1.shape == (x_bar_array.shape[1],)
 
         x_bar_obs_2_nest_1 = prob_by_design[3, :]
         x_bar_obs_2_nest_2 = prob_by_design[4, :]
@@ -721,7 +717,6 @@ class ComputationalSetUp(unittest.TestCase):
                                         x_bar_obs_2_nest_2[None, :]],
                                        axis=0)
         x_bar_obs_2 = nest_probs[1, :][None, :].dot(x_bar_array_2).ravel()
-        assert x_bar_obs_2.shape == (x_bar_array_2.shape[1],)
 
         index_bar_obs_1_nest_1 = (prob_alt_given_nest * index_array)[:2].sum()
         index_bar_obs_1_nest_2 = index_array[2]
