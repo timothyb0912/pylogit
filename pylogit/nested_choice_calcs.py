@@ -157,6 +157,8 @@ def calc_nested_probs(nest_coefs,
     # Ensure that ind_exp_sums_per_nest is an ndarray
     if isinstance(ind_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
         ind_exp_sums_per_nest = np.asarray(ind_exp_sums_per_nest)
+    elif issparse(ind_exp_sums_per_nest):
+        ind_exp_sums_per_nest = ind_exp_sums_per_nest.toarray()
     # Guard against overflow
     inf_idx = np.isposinf(ind_exp_sums_per_nest)
     ind_exp_sums_per_nest[inf_idx] = max_comp_value
