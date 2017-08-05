@@ -155,9 +155,7 @@ def calc_nested_probs(nest_coefs,
     ind_exp_sums_per_nest = (rows_to_obs.T *
                              rows_to_nests.multiply(exp_scaled_index[:, None]))
     # Ensure that ind_exp_sums_per_nest is an ndarray
-    if issparse(ind_exp_sums_per_nest):
-        ind_exp_sums_per_nest = ind_exp_sums_per_nest.toarray()
-    elif isinstance(ind_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
+    if isinstance(ind_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
         ind_exp_sums_per_nest = np.asarray(ind_exp_sums_per_nest)
     # Guard against overflow
     inf_idx = np.isposinf(ind_exp_sums_per_nest)
@@ -169,9 +167,7 @@ def calc_nested_probs(nest_coefs,
     # given row. The "*" is used to perform the dot product since rows_to_obs
     # is a sparse matrix & ind_exp_sums_per_nest is a dense numpy matrix.
     long_exp_sums_per_nest = rows_to_obs.dot(ind_exp_sums_per_nest)
-    if issparse(long_exp_sums_per_nest):
-        long_exp_sums_per_nest = long_exp_sums_per_nest.toarray()
-    elif isinstance(long_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
+    if isinstance(long_exp_sums_per_nest, np.matrixlib.defmatrix.matrix):
         long_exp_sums_per_nest = np.asarray(long_exp_sums_per_nest)
 
     # Get the relevant log-sum for each row of the long-format data
@@ -195,11 +191,6 @@ def calc_nested_probs(nest_coefs,
 
     # Get the long format denominators.
     long_denom = rows_to_obs.dot(ind_denom)
-    # Ensure long_denom is an ndarray.
-    if issparse(long_denom):
-        long_denom = long_denom.toarray()
-    elif isinstance(long_denom, np.matrixlib.defmatrix.matrix):
-        long_denom = np.asarray(long_denom)
     # Ensure that long_denom is 1D.
     long_denom.ravel()
 
@@ -218,9 +209,6 @@ def calc_nested_probs(nest_coefs,
     long_probs = (long_numerators / long_denom).ravel()
     # Guard against underflow
     long_probs[np.where(long_probs == 0)] = min_comp_value
-    # Ensure long_probs is a 1D ndarray
-    if not isinstance(long_probs, np.ndarray) and long_probs.ndim != 1:
-        long_probs = np.asarray(long_probs).ravel()
 
     # If desired, isolate the probabilities of the chosen alternatives
     if chosen_row_to_obs is None:
@@ -261,11 +249,6 @@ def calc_nested_probs(nest_coefs,
         nest_choice_probs = (np.power(ind_exp_sums_per_nest,
                                       nest_coefs[None, :]) /
                              ind_denom[:, None])
-        # Ensure that nest_choice_probs is an ndarray.
-        if issparse(nest_choice_probs):
-            nest_choice_probs = nest_choice_probs.toarray()
-        elif isinstance(nest_choice_probs, np.matrixlib.defmatrix.matrix):
-            nest_choice_probs = np.asarray(nest_choice_probs)
         # Guard against underflow
         zero_idx = (nest_choice_probs == 0)
         nest_choice_probs[zero_idx] = min_comp_value
