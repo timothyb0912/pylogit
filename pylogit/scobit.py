@@ -365,7 +365,8 @@ def _scobit_transform_deriv_shape(systematic_utilities,
     # Guard against overflow from moderate v but shape --> inf.
     shape_too_big_idx = np.where((np.abs(systematic_utilities) <= 10) &
                                  np.isposinf(powered_term))
-    curve_derivs[shape_too_big_idx] = systematic_utilities[shape_too_big_idx]
+    curve_derivs[shape_too_big_idx] =\
+        (-1 * np.log1p(exp_neg_v))[shape_too_big_idx]
 
     # Assign the calculated derivatives to the output array
     output_array.data = curve_derivs
