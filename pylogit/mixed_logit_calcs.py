@@ -655,11 +655,7 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
 
     gradient_per_obs = rows_to_mixers.T.dot(gradient)
 
-    bhhh_matrix = np.zeros((gradient_per_obs.shape[1],
-                            gradient_per_obs.shape[1]))
-    for row_idx in xrange(gradient_per_obs.shape[0]):
-        bhhh_matrix += np.outer(gradient_per_obs[row_idx, :],
-                                gradient_per_obs[row_idx, :])
+    bhhh_matrix = gradient_per_obs.T.dot(gradient_per_obs)
 
     if ridge is not None:
         bhhh_matrix -= 2 * ridge

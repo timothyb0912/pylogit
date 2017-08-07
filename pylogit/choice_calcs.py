@@ -976,20 +976,9 @@ def calc_fisher_info_matrix(beta,
     gradient_vec = rows_to_obs.T.dot(gradient_vec)
 
     # Compute and return the outer product of each row of the gradient
-    # with itself. Then sum these individual matrices together.
-    # fisher_matrix = (gradient_vec[:, :, np.newaxis] *
-    #                  gradient_vec[:, np.newaxis, :]).sum(axis=0)
-
-    # The next five lines replicate the procedure accomplished in two
-    # lines by the vectorized code above. However, when the design
-    # matrix is large, the vectorized code will cause memory problems
-    # by creating matrices that are even larger than the design matrix.
-    # The for-loop based calculation avoids memory issues.
-    fisher_matrix = np.zeros((gradient_vec.shape[1],
-                              gradient_vec.shape[1]))
-    for row_idx in range(gradient_vec.shape[0]):
-        fisher_matrix += np.outer(gradient_vec[row_idx],
-                                  gradient_vec[row_idx])
+    # with itself. Then sum these individual matrices together. The line below
+    # does the same computation just with less memory and time.
+    fisher_matrix = gradient_vec.T.dot(gradient_vec)
 
     if ridge is not None:
         # The rational behind adding 2 * ridge is that the fisher information
