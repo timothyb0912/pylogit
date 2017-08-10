@@ -65,7 +65,8 @@ def get_num_obs_choosing_each_alternative(obs_per_alt_dict):
     """
     Will create an ordered dictionary that records the number of units of
     observation that have chosen the given alternative (i.e. the associated
-    dictionary key).
+    dictionary key). Will also determine the total number of unique
+    observations in the dataset.
 
     Parameters
     ----------
@@ -73,12 +74,14 @@ def get_num_obs_choosing_each_alternative(obs_per_alt_dict):
         Each key should be a unique alternave id. Each key's value will be 1D
         ndarray that contains the sorted, unique observation ids of those
         observational units that chose the given alternative.
+
+    Returns
+    -------
+    num_obs_per_group : OrderedDict.
+        Keys will be the alternative ids present in `obs_per_alt_dict`. Values
+        will be the `len(obs_per_alt_dict[alt_id]).`
     tot_num_obs : int.
-        Should the denote the total number of "observation id-choices". If a
-        cross-sectional dataset is being used, then this value will simply be
-        the number of unique observational units. If a panel dataset is being
-        used, this value will be the sum over all observational units of the
-        number of observed choice situations for each unit.
+        Denotes the total number of unique observation ids in one's dataset.
     """
     # Initialize the object that is to be returned.
     num_obs_per_group = OrderedDict()
@@ -106,6 +109,28 @@ def create_cross_sectional_bootstrap_samples(obs_id_array,
     long-format dataframe for each bootstrap sample. Note that these will be
     correct bootstrap samples for cross-sectional datasets. This function will
     not work correctly for panel datasets.
+
+    Parameters
+    ----------
+    obs_id_array : 1D ndarray of ints.
+        Each element should denote a unique observation id for the
+        corresponding row of the long format array.
+    alt_id_array : 1D ndarray of ints.
+        Each element should denote a unique alternative id for the
+        corresponding row of the long format array.
+    choice_array : 1D ndarray of ints.
+        Each element should be a one or a zero. The values should denote a
+        whether or not the corresponding alternative in `alt_id_array` was
+        chosen by the observational unit in the corresponding row of
+        `obs_id_array.`
+
+    Returns
+    -------
+    ids_per_sample : 2D ndarray.
+        Each row represents a complete bootstrap sample. Each column denotes a
+        selected bootstrap observation that comprises the bootstrap sample. The
+        elements of the array denote the observation ids of the chosen
+        observational units.
     """
     # Determine the units of observation that chose each alternative.
     chosen_alts_to_obs_ids =\
