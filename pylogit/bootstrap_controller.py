@@ -4,10 +4,14 @@
 @summary:   This module provides functions that will control the bootstrapping
             procedure.
 """
+from copy import deepcopy
+
 import numpy as np
 import pandas as pd
 
 from . import bootstrap_sampler as bs
+from .bootstrap_mle import retrieve_point_est
+from .display_names import model_type_to_display_name
 
 try:
     # Python 3.x does not natively support xrange
@@ -16,13 +20,44 @@ except ImportError:
     pass
 
 
+def get_param_names(model_obj):
+    """
+    Extracts all the names to be displayed for the estimated parameters.
+
+    Parameters
+    ----------
+    model_obj : an instance of an MNDC object.
+        Should have the following attributes:
+        `['ind_var_names', 'intercept_names', 'shape_names', 'nest_names']`.
+
+    Returns
+    -------
+    all_names : list of strings.
+        There will be one element for each estimated parameter. The order of
+        the parameter names will be
+        `['nest_parameters', 'shape_parameters', 'outside_intercepts',
+          'index_coefficients']`.
+    """
+    # Get the index coefficient names
+    all_names = deepcopy(model_obj.ind_var_names)
+    # Add the intercept names if any exist
+    if model_obj.intercept_names is not None:
+        all_names = model_obj.intercept_names + all_names
+    # Add the shape names if any exist
+    if model_obj.shape_names is not None:
+        all_names = model_obj.shape_names + all_names
+    # Add the nest names if any exist
+    if model_obj.nest_names is not None:
+        all_names = model_obj.nest_names + all_names
+    return all_names
+
 class Boot(object):
     """
     Class to perform bootstrap resampling and to store and display its results.
 
     Parameters
     ----------
-    model_obj : and instance or sublcass of the MNDC class.
+    model_obj : an instance or sublcass of the MNDC class.
     """
     def __init__(self,
                  model_obj,
@@ -31,7 +66,7 @@ class Boot(object):
         self.model_obj = model_obj
 
         # Determine the parameter names
-        param_names = None
+        param_names = get_param_names(model_obj)
 
         # Store the MLE parameters
         self.mle_params = pd.Series(mle_params, index=param_names)
@@ -47,8 +82,11 @@ class Boot(object):
         return None
 
     def bootstrap_params(num_samples,
-                         mle_params,
-                         print_res=True,
+                         mnl_obj=None,
+                         mnl_init_vals=None,
+                         mnl_fit_kwargs=None,
+                         extract_init_vals=None
+                         print_res=False,
                          method="BFGS",
                          loss_tol=1e-06,
                          gradient_tol=1e-06,
@@ -57,6 +95,28 @@ class Boot(object):
                          constrained_pos=None,
                          boot_seed = None,
                          **kwargs):
+        """
+        Parameters
+        ----------
+        mnl_spec : OrderedDict or None, optional.
+            If the model that is being estimated is not an MNL, then `mnl_spec`
+            should be passed. This should be the specification used to estimate
+            the MNL model that our desired model is based on.
+            Default == None.
+        mnl_names : OrderedDict or None, optional.
+            If the model that is being estimated is not an MNL, then `mnl_spec`
+            should be passed. This should be the name dictionary used to
+            estimate the MNL model that our desired model is based on.
+            Default == None.
+        mnl_init_vals : 1D ndarray or None, optional.
+            If the model that is being estimated is not an MNL, then
+            `mnl_init_val` should be passed. Should contain the values used to
+            begin the estimation process for the MNL model that is used to
+            provide starting values for our desired model. Default == None.
+        mnl_fit_kwargs : dict or None.
+            If the model that is being estimated is not an MNL, then
+            `mnl_fit_kwargs` should be passed.
+        """
         # Check the passed arguments for validity.
 
         # Create an array of the observation ids
@@ -67,9 +127,6 @@ class Boot(object):
 
         # Determine how many parameters are being estimated.
         num_params = self.mle_params.shape[0]
-
-        # Determine the specification of the MNL model that corresponds to
-        # whatever model we're actually implementing.
 
         # Figure out which observations are in each bootstrap sample.
         obs_id_per_sample =\
@@ -91,6 +148,20 @@ class Boot(object):
         # Initialize an array to store the bootstrapped point estimates.
         point_estimates = np.empty((num_samples, num_params), dtype=float)
 
+        # Get keyword arguments for final model estimation with new data.
+        fit_kwargs = {"print_res": print_res,
+                      "method": method,
+                      "loss_tol": loss_tol,
+                      "gradient_tol": gradient_tol,
+                      "maxiter": maxiter,
+                      "ridge": ridge,
+                      "constrained_pos": constrained_pos,
+                      "just_point": True}
+
+        # Get the specification and name dictionary of the MNL model.
+        mnl_spec = None if mnl_obj is None else mnl_obj.specification
+        mnl_names = None if mnl_obj is None else mnl_obj.name_spec
+
         # Iterate through the bootstrap samples and perform the MLE
         for row in xrange(num_samples):
             # Get the bootstrapped dataframe
@@ -101,8 +172,17 @@ class Boot(object):
                                               dfs_by_obs_id,
                                               boot_id_col=boot_id_col)
 
-            # Go through the necessary estimation routine to bootsrap the MLE.
-            current_results = None
+            # Go through the necessary estimation routine to bootstrap the MLE.
+            current_results =\
+                retrieve_point_est(self.model_obj,
+                                   bootstrap_df,
+                                   num_params,
+                                   mnl_spec,
+                                   mnl_names,
+                                   mnl_init_vals,
+                                   mnl_fit_kwargs,
+                                   extract_init_vals=extract_init_vals
+                                   **fit_kwargs)
 
             # Store the bootstrapped point estimate.
             point_estimates[row] = current_results["x"]
