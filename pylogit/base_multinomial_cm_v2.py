@@ -1188,7 +1188,7 @@ class MNDC_Model(object):
             Should contain the various types of parameters that were actually
             estimated.
         all_names : list of strings.
-            Should cntain names of each estimated parameter.
+            Should contain names of each estimated parameter.
 
         Returns
         -------
