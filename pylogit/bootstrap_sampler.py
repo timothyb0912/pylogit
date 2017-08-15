@@ -282,8 +282,8 @@ def create_bootstrap_dataframe(orig_df,
         raise ValueError(msg)
     if not np.in1D(resampled_obs_ids_1d, orig_df[obs_id_col].values).all():
         msg =\
-            ("All values in `resampled_obs_ids_1d` MUST be in
-            "`orig_df[obs_id_col]`.")
+            ("All values in `resampled_obs_ids_1d` MUST be in "
+             "`orig_df[obs_id_col]`.")
         raise ValueError(msg)
     if boot_id_col in orig_df.columns:
         msg = "Ensure that `boot_id_col` is not in orig_df.columns."
