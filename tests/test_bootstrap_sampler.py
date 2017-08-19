@@ -155,6 +155,38 @@ class SamplerTests(unittest.TestCase):
         return None
 
     def test_create_deepcopied_groupby_dict(self):
+        # Create the dataframe of fake data
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3],
+                                "alt_id": [1, 2, 1, 2, 1, 2],
+                                "choice": [1, 0, 0, 1, 1, 0],
+                                "x": [1, 1.2, 1.4, 0.3, 0.9, 1.11]})
+        # Create the result that we expect from the function being tested.
+        expected_res = {1: fake_df.iloc[0:2],
+                        2: fake_df.iloc[2:4],
+                        3: fake_df.iloc[4:]}
+        # Alias the function being tested
+        func = bs.create_deepcopied_groupby_dict
+
+        # Get the result of the function
+        func_result = func(fake_df, "obs_id")
+
+        # Perform the requisite tests
+        # Ensure the returned value is a dictionary
+        self.assertIsInstance(func_result, dict)
+        # Ensure the returned value and the expected value have the same keys.
+        self.assertEqual(sorted(func_result.keys()),
+                         sorted(expected_res.keys()))
+        for key in func_result:
+            # Get the expected and returned dataframes for each observation id
+            sub_func_result = func_result[key]
+            sub_expected_res = expected_res[key]
+
+            # Ensure that the dataframes have equal values.
+            npt.assert_allclose(sub_func_result.values,
+                                sub_expected_res.values)
+
+            # Ensure the dataframes don't share the same location in memory.
+            self.assertNotEqual(id(sub_func_result), id(sub_expected_res))
         return None
 
     def test_create_bootstrap_dataframe(self):
