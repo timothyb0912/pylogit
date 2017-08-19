@@ -120,6 +120,15 @@ class SamplerTests(unittest.TestCase):
         self.assertEqual(func_result.shape, expected_ids.shape)
         npt.assert_allclose(func_result, expected_ids)
 
+        # Make sure the argument check works
+        self.assertRaises(ValueError,
+                          func,
+                          obs_ids,
+                          alt_ids,
+                          choices,
+                          num_samples,
+                          "2")
+
         return None
 
     def test_create_bootstrap_id_array(self):
