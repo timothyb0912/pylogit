@@ -132,6 +132,26 @@ class SamplerTests(unittest.TestCase):
         return None
 
     def test_create_bootstrap_id_array(self):
+        # Create an array of fake bootstrapped observation ids
+        fake_obs_id_per_sample = np.arange(25).reshape((5, 5))
+
+        # Create the expected result denoting the "bootstrap ids" for each of
+        # the sampled observation ids.
+        expected_results = np.array([[1, 2, 3, 4, 5],
+                                     [1, 2, 3, 4, 5],
+                                     [1, 2, 3, 4, 5],
+                                     [1, 2, 3, 4, 5],
+                                     [1, 2, 3, 4, 5]])
+        # Alias the function being tested
+        func = bs.create_bootstrap_id_array
+        # Get the function results
+        func_result = func(fake_obs_id_per_sample)
+
+        # Perform the desired tests
+        self.assertIsInstance(func_result, np.ndarray)
+        self.assertEqual(func_result.ndim, 2)
+        npt.assert_allclose(func_result, expected_results)
+
         return None
 
     def test_create_deepcopied_groupby_dict(self):
