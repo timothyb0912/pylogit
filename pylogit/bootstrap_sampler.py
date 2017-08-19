@@ -123,6 +123,14 @@ def create_cross_sectional_bootstrap_samples(obs_id_array,
         whether or not the corresponding alternative in `alt_id_array` was
         chosen by the observational unit in the corresponding row of
         `obs_id_array.`
+    num_samples : int.
+        Denotes the number of bootstrap samples that need to be drawn.
+    seed : non-negative int or None, optional.
+        Denotes the random seed to be used in order to ensure reproducibility
+        of the bootstrap sample generation. Default is None. If None, no seed
+        will be used and the generation of the bootstrap samples will (in
+        general) not be reproducible.
+
 
     Returns
     -------
