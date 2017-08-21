@@ -156,14 +156,18 @@ class SamplerTests(unittest.TestCase):
 
     def test_create_deepcopied_groupby_dict(self):
         # Create the dataframe of fake data
-        fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3],
-                                "alt_id": [1, 2, 1, 2, 1, 2],
-                                "choice": [1, 0, 0, 1, 1, 0],
-                                "x": [1, 1.2, 1.4, 0.3, 0.9, 1.11]})
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+                                "alt_id": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+                                "choice": [1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1],
+                                "x": [1, 1.2, 1.4, 0.3, 0.9, 1.11, 0.53, 0.82,
+                                      1.31, 1.24, 0.98, 0.76]})
         # Create the result that we expect from the function being tested.
         expected_res = {1: fake_df.iloc[0:2],
                         2: fake_df.iloc[2:4],
-                        3: fake_df.iloc[4:]}
+                        3: fake_df.iloc[4:6],
+                        4: fake_df.iloc[6:8],
+                        5: fake_df.iloc[8:10],
+                        6: fake_df.iloc[10:]}
         # Alias the function being tested
         func = bs.create_deepcopied_groupby_dict
 
@@ -190,4 +194,50 @@ class SamplerTests(unittest.TestCase):
         return None
 
     def test_create_bootstrap_dataframe(self):
+        # Create the dataframe of fake data
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+                                "alt_id": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+                                "choice": [1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1],
+                                "x": [1, 1.2, 1.4, 0.3, 0.9, 1.11, 0.53, 0.82,
+                                      1.31, 1.24, 0.98, 0.76]})
+        # Note the observation id column
+        obs_id_col = "obs_id"
+
+        # Get the bootstrapped samples of the observation ids
+        sampling_args = [fake_df["obs_id"].values,
+                         fake_df["alt_id"].values,
+                         fake_df["choice"].values,
+                         5]
+        sampled_obs_ids =\
+            bs.create_cross_sectional_bootstrap_samples(*sampling_args)
+        rel_sampled_ids = sampled_obs_ids[0, :]
+
+        # Get the groupby dictionary for this dataframe.
+        groupby_dictionary =\
+            bs.create_deepcopied_groupby_dict(fake_df, obs_id_col)
+
+        # Alias the function necessary to create the bootstrap dataframe
+        func = bs.create_bootstrap_dataframe
+        # Create the bootstrap id column name
+        boot_id_col = "new_id"
+
+        # Create the expected result.
+        expected_result =\
+            [groupby_dictionary[obs_id] for obs_id in rel_sampled_ids]
+        for pos in xrange(len(expected_result)):
+            expected_result[pos][boot_id_col] = pos
+        expected_result = pd.concat(expected_result, axis=0, ignore_index=True)
+
+        # Get the function result
+        func_result = func(fake_df,
+                           obs_id_col,
+                           rel_sampled_ids,
+                           groupby_dictionary,
+                           boot_id_col=boot_id_col)
+
+        # Perform the desired tests.
+        self.assertIsInstance(func_result, pd.DataFrame)
+        self.assertIn(boot_id_col, func_result.columns.values)
+        self.assertEqual(expected_result.shape, func_result.shape)
+        npt.assert_allclose(expected_result.values, func_result.values)
         return None

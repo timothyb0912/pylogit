@@ -248,6 +248,37 @@ def create_deepcopied_groupby_dict(orig_df, obs_id_col):
     return groupby_dict
 
 
+def check_column_existence(col_name, df, neg=False):
+    """
+    Checks whether or not `col_name` is in `df` and raises a helpful error msg
+    if the desired condition is not met.
+
+    Parameters
+    ----------
+    col_name : str.
+        Should represent a column whose presence in `df` is to be checked.
+    df : pandas DataFrame.
+        The dataframe that will be checked for the presence of `col_name`.
+    neg : bool, optional.
+        If True, then this function checks for the ABSENCE of `col_name` from
+            `df`. If False, then this function checks for the PRESENCE of
+            `col_name` in `df`.
+
+    Returns
+    -------
+    None.
+    """
+    if neg:
+        if col_name in df.columns:
+            msg = "Ensure that `{}` is not in `df.columns`."
+            raise ValueError(msg.format(col_name))
+    else:
+        if col_name not in df.columns:
+            msg = "Ensure that `{}` is in `df.columns`."
+            raise ValueError(msg.format(col_name))
+    return None
+
+
 def create_bootstrap_dataframe(orig_df,
                                obs_id_col,
                                resampled_obs_ids_1d,
@@ -285,16 +316,12 @@ def create_bootstrap_dataframe(orig_df,
         have the given observation id.
     """
     # Check the validity of the passed arguments.
-    if obs_id_col not in orig_df.columns:
-        msg = "`obs_id_col` MUST be a column in `orig_df`"
-        raise ValueError(msg)
-    if not np.in1D(resampled_obs_ids_1d, orig_df[obs_id_col].values).all():
+    check_column_existence(obs_id_col, orig_df, neg=False)
+    check_column_existence(boot_id_col, orig_df, neg=True)
+    if not np.in1d(resampled_obs_ids_1d, orig_df[obs_id_col].values).all():
         msg =\
             ("All values in `resampled_obs_ids_1d` MUST be in "
              "`orig_df[obs_id_col]`.")
-        raise ValueError(msg)
-    if boot_id_col in orig_df.columns:
-        msg = "Ensure that `boot_id_col` is not in orig_df.columns."
         raise ValueError(msg)
 
     # Alias the observation id column
@@ -305,7 +332,7 @@ def create_bootstrap_dataframe(orig_df,
     component_dfs = []
 
     # Populate component_dfs
-    for obs_id, boot_id in enumerate(resampled_obs_ids_1d):
+    for boot_id, obs_id in enumerate(resampled_obs_ids_1d):
         # Get the rows of orig_df that correspond to the desired observation id
         desired_rows = obs_id_values == obs_id
         # Extract the dataframe that we desire.
