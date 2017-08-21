@@ -89,7 +89,6 @@ def get_model_abbrev(model_obj):
     # object, then raise an error.
     msg = "Model object has an unknown or incorrect model type."
     raise ValueError(msg)
-    return None
 
 
 def get_model_creation_kwargs(model_obj):
@@ -107,7 +106,7 @@ def get_model_creation_kwargs(model_obj):
                     "intercept_names": model_obj.intercept_names,
                     "intercept_ref_pos": model_obj.intercept_ref_position,
                     "shape_names": model_obj.shape_names,
-                    "shape_ref_position": model_obj.shape_ref_position
+                    "shape_ref_pos": model_obj.shape_ref_position,
                     "nest_spec": model_obj.nest_spec,
                     "mixing_vars": model_obj.mixing_vars,
                     "mixing_id_col": model_obj.mixing_id_col}
@@ -149,7 +148,7 @@ def retrieve_point_est(orig_model_obj,
     # Initialize the mnl model object for the given bootstrap sample.
     mnl_obj = pl.create_choice_model(data=new_df,
                                      alt_id_col=orig_model_obj.alt_id_col,
-                                     obs_id_col=orig_model_obj.obs_id_col
+                                     obs_id_col=orig_model_obj.obs_id_col,
                                      choice_col=orig_model_obj.choice_col,
                                      specification=mnl_spec,
                                      model_type="MNL",
@@ -182,7 +181,7 @@ def retrieve_point_est(orig_model_obj,
         new_obj =\
             pl.create_choice_model(data=new_df,
                                    alt_id_col=orig_model_obj.alt_id_col,
-                                   obs_id_col=orig_model_obj.obs_id_col
+                                   obs_id_col=orig_model_obj.obs_id_col,
                                    choice_col=orig_model_obj.choice_col,
                                    specification=orig_model_obj.specification,
                                    **model_kwargs)
