@@ -246,7 +246,6 @@ class SamplerTests(unittest.TestCase):
                                 func,
                                 bad_resampled_obs_ids,
                                 fake_orig_obs_ids)
-
         return None
 
     def test_create_bootstrap_dataframe(self):
