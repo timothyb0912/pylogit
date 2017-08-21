@@ -193,6 +193,62 @@ class SamplerTests(unittest.TestCase):
             self.assertNotEqual(id(sub_func_result), id(sub_expected_res))
         return None
 
+    def test_check_column_existence(self):
+        # Create the fake dataframe for the test.
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3],
+                                "alt_id": [1, 2, 1, 2, 1, 2],
+                                "choice": [1, 0, 0, 1, 1, 0]})
+        # Create the sets of arguments and keyword arguments that should not
+        # lead to raising errors.
+        good_cols = ["obs_id", "boot_id"]
+        good_kwargs = [{"presence": True}, {"presence": False}]
+
+        # Alias the function that is being tested
+        func = bs.check_column_existence
+
+        # Perform the desired tests.
+        for pos in xrange(len(good_cols)):
+            col = good_cols[pos]
+            current_good_kwargs = good_kwargs[pos]
+            current_bad_kwargs =\
+                {"presence": bool(1 - current_good_kwargs["presence"])}
+            pattern = ("Ensure that `{}` is ".format(col) +
+                       "not " * (1 - current_bad_kwargs["presence"]) +
+                       "in `df.columns`.")
+
+            self.assertIsNone(func(col, fake_df, **current_good_kwargs))
+            self.assertRaisesRegexp(ValueError,
+                                    pattern,
+                                    func,
+                                    col,
+                                    fake_df,
+                                    **current_bad_kwargs)
+
+        return None
+
+    def test_ensure_resampled_obs_ids_in_df(self):
+        # Create fake data for the test.
+        good_resampled_obs_ids = np.array([1, 1, 4, 3, 4])
+        bad_resampled_obs_ids = np.array([1, 1, 4, 3, 8])
+        fake_orig_obs_ids = np.arange(1, 6)
+
+        # Expected error msg pattern
+        expected_err_msg =\
+            "All values in `resampled_obs_ids` MUST be in `orig_obs_id_array`."
+
+        # Alias the function being tested.
+        func = bs.ensure_resampled_obs_ids_in_df
+
+        # Perform the desired tests
+        self.assertIsNone(func(good_resampled_obs_ids, fake_orig_obs_ids))
+        self.assertRaisesRegexp(ValueError,
+                                expected_err_msg,
+                                func,
+                                bad_resampled_obs_ids,
+                                fake_orig_obs_ids)
+
+        return None
+
     def test_create_bootstrap_dataframe(self):
         # Create the dataframe of fake data
         fake_df = pd.DataFrame({"obs_id": [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],

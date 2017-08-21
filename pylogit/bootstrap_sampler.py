@@ -248,7 +248,7 @@ def create_deepcopied_groupby_dict(orig_df, obs_id_col):
     return groupby_dict
 
 
-def check_column_existence(col_name, df, neg=False):
+def check_column_existence(col_name, df, presence=True):
     """
     Checks whether or not `col_name` is in `df` and raises a helpful error msg
     if the desired condition is not met.
@@ -259,23 +259,48 @@ def check_column_existence(col_name, df, neg=False):
         Should represent a column whose presence in `df` is to be checked.
     df : pandas DataFrame.
         The dataframe that will be checked for the presence of `col_name`.
-    neg : bool, optional.
-        If True, then this function checks for the ABSENCE of `col_name` from
-            `df`. If False, then this function checks for the PRESENCE of
-            `col_name` in `df`.
+    presence : bool, optional.
+        If True, then this function checks for the PRESENCE of `col_name` from
+        `df`. If False, then this function checks for the ABSENCE of
+        `col_name` in `df`. Default == True.
 
     Returns
     -------
     None.
     """
-    if neg:
-        if col_name in df.columns:
-            msg = "Ensure that `{}` is not in `df.columns`."
-            raise ValueError(msg.format(col_name))
-    else:
+    if presence:
         if col_name not in df.columns:
             msg = "Ensure that `{}` is in `df.columns`."
             raise ValueError(msg.format(col_name))
+    else:
+        if col_name in df.columns:
+            msg = "Ensure that `{}` is not in `df.columns`."
+            raise ValueError(msg.format(col_name))
+    return None
+
+
+def ensure_resampled_obs_ids_in_df(resampled_obs_ids, orig_obs_id_array):
+    """
+    Checks whether all ids in `resampled_obs_ids` are in `orig_obs_id_array`.
+    Raises a helpful ValueError if not.
+
+    Parameters
+    ----------
+    resampled_obs_ids : 1D ndarray of ints.
+        Should contain the observation ids of the observational units that will
+        be used in the current bootstrap sample.
+    orig_obs_id_array : 1D ndarray of ints.
+        Should countain the observation ids of the observational units in the
+        original dataframe containing the data for this model.
+
+    Returns
+    -------
+    None.
+    """
+    if not np.in1d(resampled_obs_ids, orig_obs_id_array).all():
+        msg =\
+            "All values in `resampled_obs_ids` MUST be in `orig_obs_id_array`."
+        raise ValueError(msg)
     return None
 
 
@@ -316,16 +341,12 @@ def create_bootstrap_dataframe(orig_df,
         have the given observation id.
     """
     # Check the validity of the passed arguments.
-    check_column_existence(obs_id_col, orig_df, neg=False)
-    check_column_existence(boot_id_col, orig_df, neg=True)
-    if not np.in1d(resampled_obs_ids_1d, orig_df[obs_id_col].values).all():
-        msg =\
-            ("All values in `resampled_obs_ids_1d` MUST be in "
-             "`orig_df[obs_id_col]`.")
-        raise ValueError(msg)
-
+    check_column_existence(obs_id_col, orig_df, presence=True)
+    check_column_existence(boot_id_col, orig_df, presence=False)
     # Alias the observation id column
     obs_id_values = orig_df[obs_id_col].values
+    # Check the validity of the resampled observation ids.
+    ensure_resampled_obs_ids_in_df(resampled_obs_ids_1d, obs_id_values)
 
     # Initialize a list to store the component dataframes that will be
     # concatenated to form the final bootstrap_df
