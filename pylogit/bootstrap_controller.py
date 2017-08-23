@@ -181,7 +181,7 @@ class Boot(object):
                                    mnl_names,
                                    mnl_init_vals,
                                    mnl_fit_kwargs,
-                                   extract_init_vals=extract_init_vals
+                                   extract_init_vals=extract_init_vals,
                                    **fit_kwargs)
 
             # Store the bootstrapped point estimate.
