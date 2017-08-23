@@ -53,11 +53,6 @@ def extract_default_init_vals(orig_model_obj, mnl_point_series, num_params):
         init_intercepts =\
             mnl_point_series.loc[orig_model_obj.intercept_names].values
 
-    # Combine the initial interept values with the initial index coefficients
-    if init_intercepts is not None:
-        init_index_coefs =\
-            np.concatenate([init_intercepts, init_index_coefs], axis=0)
-
     # Add any mixing variables to the index coefficients.
     if orig_model_obj.mixing_vars is not None:
         num_mixing_vars = len(orig_model_obj.mixing_vars)
@@ -74,6 +69,11 @@ def extract_default_init_vals(orig_model_obj, mnl_point_series, num_params):
         init_index_coefs = init_index_coefs.astype(float)
         # Adjust the scale of the index coefficients for the asymmetric logit.
         init_index_coefs /= multiplier
+
+    # Combine the initial interept values with the initial index coefficients
+    if init_intercepts is not None:
+        init_index_coefs =\
+            np.concatenate([init_intercepts, init_index_coefs], axis=0)
 
     # Add index coefficients (and mixing variables) to the total initial array
     num_index = init_index_coefs.shape[0]
@@ -142,7 +142,7 @@ def get_model_creation_kwargs(model_obj):
     return model_kwargs
 
 
-def get_mle_point_est(orig_model_obj,
+def get_mnl_point_est(orig_model_obj,
                       new_df,
                       num_params,
                       mnl_spec,
@@ -287,7 +287,7 @@ def retrieve_point_est(orig_model_obj,
         desired choice model.
     """
     # Get the MNL point estimate for the parameters of this bootstrap sample.
-    mnl_point, mnl_obj = get_mle_point_est(orig_model_obj,
+    mnl_point, mnl_obj = get_mnl_point_est(orig_model_obj,
                                            new_df,
                                            num_params,
                                            mnl_spec,
@@ -323,6 +323,10 @@ def retrieve_point_est(orig_model_obj,
                                    choice_col=orig_model_obj.choice_col,
                                    specification=orig_model_obj.specification,
                                    **model_kwargs)
+
+        # Be sure to add 'just_point' to perform pure point estimation.
+        if 'just_point' not in fit_kwargs:
+            fit_kwargs['just_point'] = True
 
         # Fit the model with new data, and return the point estimate dict.
         final_point = new_obj.fit_mle(default_init_vals, **fit_kwargs)

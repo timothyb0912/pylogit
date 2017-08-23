@@ -154,7 +154,9 @@ class HelperTests(unittest.TestCase):
                                fake_attr=fake_attr_dict_3)
         new_results_3 = func(fake_obj_3, mnl_point_series, num_params_3)
         expected_array_3 =\
-            np.concatenate([np.zeros(3), mnl_point_array / np.log(4)], axis=0)
+            np.concatenate([np.zeros(3),
+                            mnl_point_array[:3],
+                            mnl_point_array[3:] / np.log(4)], axis=0)
         npt.assert_allclose(expected_array_3, new_results_3)
 
         return None
@@ -212,17 +214,33 @@ class BootstrapEstimationTests(unittest.TestCase):
                                                       [0, 0, 1],
                                                       [1, 0, 0],
                                                       [0, 1, 0],
+                                                      [0, 0, 1],
+                                                      [0, 1, 0],
+                                                      [0, 0, 1],
+                                                      [1, 0, 0],
+                                                      [0, 1, 0],
+                                                      [0, 0, 1],
+                                                      [1, 0, 0],
+                                                      [0, 1, 0],
                                                       [0, 0, 1]]))
 
         # Get the mappping between rows and observations
-        self.fake_rows_to_obs = csr_matrix(np.array([[1, 0, 0],
-                                                     [1, 0, 0],
-                                                     [1, 0, 0],
-                                                     [0, 1, 0],
-                                                     [0, 1, 0],
-                                                     [0, 0, 1],
-                                                     [0, 0, 1],
-                                                     [0, 0, 1]]))
+        self.fake_rows_to_obs = csr_matrix(np.array([[1, 0, 0, 0, 0, 0],
+                                                     [1, 0, 0, 0, 0, 0],
+                                                     [1, 0, 0, 0, 0, 0],
+                                                     [0, 1, 0, 0, 0, 0],
+                                                     [0, 1, 0, 0, 0, 0],
+                                                     [0, 0, 1, 0, 0, 0],
+                                                     [0, 0, 1, 0, 0, 0],
+                                                     [0, 0, 1, 0, 0, 0],
+                                                     [0, 0, 0, 1, 0, 0],
+                                                     [0, 0, 0, 1, 0, 0],
+                                                     [0, 0, 0, 0, 1, 0],
+                                                     [0, 0, 0, 0, 1, 0],
+                                                     [0, 0, 0, 0, 1, 0],
+                                                     [0, 0, 0, 0, 0, 1],
+                                                     [0, 0, 0, 0, 0, 1],
+                                                     [0, 0, 0, 0, 0, 1]]))
 
         # Create the fake design matrix with columns denoting X
         # The intercepts are not included because they are kept outside the
@@ -234,15 +252,26 @@ class BootstrapEstimationTests(unittest.TestCase):
                                      [3.5],
                                      [0.78],
                                      [0.23],
-                                     [1.04]])
+                                     [1.04],
+                                     [2.52],
+                                     [1.49],
+                                     [0.85],
+                                     [1.37],
+                                     [1.17],
+                                     [2.03],
+                                     [1.62],
+                                     [1.94]])
 
         # Create the index array for this set of choice situations
         self.fake_index = self.fake_design.dot(self.fake_betas)
 
         # Create the needed dataframe for the Asymmetric Logit constructor
-        self.fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2, 3, 3, 3],
-                                     "alt_id": [1, 2, 3, 1, 3, 1, 2, 3],
-                                     "choice": [0, 1, 0, 0, 1, 1, 0, 0],
+        self.fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2, 3, 3, 3,
+                                                4, 4, 5, 5, 5, 6, 6, 6],
+                                     "alt_id": [1, 2, 3, 1, 3, 1, 2, 3,
+                                                2, 3, 1, 2, 3, 1, 2, 3],
+                                     "choice": [0, 1, 0, 0, 1, 1, 0, 0,
+                                                1, 0, 1, 0, 0, 0, 0, 1],
                                      "x": self.fake_design[:, 0],
                                      "intercept":
                                         np.ones(self.fake_design.shape[0])})
@@ -310,13 +339,13 @@ class BootstrapEstimationTests(unittest.TestCase):
 
         return None
 
-    def test_get_mle_point_est_using_mnl_model(self):
+    def test_get_mnl_point_est_using_mnl_model(self):
         """
         Ensure that the function returns the expected results when called using
         a Multinomial Logit Model object.
         """
         # Alias the function that is to be tested.
-        func = bmle.get_mle_point_est
+        func = bmle.get_mnl_point_est
 
         # Create the initial values for the mnl model object
         mnl_init_vals =\
@@ -346,13 +375,13 @@ class BootstrapEstimationTests(unittest.TestCase):
             self.assertIsInstance(obj_result, MNL)
         return None
 
-    def test_get_mle_point_est_using_asym_model(self):
+    def test_get_mnl_point_est_using_asym_model(self):
         """
         Ensure that the function returns the expected results when called using
         a Multinomial Asymmetric Logit Model object.
         """
         # Alias the function that is to be tested.
-        func = bmle.get_mle_point_est
+        func = bmle.get_mnl_point_est
 
         # Create the initial values for the mnl model object
         mnl_init_vals =\
@@ -373,4 +402,100 @@ class BootstrapEstimationTests(unittest.TestCase):
         self.assertIsInstance(point_result["x"], np.ndarray)
         self.assertEqual(point_result["x"].size, mnl_init_vals.size)
         self.assertIsInstance(obj_result, MNL)
+        return None
+
+    def test_retrieve_point_est_using_asym_model(self):
+        """
+        Ensure that the function returns the expected results when called using
+        a Multinomial Asymmetric Logit Model object.
+        """
+        # Alias the function that is to be tested.
+        func = bmle.retrieve_point_est
+
+        # Determine the number of parameters for this model.
+        num_params = self.asym_model_obj.params.size
+
+        # Create the initial values for the mnl model object
+        mnl_init_vals =\
+            np.zeros(len(self.fake_intercept_names) +
+                     sum([len(x) for x in self.fake_names.values()]))
+        mnl_kwargs = {"ridge": 0.01,
+                      "maxiter": 1200,
+                      "method": "bfgs"}
+
+        # Use arg list to test the function using an Asymmetric Logit model
+        arg_list = [self.asym_model_obj, self.fake_df, num_params,
+                    self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
+
+        # Use extract_func to create the array of initial values.
+        def extract_func(model_obj, mnl_series, num_est_params):
+            intercept_names = model_obj.intercept_names
+            intercepts =\
+                mnl_series.loc[intercept_names].values
+            index_coefs =\
+                mnl_series.loc[~mnl_series.index.isin(intercept_names)].values
+            remaining_num_params =\
+                num_est_params - intercepts.size - index_coefs.size
+            num_alts = np.unique(model_obj.alt_IDs).size
+            init_vals =\
+                np.concatenate([np.zeros(remaining_num_params, dtype=float),
+                                intercepts,
+                                index_coefs / np.log(num_alts)],
+                               axis=0)
+            return init_vals
+
+        # Get the kwargs for retrieve_point_est
+        kwargs = deepcopy(mnl_kwargs)
+        kwargs["extract_init_vals"] = extract_func
+        # Get the function results
+        point_result = func(*arg_list, **kwargs)
+        # Perform the desired tests
+        self.assertIsInstance(point_result, dict)
+        self.assertIn("x", point_result)
+        self.assertIsInstance(point_result["x"], np.ndarray)
+        self.assertEqual(point_result["x"].size, num_params)
+
+        # Test the function with the default extraction func.
+        kwargs["extract_init_vals"] = None
+        point_result = func(*arg_list, **kwargs)
+        self.assertIsInstance(point_result, dict)
+        self.assertIn("x", point_result)
+        self.assertIsInstance(point_result["x"], np.ndarray)
+        self.assertEqual(point_result["x"].size, num_params)
+
+        return None
+
+    def test_retrieve_point_est_using_mnl_model(self):
+        """
+        Ensure that the function returns the expected results when called using
+        a Multinomial Logit Model object.
+        """
+        # Alias the function that is to be tested.
+        func = bmle.retrieve_point_est
+
+        # Create the initial values for the mnl model object
+        mnl_init_vals =\
+            np.zeros(len(self.fake_intercept_names) +
+                     sum([len(x) for x in self.fake_names.values()]))
+        mnl_kwargs = {"ridge": 0.01,
+                      "maxiter": 1200,
+                      "method": "bfgs"}
+
+        # Determine the number of parameters for this model.
+        num_params = mnl_init_vals.size
+
+        # Use arg list to test the function using an Asymmetric Logit model
+        arg_list = [self.mnl_model_obj, self.fake_df, num_params,
+                    self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
+
+        # Get the kwargs for retrieve_point_est
+        kwargs = deepcopy(mnl_kwargs)
+        # Get the function results
+        point_result = func(*arg_list, **kwargs)
+        # Perform the desired tests
+        self.assertIsInstance(point_result, dict)
+        self.assertIn("x", point_result)
+        self.assertIsInstance(point_result["x"], np.ndarray)
+        self.assertEqual(point_result["x"].size, num_params)
+
         return None
