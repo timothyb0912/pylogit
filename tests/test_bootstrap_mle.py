@@ -167,7 +167,6 @@ class BootstrapEstimationTests(unittest.TestCase):
     Make sure that we return expected results when using the various point
     estimation functions.
     """
-
     def setUp(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -356,10 +355,12 @@ class BootstrapEstimationTests(unittest.TestCase):
                       "method": "bfgs"}
 
         # Use arg list 1 to test the function using a regular MNL model
-        arg_list_1 = [self.mnl_model_obj, self.fake_df, mnl_init_vals.size,
+        arg_list_1 = [self.mnl_model_obj, self.fake_df,
+                      self.mnl_model_obj.obs_id_col, mnl_init_vals.size,
                       self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
         # Use arg list 2 to test the function when all arguments are not given.
-        arg_list_2 = [self.mnl_model_obj, self.fake_df, mnl_init_vals.size,
+        arg_list_2 = [self.mnl_model_obj, self.fake_df,
+                      self.mnl_model_obj.obs_id_col, mnl_init_vals.size,
                       self.mnl_spec, self.mnl_names, None, None]
         # Combine all the argument lists for each series of tests.
         total_arg_lists = [arg_list_1, arg_list_2]
@@ -392,7 +393,8 @@ class BootstrapEstimationTests(unittest.TestCase):
                       "method": "bfgs"}
 
         # Use arg list to test the function using an Asymmetric Logit model
-        arg_list = [self.asym_model_obj, self.fake_df, mnl_init_vals.size,
+        arg_list = [self.asym_model_obj, self.fake_df,
+                    self.asym_model_obj.obs_id_col, mnl_init_vals.size,
                     self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
         # Get the function results
         point_result, obj_result = func(*arg_list)
@@ -424,7 +426,8 @@ class BootstrapEstimationTests(unittest.TestCase):
                       "method": "bfgs"}
 
         # Use arg list to test the function using an Asymmetric Logit model
-        arg_list = [self.asym_model_obj, self.fake_df, num_params,
+        arg_list = [self.asym_model_obj, self.fake_df,
+                    self.asym_model_obj.obs_id_col, num_params,
                     self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
 
         # Use extract_func to create the array of initial values.
@@ -485,7 +488,8 @@ class BootstrapEstimationTests(unittest.TestCase):
         num_params = mnl_init_vals.size
 
         # Use arg list to test the function using an Asymmetric Logit model
-        arg_list = [self.mnl_model_obj, self.fake_df, num_params,
+        arg_list = [self.mnl_model_obj, self.fake_df,
+                    self.mnl_model_obj.obs_id_col, num_params,
                     self.mnl_spec, self.mnl_names, mnl_init_vals, mnl_kwargs]
 
         # Get the kwargs for retrieve_point_est

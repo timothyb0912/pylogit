@@ -144,6 +144,7 @@ def get_model_creation_kwargs(model_obj):
 
 def get_mnl_point_est(orig_model_obj,
                       new_df,
+                      boot_id_col,
                       num_params,
                       mnl_spec,
                       mnl_names,
@@ -159,6 +160,9 @@ def get_mnl_point_est(orig_model_obj,
     new_df : pandas DataFrame.
         The pandas dataframe containing the data to be used to estimate the
         MLE of the MNL model for the current bootstrap sample.
+    boot_id_col : str.
+        Denotes the new column that specifies the bootstrap observation ids for
+        choice model estimation.
     num_params : non-negative int.
         The number of parameters in the MLE of the `orig_model_obj`.
     mnl_spec : OrderedDict or None.
@@ -213,7 +217,7 @@ def get_mnl_point_est(orig_model_obj,
     # Initialize the mnl model object for the given bootstrap sample.
     mnl_obj = pl.create_choice_model(data=new_df,
                                      alt_id_col=orig_model_obj.alt_id_col,
-                                     obs_id_col=orig_model_obj.obs_id_col,
+                                     obs_id_col=boot_id_col,
                                      choice_col=orig_model_obj.choice_col,
                                      specification=mnl_spec,
                                      model_type="MNL",
@@ -225,6 +229,7 @@ def get_mnl_point_est(orig_model_obj,
 
 def retrieve_point_est(orig_model_obj,
                        new_df,
+                       boot_id_col,
                        num_params,
                        mnl_spec,
                        mnl_names,
@@ -242,6 +247,9 @@ def retrieve_point_est(orig_model_obj,
     new_df : pandas DataFrame.
         The pandas dataframe containing the data to be used to estimate the
         MLE of the MNL model for the current bootstrap sample.
+    boot_id_col : str.
+        Denotes the new column that specifies the bootstrap observation ids for
+        choice model estimation.
     num_params : non-negative int.
         The number of parameters in the MLE of the `orig_model_obj`.
     mnl_spec : OrderedDict or None.
@@ -289,6 +297,7 @@ def retrieve_point_est(orig_model_obj,
     # Get the MNL point estimate for the parameters of this bootstrap sample.
     mnl_point, mnl_obj = get_mnl_point_est(orig_model_obj,
                                            new_df,
+                                           boot_id_col,
                                            num_params,
                                            mnl_spec,
                                            mnl_names,
@@ -319,7 +328,7 @@ def retrieve_point_est(orig_model_obj,
         new_obj =\
             pl.create_choice_model(data=new_df,
                                    alt_id_col=orig_model_obj.alt_id_col,
-                                   obs_id_col=orig_model_obj.obs_id_col,
+                                   obs_id_col=boot_id_col,
                                    choice_col=orig_model_obj.choice_col,
                                    specification=orig_model_obj.specification,
                                    **model_kwargs)

@@ -58,6 +58,8 @@ class Boot(object):
     Parameters
     ----------
     model_obj : an instance or sublcass of the MNDC class.
+    mle_params : 1D ndarray.
+        Should contain the desired model's maximum likelihood point estimate.
     """
     def __init__(self,
                  model_obj,
@@ -72,20 +74,19 @@ class Boot(object):
         self.mle_params = pd.Series(mle_params, index=param_names)
 
         # Initialize the attributes that will be used later on.
-        desired_attributes = ["point_samples",
-                              "conf_intervals",
-                              "conf_alpha",
-                              "summary"]
+        desired_attributes =\
+            ["point_samples", "conf_intervals", "conf_alpha", "summary"]
         for attr_name in desired_attributes:
             setattr(self, attr_name, None)
 
         return None
 
-    def bootstrap_params(num_samples,
+    def bootstrap_params(self,
+                         num_samples,
                          mnl_obj=None,
                          mnl_init_vals=None,
                          mnl_fit_kwargs=None,
-                         extract_init_vals=None
+                         extract_init_vals=None,
                          print_res=False,
                          method="BFGS",
                          loss_tol=1e-06,
@@ -93,11 +94,13 @@ class Boot(object):
                          maxiter=1000,
                          ridge=None,
                          constrained_pos=None,
-                         boot_seed = None,
+                         boot_seed=None,
                          **kwargs):
         """
         Parameters
         ----------
+        num_samples : positive int.
+            Specifies the number of bootstrap samples that are to be drawn.
         mnl_spec : OrderedDict or None, optional.
             If the model that is being estimated is not an MNL, then `mnl_spec`
             should be passed. This should be the specification used to estimate
@@ -116,6 +119,47 @@ class Boot(object):
         mnl_fit_kwargs : dict or None.
             If the model that is being estimated is not an MNL, then
             `mnl_fit_kwargs` should be passed.
+        extract_init_vals : callable or None, optional.
+            Should accept 3 arguments, in the following order. First, it should
+            accept `orig_model_obj`. Second, it should accept a pandas Series of
+            the estimated parameters from the MNL model. The index of the Series
+            will be the names of the coefficients from `mnl_names`. Thirdly, it
+            should accept an int denoting the number of parameters in the final
+            choice model. The callable should return a 1D ndarray of starting
+            values for the final choice model. Default == None.
+        print_res : bool, optional.
+            Determines whether the timing and initial and final log likelihood
+            results will be printed as they they are determined.
+            Default `== True`.
+        method : str, optional.
+            Should be a valid string for scipy.optimize.minimize. Determines
+            the optimization algorithm that is used for this problem.
+            Default `== 'bfgs'`.
+        loss_tol : float, optional.
+            Determines the tolerance on the difference in objective function
+            values from one iteration to the next that is needed to determine
+            convergence. Default `== 1e-06`.
+        gradient_tol : float, optional.
+            Determines the tolerance on the difference in gradient values from
+            one iteration to the next which is needed to determine convergence.
+            Default `== 1e-06`.
+        maxiter : int, optional.
+            Determines the maximum number of iterations used by the optimizer.
+            Default `== 1000`.
+        ridge : int, float, long, or None, optional.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero. Default `== None`.
+        constrained_pos : list or None, optional.
+            Denotes the positions of the array of estimated parameters that are
+            not to change from their initial values. If a list is passed, the
+            elements are to be integers where no such integer is greater than
+            `init_vals.size.` Default == None.
+        boot_seed = non-negative int or None, optional.
+            Denotes the random seed to be used when generating the bootstrap
+            samples. If None, the sample generation process will generally be
+            non-reproducible. Default == None.
         """
         # Check the passed arguments for validity.
 
@@ -176,6 +220,7 @@ class Boot(object):
             current_results =\
                 retrieve_point_est(self.model_obj,
                                    bootstrap_df,
+                                   boot_id_col,
                                    num_params,
                                    mnl_spec,
                                    mnl_names,
