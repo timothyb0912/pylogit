@@ -4,20 +4,11 @@
 @summary:   This module provides functions that will perform the MLE for each
             of the bootstrap samples.
 """
-from collections import OrderedDict
-from copy import deepcopy
-
 import numpy as np
 import pandas as pd
 
 from . import pylogit as pl
 from .display_names import model_type_to_display_name
-
-try:
-    # Python 3.x does not natively support xrange
-    from past.builtins import xrange
-except ImportError:
-    pass
 
 
 def extract_default_init_vals(orig_model_obj, mnl_point_series, num_params):
@@ -227,9 +218,10 @@ def get_mnl_point_est(orig_model_obj,
     mnl_point = mnl_obj.fit_mle(mnl_init_vals, **mnl_fit_kwargs)
     return mnl_point, mnl_obj
 
+
 def retrieve_point_est(orig_model_obj,
                        new_df,
-                       boot_id_col,
+                       new_id_col,
                        num_params,
                        mnl_spec,
                        mnl_names,
@@ -247,7 +239,7 @@ def retrieve_point_est(orig_model_obj,
     new_df : pandas DataFrame.
         The pandas dataframe containing the data to be used to estimate the
         MLE of the MNL model for the current bootstrap sample.
-    boot_id_col : str.
+    new_id_col : str.
         Denotes the new column that specifies the bootstrap observation ids for
         choice model estimation.
     num_params : non-negative int.
@@ -297,7 +289,7 @@ def retrieve_point_est(orig_model_obj,
     # Get the MNL point estimate for the parameters of this bootstrap sample.
     mnl_point, mnl_obj = get_mnl_point_est(orig_model_obj,
                                            new_df,
-                                           boot_id_col,
+                                           new_id_col,
                                            num_params,
                                            mnl_spec,
                                            mnl_names,
@@ -328,7 +320,7 @@ def retrieve_point_est(orig_model_obj,
         new_obj =\
             pl.create_choice_model(data=new_df,
                                    alt_id_col=orig_model_obj.alt_id_col,
-                                   obs_id_col=boot_id_col,
+                                   obs_id_col=new_id_col,
                                    choice_col=orig_model_obj.choice_col,
                                    specification=orig_model_obj.specification,
                                    **model_kwargs)

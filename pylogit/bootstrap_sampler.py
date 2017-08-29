@@ -9,12 +9,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-try:
-    # Python 3.x does not natively support xrange
-    from past.builtins import xrange
-except ImportError:
-    pass
-
 
 def relate_obs_ids_to_chosen_alts(obs_id_array,
                                   alt_id_array,
@@ -202,10 +196,10 @@ def create_bootstrap_id_array(obs_id_per_sample):
         denote the fake observational id in the new bootstrap dataset.
     """
     # Determine the shape of the object to be returned.
-    num_rows, num_cols = obs_id_per_sample.shape
+    n_rows, n_cols = obs_id_per_sample.shape
     # Create the array of bootstrap ids.
     bootstrap_id_array =\
-        np.tile(np.arange(num_cols) +1, num_rows).reshape((num_rows, num_cols))
+        np.tile(np.arange(n_cols) + 1, n_rows).reshape((n_rows, n_cols))
     # Return the desired object
     return bootstrap_id_array
 
@@ -354,8 +348,6 @@ def create_bootstrap_dataframe(orig_df,
 
     # Populate component_dfs
     for boot_id, obs_id in enumerate(resampled_obs_ids_1d):
-        # Get the rows of orig_df that correspond to the desired observation id
-        desired_rows = obs_id_values == obs_id
         # Extract the dataframe that we desire.
         extracted_df = groupby_dict[obs_id]
         # Add the bootstrap id value.

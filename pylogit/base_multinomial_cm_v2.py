@@ -807,7 +807,7 @@ class MNDC_Model(object):
         # For model identification, ensure that the number of chosen
         # alternatives equals the total number of alternatives available in the
         # dataset. Currently commented out because many tests need to be
-        # rewritten to handle the fact that this constraint is being made explicit.
+        # rewritten to cope with this constraint being made explicit.
         # ensure_all_alternatives_are_chosen(alt_id_col, choice_col, dataframe)
 
         # Check for correct length of shape_names and intercept_names

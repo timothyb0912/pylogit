@@ -1190,7 +1190,6 @@ def convert_long_to_wide(long_data,
         # Ensure that obs_to_var has a float dtype
         obs_to_var = obs_to_var.astype(float)
 
-
         # Place a null value in columns where the alternative is not available
         # to a given observation
         if (obs_to_alt == 0).any():
