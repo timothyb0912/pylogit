@@ -5,11 +5,14 @@
             procedure.
 """
 from copy import deepcopy
+import itertools
 
 import numpy as np
 import pandas as pd
 
 from . import bootstrap_sampler as bs
+from . import bootstrap_calcs as bc
+from . import bootstrap_abc as abc
 from .bootstrap_mle import retrieve_point_est
 
 try:
@@ -315,6 +318,115 @@ class Boot(object):
         raise NotImplementedError
         return None
 
-    def calc_conf_intervals(self, conf_percentage, interval_type='all'):
-        raise NotImplementedError
+    def calc_percentile_interval(self, conf_percentage):
+        # Get the alpha % that corresponds to the given confidence percentage.
+        alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
+        # Create the column names for the dataframe of confidence intervals
+        single_column_names =\
+            ['{:.3g}%'.format(alpha / 2.0),
+             '{:.3g}%'.format(100 - alpha / 2.0)]
+        # Calculate the desired confidence intervals.
+        conf_intervals =\
+            bc.calc_percentile_interval(self.bootstrap_replicates.values,
+                                        conf_percentage)
+        # Store the desired confidence intervals
+        self.percentile_interval =\
+            pd.DataFrame(conf_intervals.T,
+                         index=self.mle_params.index,
+                         columns=single_column_names)
+        return None
+
+    def calc_bca_interval(self, conf_percentage):
+        # Get the alpha % that corresponds to the given confidence percentage.
+        alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
+        # Create the column names for the dataframe of confidence intervals
+        single_column_names =\
+            ['{:.3g}%'.format(alpha / 2.0),
+             '{:.3g}%'.format(100 - alpha / 2.0)]
+        # Bundle the arguments needed to create the desired confidence interval
+        args = [self.bootstrap_replicates.values,
+                self.jackknife_replicates.values,
+                self.mle_params.values,
+                conf_percentage]
+        # Calculate the BCa confidence intervals.
+        conf_intervals = bc.calc_bca_interval(*args)
+        # Store the BCa confidence intervals.
+        self.bca_interval = pd.DataFrame(conf_intervals.T,
+                                         index=self.mle_params.index,
+                                         columns=single_column_names)
+        return None
+
+    def calc_abc_interval(self,
+                          conf_percentage,
+                          init_vals,
+                          epsilon=abc.EPSILON,
+                          **fit_kwargs):
+        # Get the alpha % that corresponds to the given confidence percentage.
+        alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
+        # Create the column names for the dataframe of confidence intervals
+        single_column_names =\
+            ['{:.3g}%'.format(alpha / 2.0),
+             '{:.3g}%'.format(100 - alpha / 2.0)]
+        # Calculate the ABC confidence intervals
+        conf_intervals =\
+            abc.calc_abc_interval(self.model_obj,
+                                  self.mle_params.values,
+                                  init_vals,
+                                  conf_percentage,
+                                  epsilon=epsilon,
+                                  **fit_kwargs)
+        # Store the ABC confidence intervals
+        self.abc_interval = pd.DataFrame(conf_intervals.T,
+                                         index=self.mle_params.index,
+                                         columns=single_column_names)
+        return None
+
+    def calc_conf_intervals(self,
+                            conf_percentage,
+                            interval_type='all',
+                            init_vals=None,
+                            epsilon=abc.EPSILON,
+                            **fit_kwargs):
+        if interval_type == 'pi':
+            self.calc_percentile_interval(conf_percentage)
+        elif interval_type == 'bca':
+            self.calc_bca_interval(conf_percentage)
+        elif interval_type == 'abc':
+            self.calc_abc_interval(conf_percentage,
+                                   init_vals,
+                                   epsilon=epsilon,
+                                   **fit_kwargs)
+        elif interval_type == 'all':
+            print("Calculating Percentile Confidence Intervals")
+            self.calc_percentile_interval(conf_percentage)
+            print("Calculating BCa Confidence Intervals")
+            self.calc_bca_interval(conf_percentage)
+            print("Calculating ABC Confidence Intervals")
+            self.calc_abc_interval(conf_percentage,
+                                   init_vals,
+                                   epsilon=epsilon,
+                                   **fit_kwargs)
+            # Get the alpha % for the given confidence percentage.
+            alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
+            # Get lists of the interval type names and the endpoint names
+            interval_type_names = ['percentile_interval',
+                                   'BCa_interval',
+                                   'ABC_interval']
+            endpoint_names = ['{:.3g}%'.format(alpha / 2.0),
+                              '{:.3g}%'.format(100 - alpha / 2.0)]
+            # Create the column names for the dataframe of confidence intervals
+            multi_index_names =\
+                list(itertools.product(interval_type_names, endpoint_names))
+            df_column_index = pd.MultiIndex.from_tuples(multi_index_names)
+            # Create the dataframe containing all confidence intervals
+            self.all_intervals = pd.concat([self.percentile_interval,
+                                            self.bca_interval,
+                                            self.abc_interval],
+                                            axis=1,
+                                            ignore_index=True)
+            # Store the column names for the combined confidence intervals
+            self.all_intervals.columns = df_column_index
+        else:
+            msg = "interval_type MUST be in `['pi', 'bca', 'abc', 'all']`"
+            raise ValueError(msg)
         return None
