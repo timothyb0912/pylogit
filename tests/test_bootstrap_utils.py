@@ -2,18 +2,11 @@
 Tests for the bootstrap_utils.py file.
 """
 import unittest
-import warnings
-from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
-import pandas as pd
-from scipy.sparse import csr_matrix
 
 import pylogit.bootstrap_utils as bu
-import pylogit.asym_logit as asym
-from pylogit.conditional_logit import MNL
 
 class UtilityTester(unittest.TestCase):
     def test_check_conf_percentage_validity(self):
