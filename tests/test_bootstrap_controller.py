@@ -222,14 +222,17 @@ class BootstrapTests(unittest.TestCase):
         self.assertEqual(self.asym_model_obj.params.index.tolist(),
                          boot_obj.mle_params.index.tolist())
         expected_attrs =\
-            ["point_samples", "conf_intervals", "conf_alpha", "summary"]
+            ["bootstrap_replicates", "jackknife_replicates",
+             "percentile_interval", "bca_interval",
+             "abc_interval", "conf_intervals",
+             "conf_alpha", "summary"]
         for current_attr in expected_attrs:
             self.assertTrue(hasattr(boot_obj, current_attr))
             self.assertIsNone(getattr(boot_obj, current_attr))
 
         return None
 
-    def test_bootstrap_params(self):
+    def test_generate_bootstrap_replicates(self):
         # Create the bootstrap object.
         boot_obj =\
             bc.Boot(self.asym_model_obj, self.asym_model_obj.params.values)
@@ -252,23 +255,29 @@ class BootstrapTests(unittest.TestCase):
                             "constrained_pos": [0],
                             "boot_seed": 1988}
 
+        # Alias the needed function
+        func = boot_obj.generate_bootstrap_replicates
+
         # Get the function results
         func_results =\
-            boot_obj.bootstrap_params(num_samples,
-                                      mnl_obj=self.mnl_model_obj,
-                                      mnl_init_vals=mnl_init_vals,
-                                      mnl_fit_kwargs=mnl_kwargs,
-                                      constrained_pos=[0],
-                                      boot_seed=1988)
+            func(num_samples,
+                 mnl_obj=self.mnl_model_obj,
+                 mnl_init_vals=mnl_init_vals,
+                 mnl_fit_kwargs=mnl_kwargs,
+                 constrained_pos=[0],
+                 boot_seed=1988)
 
         # Perform the requisite tests
         self.assertIsNone(func_results)
-        self.assertIsInstance(boot_obj.point_samples, pd.DataFrame)
-        self.assertEqual(boot_obj.point_samples.ndim, 2)
+        self.assertIsInstance(boot_obj.bootstrap_replicates, pd.DataFrame)
+        self.assertEqual(boot_obj.bootstrap_replicates.ndim, 2)
 
         expected_shape = (3, self.asym_model_obj.params.size)
-        self.assertEqual(boot_obj.point_samples.shape, expected_shape)
-        self.assertEqual(boot_obj.point_samples.iloc[:, 0].unique().size, 1)
-        self.assertEqual(boot_obj.point_samples.iloc[:, 0].unique()[0], 0)
-        self.assertTrue(boot_obj.point_samples.iloc[:, 1].unique().size > 1)
+        self.assertEqual(boot_obj.bootstrap_replicates.shape, expected_shape)
+        self.assertEqual(boot_obj.bootstrap_replicates
+                                 .iloc[:, 0].unique().size, 1)
+        self.assertEqual(boot_obj.bootstrap_replicates
+                                 .iloc[:, 0].unique()[0], 0)
+        self.assertTrue(boot_obj.bootstrap_replicates
+                                .iloc[:, 1].unique().size > 1)
         return None

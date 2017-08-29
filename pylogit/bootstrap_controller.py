@@ -11,7 +11,6 @@ import pandas as pd
 
 from . import bootstrap_sampler as bs
 from .bootstrap_mle import retrieve_point_est
-from .display_names import model_type_to_display_name
 
 try:
     # Python 3.x does not natively support xrange
@@ -51,6 +50,7 @@ def get_param_names(model_obj):
         all_names = model_obj.nest_names + all_names
     return all_names
 
+
 class Boot(object):
     """
     Class to perform bootstrap resampling and to store and display its results.
@@ -75,27 +75,29 @@ class Boot(object):
 
         # Initialize the attributes that will be used later on.
         desired_attributes =\
-            ["point_samples", "conf_intervals", "conf_alpha", "summary"]
+            ["bootstrap_replicates", "jackknife_replicates",
+             "percentile_interval", "bca_interval",
+             "abc_interval", "conf_intervals",
+             "conf_alpha", "summary"]
         for attr_name in desired_attributes:
             setattr(self, attr_name, None)
 
         return None
 
-    def bootstrap_params(self,
-                         num_samples,
-                         mnl_obj=None,
-                         mnl_init_vals=None,
-                         mnl_fit_kwargs=None,
-                         extract_init_vals=None,
-                         print_res=False,
-                         method="BFGS",
-                         loss_tol=1e-06,
-                         gradient_tol=1e-06,
-                         maxiter=1000,
-                         ridge=None,
-                         constrained_pos=None,
-                         boot_seed=None,
-                         **kwargs):
+    def generate_bootstrap_replicates(self,
+                                      num_samples,
+                                      mnl_obj=None,
+                                      mnl_init_vals=None,
+                                      mnl_fit_kwargs=None,
+                                      extract_init_vals=None,
+                                      print_res=False,
+                                      method="BFGS",
+                                      loss_tol=1e-06,
+                                      gradient_tol=1e-06,
+                                      maxiter=1000,
+                                      ridge=None,
+                                      constrained_pos=None,
+                                      boot_seed=None):
         """
         Parameters
         ----------
@@ -121,9 +123,9 @@ class Boot(object):
             `mnl_fit_kwargs` should be passed.
         extract_init_vals : callable or None, optional.
             Should accept 3 arguments, in the following order. First, it should
-            accept `orig_model_obj`. Second, it should accept a pandas Series of
-            the estimated parameters from the MNL model. The index of the Series
-            will be the names of the coefficients from `mnl_names`. Thirdly, it
+            accept `orig_model_obj`. Second, it should accept a pandas Series
+            of estimated parameters from the MNL model. The Series' index will
+            be the names of the coefficients from `mnl_names`. Thirdly, it
             should accept an int denoting the number of parameters in the final
             choice model. The callable should return a 1D ndarray of starting
             values for the final choice model. Default == None.
@@ -179,8 +181,7 @@ class Boot(object):
                                                         choice_array,
                                                         num_samples,
                                                         seed=boot_seed)
-        # Get the 'fake' bootstrap observation ids.
-        bootstrap_obs_ids = bs.create_bootstrap_id_array(obs_id_per_sample)
+
         # Get the dictionary of sub-dataframes for each observation id
         dfs_by_obs_id =\
             bs.create_deepcopied_groupby_dict(self.model_obj.data,
@@ -233,19 +234,87 @@ class Boot(object):
             point_estimates[row] = current_results["x"]
 
         # Store the point estimates as a pandas dataframe
-        self.point_samples = pd.DataFrame(point_estimates,
-                                          columns=self.mle_params.index)
+        self.bootstrap_replicates =\
+            pd.DataFrame(point_estimates, columns=self.mle_params.index)
 
         return None
 
-    def calc_log_likes_for_samples():
+    def generate_jacknife_replicates(self,
+                                     mnl_obj=None,
+                                     mnl_init_vals=None,
+                                     mnl_fit_kwargs=None,
+                                     extract_init_vals=None,
+                                     print_res=False,
+                                     method="BFGS",
+                                     loss_tol=1e-06,
+                                     gradient_tol=1e-06,
+                                     maxiter=1000,
+                                     ridge=None,
+                                     constrained_pos=None):
+        # Take note of the observation id column that is to be used
+        obs_id_col = self.model_obj.obs_id_col
+
+        # Get the array of original observation ids
+        orig_obs_id_array =\
+            self.model_obj.data[obs_id_col].values
+
+        # Get an array of the unique observation ids.
+        unique_obs_ids = np.sort(np.unique(orig_obs_id_array))
+
+        # Determine how many observations are in one's dataset.
+        num_obs = unique_obs_ids.size
+        # Determine how many parameters are being estimated.
+        num_params = self.mle_params.size
+
+        # Get keyword arguments for final model estimation with new data.
+        fit_kwargs = {"print_res": print_res,
+                      "method": method,
+                      "loss_tol": loss_tol,
+                      "gradient_tol": gradient_tol,
+                      "maxiter": maxiter,
+                      "ridge": ridge,
+                      "constrained_pos": constrained_pos,
+                      "just_point": True}
+
+        # Get the specification and name dictionary of the MNL model.
+        mnl_spec = None if mnl_obj is None else mnl_obj.specification
+        mnl_names = None if mnl_obj is None else mnl_obj.name_spec
+
+        # Initialize the array of jackknife replicates
+        point_replicates = np.empty((num_obs, num_params), dtype=float)
+
+        # Populate the array of jackknife replicates
+        for pos, obs_id in enumerate(unique_obs_ids):
+            # Create the dataframe without the current observation
+            new_df = self.model_obj.data.loc[orig_obs_id_array != obs_id]
+            # Get the point estimate for this new dataset
+            current_results =\
+                retrieve_point_est(self.model_obj,
+                                   new_df,
+                                   obs_id_col,
+                                   num_params,
+                                   mnl_spec,
+                                   mnl_names,
+                                   mnl_init_vals,
+                                   mnl_fit_kwargs,
+                                   extract_init_vals=extract_init_vals,
+                                   **fit_kwargs)
+            # Store the estimated parameters
+            point_replicates[pos] = current_results['x']
+
+        # Store the jackknife replicates as a pandas dataframe
+        self.jackknife_replicates =\
+            pd.DataFrame(point_replicates, columns=self.mle_params.index)
+        return None
+
+    def calc_log_likes_for_replicates(self, replicate='bootstrap'):
         raise NotImplementedError
         return None
 
-    def calc_gradient_norm_for_samples():
+    def calc_gradient_norm_for_replicates(self, replicate='bootstrap'):
         raise NotImplementedError
         return None
 
-    def calc_conf_intervals():
+    def calc_conf_intervals(self, conf_percentage, interval_type='all'):
         raise NotImplementedError
         return None
