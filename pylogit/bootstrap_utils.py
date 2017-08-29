@@ -18,9 +18,7 @@ def check_conf_percentage_validity(conf_percentage):
 
 
 def ensure_samples_is_2d_ndarray(samples, name='bootstrap'):
-    condition_1 = isinstance(samples, np.ndarray)
-    condition_2 = samples.ndim == 2
-    if not (condition_1 and condition_2):
+    if not isinstance(samples, np.ndarray) or not (samples.ndim == 2):
         sample_name = name + "_samples"
         msg = "`{}` MUST be a 2D ndarray.".format(sample_name)
         raise ValueError(msg)
