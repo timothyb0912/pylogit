@@ -315,7 +315,7 @@ def calc_bca_interval(bootstrap_replicates,
                                             axis=0))
     upper_endpoints = np.diag(np.percentile(bootstrap_replicates,
                                             upper_percents,
-                                            interpolation='upper',
+                                            interpolation='higher',
                                             axis=0))
     # Combine the enpoints into a single ndarray.
     conf_intervals = combine_conf_endpoints(lower_endpoints, upper_endpoints)
