@@ -293,10 +293,8 @@ def calc_std_error_abc(empirical_influence):
     Efron, Bradley, and Robert J. Tibshirani. An Introduction to the Bootstrap.
         CRC press, 1994. Section 22.6, Equation 22.31.
     """
-    influence_squared = empirical_influence**2
     num_obs = empirical_influence.shape[0]
-    constant = num_obs**2
-    std_error = (influence_squared.sum(axis=0) / constant)**0.5
+    std_error = ((empirical_influence**2).sum(axis=0))**0.5 / num_obs
     return std_error
 
 
