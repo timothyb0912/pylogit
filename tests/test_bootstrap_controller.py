@@ -272,12 +272,60 @@ class BootstrapTests(unittest.TestCase):
         self.assertIsInstance(boot_obj.bootstrap_replicates, pd.DataFrame)
         self.assertEqual(boot_obj.bootstrap_replicates.ndim, 2)
 
-        expected_shape = (3, self.asym_model_obj.params.size)
+        expected_shape = (num_samples, self.asym_model_obj.params.size)
         self.assertEqual(boot_obj.bootstrap_replicates.shape, expected_shape)
         self.assertEqual(boot_obj.bootstrap_replicates
                                  .iloc[:, 0].unique().size, 1)
         self.assertEqual(boot_obj.bootstrap_replicates
                                  .iloc[:, 0].unique()[0], 0)
         self.assertTrue(boot_obj.bootstrap_replicates
+                                .iloc[:, 1].unique().size > 1)
+        return None
+
+    def test_generate_jackknife_replicates(self):
+        # Create the bootstrap object.
+        boot_obj =\
+            bc.Boot(self.asym_model_obj, self.asym_model_obj.params.values)
+
+
+
+        # Create the necessary keyword arguments.
+        mnl_init_vals =\
+            np.zeros(len(self.fake_intercept_names) +
+                     sum([len(x) for x in self.fake_names.values()]))
+
+        mnl_kwargs = {"ridge": 0.01,
+                      "maxiter": 1200,
+                      "method": "bfgs"}
+
+        bootstrap_kwargs = {"mnl_obj": self.mnl_model_obj,
+                            "mnl_init_vals": mnl_init_vals,
+                            "mnl_fit_kwargs": mnl_kwargs,
+                            "constrained_pos": [0],
+                            "boot_seed": 1988}
+
+        # Alias the needed function
+        func = boot_obj.generate_jackknife_replicates
+
+        # Get the function results
+        func_results =\
+            func(mnl_obj=self.mnl_model_obj,
+                 mnl_init_vals=mnl_init_vals,
+                 mnl_fit_kwargs=mnl_kwargs,
+                 constrained_pos=[0])
+
+        # Perform the requisite tests
+        self.assertIsNone(func_results)
+        self.assertIsInstance(boot_obj.jackknife_replicates, pd.DataFrame)
+        self.assertEqual(boot_obj.jackknife_replicates.ndim, 2)
+
+        expected_shape =\
+            (self.fake_rows_to_obs.shape[1], self.asym_model_obj.params.size)
+        self.assertEqual(boot_obj.jackknife_replicates.shape, expected_shape)
+        self.assertEqual(boot_obj.jackknife_replicates
+                                 .iloc[:, 0].unique().size, 1)
+        self.assertEqual(boot_obj.jackknife_replicates
+                                 .iloc[:, 0].unique()[0], 0)
+        self.assertTrue(boot_obj.jackknife_replicates
                                 .iloc[:, 1].unique().size > 1)
         return None

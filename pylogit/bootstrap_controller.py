@@ -242,18 +242,18 @@ class Boot(object):
 
         return None
 
-    def generate_jacknife_replicates(self,
-                                     mnl_obj=None,
-                                     mnl_init_vals=None,
-                                     mnl_fit_kwargs=None,
-                                     extract_init_vals=None,
-                                     print_res=False,
-                                     method="BFGS",
-                                     loss_tol=1e-06,
-                                     gradient_tol=1e-06,
-                                     maxiter=1000,
-                                     ridge=None,
-                                     constrained_pos=None):
+    def generate_jackknife_replicates(self,
+                                      mnl_obj=None,
+                                      mnl_init_vals=None,
+                                      mnl_fit_kwargs=None,
+                                      extract_init_vals=None,
+                                      print_res=False,
+                                      method="BFGS",
+                                      loss_tol=1e-06,
+                                      gradient_tol=1e-06,
+                                      maxiter=1000,
+                                      ridge=None,
+                                      constrained_pos=None):
         # Take note of the observation id column that is to be used
         obs_id_col = self.model_obj.obs_id_col
 
