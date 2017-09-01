@@ -116,7 +116,6 @@ class SamplerTests(unittest.TestCase):
 
         # Perform the requisite tests
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 2)
         self.assertEqual(func_result.shape, expected_ids.shape)
         npt.assert_allclose(func_result, expected_ids)
 
@@ -149,7 +148,6 @@ class SamplerTests(unittest.TestCase):
 
         # Perform the desired tests
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 2)
         npt.assert_allclose(func_result, expected_results)
 
         return None
