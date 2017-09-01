@@ -28,7 +28,7 @@ class UtilityTester(unittest.TestCase):
                                     arg)
         return None
 
-    def test_ensure_samples_is_2d_ndarray(self):
+    def test_ensure_samples_is_ndim_ndarray(self):
         # Create a list of valid and invalid arguments
         base_array = np.arange(10)
         good_args = [base_array.copy().reshape((2, 5)),
@@ -40,7 +40,7 @@ class UtilityTester(unittest.TestCase):
         expected_err_msg =\
              "`{}` MUST be a 2D ndarray.".format(fake_name + '_samples')
         # Alias the function being tested
-        func = bu.ensure_samples_is_2d_ndarray
+        func = bu.ensure_samples_is_ndim_ndarray
         # Perform the desired tests
         for arg in good_args:
             self.assertIsNone(func(arg, name=fake_name))
@@ -50,6 +50,7 @@ class UtilityTester(unittest.TestCase):
                                     func,
                                     arg,
                                     name=fake_name)
+        self.assertIsNone(func(base_array, ndim=1))
         return None
 
     def test_get_alpha_from_conf_percentage(self):

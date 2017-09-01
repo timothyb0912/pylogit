@@ -9,7 +9,7 @@ import numpy as np
 from scipy.stats import norm
 
 from .bootstrap_utils import check_conf_percentage_validity
-from .bootstrap_utils import ensure_samples_is_2d_ndarray
+from .bootstrap_utils import ensure_samples_is_ndim_ndarray
 from .bootstrap_utils import get_alpha_from_conf_percentage
 from .bootstrap_utils import combine_conf_endpoints
 
@@ -58,7 +58,7 @@ def calc_percentile_interval(bootstrap_replicates, conf_percentage):
     """
     # Check validity of arguments
     check_conf_percentage_validity(conf_percentage)
-    ensure_samples_is_2d_ndarray(bootstrap_replicates)
+    ensure_samples_is_ndim_ndarray(bootstrap_replicates, ndim=2)
     # Get the alpha * 100% value
     alpha = get_alpha_from_conf_percentage(conf_percentage)
     # Get the lower and upper percentiles that demarcate the desired interval.
@@ -294,8 +294,9 @@ def calc_bca_interval(bootstrap_replicates,
     """
     # Check validity of arguments
     check_conf_percentage_validity(conf_percentage)
-    ensure_samples_is_2d_ndarray(bootstrap_replicates)
-    ensure_samples_is_2d_ndarray(jackknife_replicates, name='jackknife')
+    ensure_samples_is_ndim_ndarray(bootstrap_replicates, ndim=2)
+    ensure_samples_is_ndim_ndarray(jackknife_replicates,
+                                   name='jackknife', ndim=2)
     # Calculate the alpha * 100% value
     alpha_percent = get_alpha_from_conf_percentage(conf_percentage)
     # Estimate the bias correction for the bootstrap samples
