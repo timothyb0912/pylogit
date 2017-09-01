@@ -17,10 +17,12 @@ def check_conf_percentage_validity(conf_percentage):
     return None
 
 
-def ensure_samples_is_2d_ndarray(samples, name='bootstrap'):
-    if not isinstance(samples, np.ndarray) or not (samples.ndim == 2):
+def ensure_samples_is_ndim_ndarray(samples, name='bootstrap', ndim=2):
+    assert isinstance(ndim, int)
+    assert isinstance(name, str)
+    if not isinstance(samples, np.ndarray) or not (samples.ndim == ndim):
         sample_name = name + "_samples"
-        msg = "`{}` MUST be a 2D ndarray.".format(sample_name)
+        msg = "`{}` MUST be a {}D ndarray.".format(sample_name, ndim)
         raise ValueError(msg)
     return None
 
