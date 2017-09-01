@@ -15,8 +15,8 @@ class ComputationalTests(unittest.TestCase):
     def setUp(self):
         """
         Note that the spatial test data used in many of these tests comes from
-        Efron, Bradley, and Robert J. Tibshirani. An Introduction to the Bootstrap.
-            CRC press, 1994. Chapter 14.
+        Efron, Bradley, and Robert J. Tibshirani. An Introduction to the
+        Bootstrap. CRC press, 1994. Chapter 14.
         """
         # Determine the number of parameters and number of bootstrap replicates
         num_replicates = 100
@@ -84,7 +84,6 @@ class ComputationalTests(unittest.TestCase):
         func_results =func(self.bootstrap_replicates, self.conf_percentage)
         # Perform the desired tests
         self.assertIsInstance(func_results, np.ndarray)
-        self.assertEqual(func_results.ndim, 2)
         self.assertEqual(func_results.shape, expected_results.shape)
         npt.assert_allclose(func_results, expected_results)
         return None
@@ -101,7 +100,6 @@ class ComputationalTests(unittest.TestCase):
         # Perform the desired test
         func_result = func(self.bootstrap_replicates, self.mle_params)
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 1)
         self.assertEqual(func_result.shape, expected_result.shape)
         npt.assert_allclose(func_result, expected_result)
 
@@ -111,7 +109,6 @@ class ComputationalTests(unittest.TestCase):
         func_result_2 = func(self.bootstrap_replicates, fake_mle)
 
         self.assertIsInstance(func_result_2, np.ndarray)
-        self.assertEqual(func_result_2.ndim, 1)
         self.assertEqual(func_result_2.shape, expected_result_2.shape)
         npt.assert_allclose(func_result_2, expected_result_2)
         return None
@@ -126,7 +123,6 @@ class ComputationalTests(unittest.TestCase):
         # Perform the desired test
         func_result = func(self.test_jackknife_replicates)
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 1)
         self.assertEqual(func_result.shape, expected_result.shape)
         # Note the absolute tolerance of 5e-4 is used because the results
         # should agree when rounded to 3 decimal places. This will be the case
@@ -154,7 +150,6 @@ class ComputationalTests(unittest.TestCase):
         # terms of percents and Efron's results are in decimals.
         func_result = func(alpha_percent, bias_correction, acceleration) / 100
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 1)
         self.assertEqual(func_result.shape, expected_result.shape)
         # Note the absolute tolerance of 5e-4 is used because the results
         # should agree when rounded to 3 decimal places. This will be the case
@@ -182,7 +177,6 @@ class ComputationalTests(unittest.TestCase):
         # terms of percents and Efron's results are in decimals.
         func_result = func(alpha_percent, bias_correction, acceleration) / 100
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 1)
         self.assertEqual(func_result.shape, expected_result.shape)
         # Note the absolute tolerance of 1e-3 is used because the results
         # should be within 0.001 of each other.
@@ -224,7 +218,6 @@ class ComputationalTests(unittest.TestCase):
         # Note we divide the function results by 100 since our results are in
         # terms of percents and Efron's results are in decimals.
         self.assertIsInstance(func_result, np.ndarray)
-        self.assertEqual(func_result.ndim, 2)
         self.assertEqual(func_result.shape, expected_result.shape)
         # Note the relative tolerance of 0.01 is used because the function
         # results should be within 1% of the expected result. Note that some
