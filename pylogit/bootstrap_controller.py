@@ -426,7 +426,9 @@ class Boot(object):
                                             ignore_index=True)
             # Store the column names for the combined confidence intervals
             self.all_intervals.columns = df_column_index
+            self.all_intervals.index = self.mle_params.index
         else:
-            msg = "interval_type MUST be in `['pi', 'bca', 'abc', 'all']`"
+            msg =\
+                "interval_type MUST be in `['pi', 'bca', 'abc', 'all']`"
             raise ValueError(msg)
         return None
