@@ -9,7 +9,7 @@ from copy import deepcopy
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, eye
 
 import pylogit.bootstrap_controller as bc
 import pylogit.asym_logit as asym
@@ -328,4 +328,313 @@ class BootstrapTests(unittest.TestCase):
                                  .iloc[:, 0].unique()[0], 0)
         self.assertTrue(boot_obj.jackknife_replicates
                                 .iloc[:, 1].unique().size > 1)
+        return None
+
+
+class IntervalTests(unittest.TestCase):
+    """
+    References
+    ----------
+    Efron, Bradley, and Robert J. Tibshirani. An Introduction to the
+        Bootstrap. CRC press, 1994. Chapter 14.
+
+    Notes
+    -----
+    The data and tests used in the `IntervalTests` test suite come from the
+    Efron & Tibshirani reference cited above.
+    """
+    def setUp(self):
+        # Store the spatial test data from Efron and Tibshirani (1994)
+        self.test_data =\
+            np.array([48, 36, 20, 29, 42, 42, 20, 42, 22, 41, 45, 14, 6,
+                      0, 33, 28, 34, 4, 32, 24, 47, 41, 24, 26, 30, 41])
+
+        # Note how many test data observations there are.
+        self.num_test_obs = self.test_data.size
+
+        # Store the MLE estimate
+        self.test_theta_hat = self.calc_theta(self.test_data)
+        # Create a pandas series of the data. Allows for easy case deletion.
+        self.raw_series = pd.Series(self.test_data)
+        # Create the array of jackknife replicates
+        self.jackknife_replicates =\
+            np.empty((self.num_test_obs, 1), dtype=float)
+        for obs in xrange(self.num_test_obs):
+            current_data = self.raw_series[self.raw_series.index != obs].values
+            self.jackknife_replicates[obs] = self.calc_theta(current_data)[0]
+
+        # Create the bootstrap replicates
+        num_test_reps = 5000
+        test_indices = np.arange(self.num_test_obs)
+        boot_indx_shape = (num_test_reps, self.num_test_obs)
+        np.random.seed(8292017)
+        boot_indices =\
+            np.random.choice(test_indices,
+                             replace=True,
+                             size=self.num_test_obs*num_test_reps)
+        self.bootstrap_replicates =\
+            np.fromiter((self.calc_theta(self.test_data[x])[0] for x in
+                         boot_indices.reshape(boot_indx_shape)),
+                        dtype=float)[:, None]
+
+        self.rows_to_obs = eye(self.test_data.size, format='csr', dtype=int)
+
+        # Create a fake model object and a fake model class that will implement the
+        # T(P) function through it's fit_mle method.
+        test_data = self.test_data
+        fake_rows_to_obs = self.rows_to_obs
+        calc_theta = self.calc_theta
+
+        class FakeModel(object):
+            def __init__(self):
+                # Create needed attributes to successfully mock an MNDC_Model
+                #instance in this test
+                self.data = pd.Series([pos for pos, x in enumerate(test_data)])
+                self.obs_id_col = np.arange(self.data.size, dtype=int)
+
+                needed_names = ['ind_var_names', 'intercept_names',
+                                'shape_names', 'nest_names']
+                for name in needed_names:
+                    setattr(self, name, None)
+                self.ind_var_names = ['variance']
+
+            # Create a get_mappings_for_fit function that will allow for
+            # successful mocking in this test
+            def get_mappings_for_fit(self):
+                return {"rows_to_obs": fake_rows_to_obs}
+
+            # Use the T(P) function from the spatial test data example.
+            def fit_mle(self,
+                        init_vals,
+                        weights=None,
+                        **kwargs):
+                return {'x': calc_theta(test_data, weights=weights)}
+        self.fake_model_obj = FakeModel()
+
+        # Create the bootstrap object
+        self.boot =\
+            bc.Boot(self.fake_model_obj,
+                    pd.Series(self.test_theta_hat, index=["variance"]))
+
+        self.boot.bootstrap_replicates =\
+            pd.DataFrame(self.bootstrap_replicates, columns=['variance'])
+        self.boot.jackknife_replicates =\
+            pd.DataFrame(self.jackknife_replicates, columns=['variance'])
+
+        # Store the confidence percentage that will be used for the test
+        self.conf_percentage = 90
+        return None
+
+    # Create the function to calculate the objective function.
+    def calc_theta(self, array, weights=None):
+        if weights is None:
+            result = ((array - array.mean())**2).sum() / float(array.size)
+        else:
+            a_mean = weights.dot(array)
+            differences = (array - a_mean)
+            squared_diffs = differences**2
+            result = weights.dot(squared_diffs)
+        return np.array([result])
+
+    def test_calc_percentile_interval(self):
+        # Alias the function being tested
+        func = self.boot.calc_percentile_interval
+
+        # Perform the first test
+        self.assertIsNone(self.boot.percentile_interval)
+
+        # Calculate the function result
+        func(self.conf_percentage)
+
+        # Note the expected result is from Table 14.2 on page 183 of
+        # Efron & Tibshirani (1994)
+        expected_result = np.array([100.8, 233.9])
+        expected_columns = ['5%', '95%']
+
+        # Perform the remaining tests
+        self.assertIsInstance(self.boot.percentile_interval, pd.DataFrame)
+        self.assertEqual(expected_columns,
+                         self.boot.percentile_interval.columns.tolist())
+        self.assertIn("variance", self.boot.percentile_interval.index)
+        self.assertEqual(self.boot.percentile_interval.shape, (1, 2))
+        npt.assert_allclose(self.boot.percentile_interval.iloc[0, :],
+                            expected_result, rtol=0.02)
+
+        # Set the percentile interval back to none.
+        self.boot.percentile_interval = None
+        self.assertIsNone(self.boot.percentile_interval)
+        return None
+
+    def test_calc_bca_interval(self):
+        # Alias the function being tested
+        func = self.boot.calc_bca_interval
+
+        # Perform the first test
+        self.assertIsNone(self.boot.bca_interval)
+
+        # Calculate the function result
+        func(self.conf_percentage)
+
+        # Note the expected result is from Table 14.2 on page 183 of
+        # Efron & Tibshirani (1994)
+        expected_result = np.array([115.8, 259.6])
+        expected_columns = ['5%', '95%']
+
+        # Perform the remaining tests
+        self.assertIsInstance(self.boot.bca_interval, pd.DataFrame)
+        self.assertEqual(expected_columns,
+                         self.boot.bca_interval.columns.tolist())
+        self.assertIn("variance", self.boot.bca_interval.index)
+        self.assertEqual(self.boot.bca_interval.shape, (1, 2))
+        npt.assert_allclose(self.boot.bca_interval.iloc[0, :],
+                            expected_result, rtol=0.01)
+
+        # Set the percentile interval back to none.
+        self.boot.bca_interval = None
+        self.assertIsNone(self.boot.bca_interval)
+        return None
+
+    def test_calc_abc_interval(self):
+        # Alias the function being tested
+        func = self.boot.calc_abc_interval
+
+        # Perform the first test
+        self.assertIsNone(self.boot.abc_interval)
+
+        # Calculate the function result
+        func(self.conf_percentage, self.test_theta_hat, epsilon=0.001)
+
+        # Note the expected result, from Table 14.2 on page 183 of
+        # Efron & Tibshirani (1994)
+        expected_result = np.array([116.7, 260.9])
+        expected_columns = ['5%', '95%']
+
+        # Perform the remaining tests
+        self.assertIsInstance(self.boot.abc_interval, pd.DataFrame)
+        self.assertEqual(expected_columns,
+                         self.boot.abc_interval.columns.tolist())
+        self.assertIn("variance", self.boot.abc_interval.index)
+        self.assertEqual(self.boot.abc_interval.shape, (1, 2))
+        npt.assert_allclose(self.boot.abc_interval.iloc[0, :],
+                            expected_result, rtol=0.01)
+
+        # Set the percentile interval back to none.
+        self.boot.abc_interval = None
+        self.assertIsNone(self.boot.abc_interval)
+        return None
+
+    def test_calc_conf_intervals_except_all(self):
+        kwargs = {"init_vals": self.test_theta_hat,
+                  "epsilon": 0.001}
+
+        # Alias the function being tested
+        func = self.boot.calc_conf_intervals
+
+        # Create the list of attributes to be tested
+        tested_attrs = ['percentile_interval', 'bca_interval', 'abc_interval']
+        interval_types = ['pi', 'bca', 'abc']
+
+        # Note the expected result, from Table 14.2 on page 183 of
+        # Efron & Tibshirani (1994)
+        expected_result =\
+            np.array([[100.8, 233.9], [115.8, 259.6], [116.7, 260.9]])
+        expected_columns = ['5%', '95%']
+
+        # Perform the desired tests
+        for pos, i_type in enumerate(interval_types):
+            desired_attr = getattr(self.boot, tested_attrs[pos])
+            self.assertIsNone(desired_attr)
+            # Calculate the function result
+            kwargs['interval_type'] = i_type
+            func(self.conf_percentage, **kwargs)
+            # Perform the remaining tests
+            desired_attr = getattr(self.boot, tested_attrs[pos])
+            self.assertIsInstance(desired_attr, pd.DataFrame)
+            self.assertEqual(expected_columns,
+                             desired_attr.columns.tolist())
+            self.assertIn("variance", desired_attr.index)
+            self.assertEqual(desired_attr.shape, (1, 2))
+            npt.assert_allclose(desired_attr.iloc[0, :],
+                                expected_result[pos], rtol=0.02)
+
+            # Perform clean-up activities after the test
+            setattr(self.boot, tested_attrs[pos], None)
+        return None
+
+    def test_calc_conf_intervals_all(self):
+        kwargs = {"interval_type": 'all',
+                  "init_vals": self.test_theta_hat,
+                  "epsilon": 0.001}
+
+        # Alias the function being tested
+        func = self.boot.calc_conf_intervals
+
+        # Create the list of attributes to be tested
+        tested_attrs = ['percentile_interval', 'bca_interval', 'abc_interval']
+
+        # Note the expected result, from Table 14.2 on page 183 of
+        # Efron & Tibshirani (1994)
+        expected_result =\
+            np.array([[100.8, 233.9], [115.8, 259.6], [116.7, 260.9]])
+
+        # Note the expected MultiIndex columns
+        expected_columns_all = [("percentile_interval", "5%"),
+                                ("percentile_interval", "95%"),
+                                ("BCa_interval", "5%"),
+                                ("BCa_interval", "95%"),
+                                ("ABC_interval", "5%"),
+                                ("ABC_interval", "95%")]
+        expected_columns_single = ["5%", "95%"]
+
+        # Perform the expected tests before running the function
+        for attr in tested_attrs:
+            self.assertIsNone(getattr(self.boot, attr))
+
+        # Calculate the function results
+        func(self.conf_percentage, **kwargs)
+
+        # Perform the remaining tests
+        for pos, attr in enumerate(tested_attrs):
+            desired_attr = getattr(self.boot, attr)
+            self.assertEqual(expected_columns_single,
+                             desired_attr.columns.tolist())
+            self.assertIn("variance", desired_attr.index)
+            self.assertEqual(desired_attr.shape, (1, 2))
+            npt.assert_allclose(desired_attr.iloc[0, :],
+                                expected_result[pos], rtol=0.02)
+
+        # Test the 'all_intervals' attribute.
+        self.assertIsInstance(self.boot.all_intervals, pd.DataFrame)
+        self.assertEqual(expected_columns_all,
+                         self.boot.all_intervals.columns.tolist())
+        self.assertIn("variance", self.boot.all_intervals.index)
+        self.assertEqual(self.boot.all_intervals.shape, (1, 6))
+        npt.assert_allclose(self.boot.all_intervals.values,
+                            expected_result.reshape((1, 6)), rtol=0.02)
+
+        # Set the various intervals back to None.
+        for attr in tested_attrs + ['all_intervals']:
+            setattr(self.boot, attr, None)
+            self.assertIsNone(getattr(self.boot, attr))
+        return None
+
+    def test_interval_type_error_in_calc_conf_intervals(self):
+        # Alias the function being tested
+        func = self.boot.calc_conf_intervals
+
+        # Create kwargs for the function to be tested
+        kwargs = {"interval_type": 'bad_type',
+                  "init_vals": self.test_theta_hat,
+                  "epsilon": 0.001}
+
+        # Note the expected error message.
+        expected_error_msg =\
+            "interval_type MUST be in `\['pi', 'bca', 'abc', 'all'\]`"
+
+        # Ensure that the appropriate errors are raised.
+        self.assertRaisesRegexp(ValueError,
+                                expected_error_msg,
+                                func,
+                                self.conf_percentage,
+                                **kwargs)
         return None
