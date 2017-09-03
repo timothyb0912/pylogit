@@ -211,6 +211,62 @@ class BootstrapTests(unittest.TestCase):
 
         return None
 
+    def test_get_param_list_for_prediction(self):
+        # Determine the number of replicates
+        num_replicates = 10
+        # Create a fake model object with the needed attributes
+        class FakeModel(object):
+            def __init__(self):
+                self.nest_names = ['one', 'oneA']
+                self.shape_names = ['two', 'twoA', 'twoB']
+                self.intercept_names = ['three']
+                self.ind_var_names =\
+                    ['four', 'fourA', 'fourB', 'fourC', 'fourD']
+        fake_model_obj = FakeModel()
+
+        # Create a fake set of bootstrap replicates
+        fake_replicates =\
+            (np.array([1, 1, 2, 2, 2, 3, 4, 4, 4, 4, 4])[None, :] *
+             np.ones(num_replicates)[:, None])
+
+        # Create the expected result
+        expected_param_list = [np.ones((2, num_replicates)),
+                               2 * np.ones((3, num_replicates)),
+                               3 * np.ones((1, num_replicates)),
+                               4 * np.ones((5, num_replicates))]
+
+        # Alias the function being tested
+        func = bc.get_param_list_for_prediction
+
+        # Calculate the function result
+        func_result = func(fake_model_obj, fake_replicates)
+
+        # Perform the desired tests with a full set of parameters
+        self.assertIsInstance(func_result, list)
+        self.assertEqual(len(func_result), 4)
+        for pos, func_array in enumerate(func_result):
+            expected_array = expected_param_list[pos]
+            self.assertIsInstance(func_array, np.ndarray)
+            self.assertEqual(func_array.shape, expected_array.shape)
+            npt.assert_allclose(func_array, expected_array)
+
+        # Perform the desired tests with just index coefficients
+        for attr in ['intercept_names', 'shape_names', 'nest_names']:
+            setattr(fake_model_obj, attr, None)
+
+        func_result_2 = func(fake_model_obj, fake_replicates[:, -5:])
+        expected_result_2 =\
+            [None, None, None, 4 * np.ones((5, num_replicates))]
+
+        self.assertIsInstance(func_result_2, list)
+        for pos in xrange(3):
+            self.assertIsNone(func_result_2[pos])
+        self.assertIsInstance(func_result_2[3], np.ndarray)
+        self.assertEqual(func_result_2[3].shape, expected_result_2[3].shape)
+        npt.assert_allclose(func_result_2[3], expected_result_2[3])
+
+        return None
+
     def test_boot_initialization(self):
         # Create the bootstrap object
         boot_obj =\

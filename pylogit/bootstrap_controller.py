@@ -116,6 +116,16 @@ def get_param_list_for_prediction(model_obj, replicates):
     return param_list
 
 
+def ensure_replicates_kwarg_validity(replicate_kwarg):
+    """
+    Ensures `replicate_kwarg` is either 'bootstrap' or 'jackknife'. Raises a
+    helpful ValueError otherwise.
+    """
+    if replicate_kwarg not in ['bootstrap', 'jackknife']:
+        msg = "`replicates` MUST be either 'bootstrap' or 'jackknife'."
+        raise ValueError(msg)
+    return None
+
 class Boot(object):
     """
     Class to perform bootstrap resampling and to store and display its results.
@@ -376,7 +386,8 @@ class Boot(object):
                                       replicates='bootstrap',
                                       num_draws=None,
                                       seed=None):
-        # Check the validity of the replicates kwarg
+        # Check the validity of the kwargs
+        ensure_replicates_kwarg_validity(replicates)
 
         # Get the desired type of replicates
         replicate_vec = getattr(self, replicates + "_replicates")
@@ -386,6 +397,9 @@ class Boot(object):
 
         # Split the control flow based on whether we're using a Nested Logit
         current_model_type = self.model_obj.model_type
+        non_2d_predictions =\
+            [model_type_to_display_name["Nested Logit"],
+             model_type_to_display_name["Mixed Logit"]]
         if current_model_type != model_type_to_display_name["Nested Logit"]:
             # Get the param list for this set of replicates
             param_list =\
@@ -412,24 +426,41 @@ class Boot(object):
                                                   replicate_vec[idx][None, :])
 
                 # Get the 'chosen_probs' using the desired set of replicates
-                chosen_probs = chosen_probs =\
+                chosen_probs =\
                     self.model_obj.predict(self.model_obj.data,
                                            param_list=param_list,
                                            return_long_probs=False,
-                                           choice_col=choice_col)
+                                           choice_col=choice_col,
+                                           num_draws=num_draws,
+                                           seed=seed)
 
                 # store those chosen prob_results
-                chosen_probs_list.append(chosen_probs)
+                chosen_probs_list.append(chosen_probs[:, None])
 
             # Get the final array of chosen probs
             chosen_probs = np.concatenate(chosen_probs_list, axis=1)
 
         # Calculate the log_likelihood
-        log_likelihood = np.log(chosen_probs).sum(axis=0)
-        return log_likelihood
+        log_likelihoods = np.log(chosen_probs).sum(axis=0)
+        return log_likelihoods
 
     def calc_gradient_norm_for_replicates(self, replicates='bootstrap'):
         raise NotImplementedError
+        # Check the validity of the kwargs
+        ensure_replicates_kwarg_validity(replicates)
+        # Create the estimation object
+        # Get the array of parameter replicates
+        replicate_array = getattr(self, replicates + "_replicates")
+        # Determine the number of replicates
+        num_reps = replicate_array.shape[0]
+        # Initialize an empty array to store the gradient norms
+        gradient_norms = np.empty((num_reps,), dtype=float)
+        # Iterate through the rows of the replicates and calculate and store
+        # the gradient norm for each replicated parameter vector.
+        for row in xrange(num_reps):
+            current_params = replicate_array[row]
+            gradient = estimation_obj.convenience_calc_gradient(current_params)
+            gradient_norms[row] = None
         return None
 
     def calc_percentile_interval(self, conf_percentage):
