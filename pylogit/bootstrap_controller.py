@@ -10,10 +10,12 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from .display_names import model_type_to_display_name
 from . import bootstrap_sampler as bs
 from . import bootstrap_calcs as bc
 from . import bootstrap_abc as abc
 from .bootstrap_mle import retrieve_point_est
+from .bootstrap_utils import ensure_samples_is_ndim_ndarray
 
 try:
     # Python 3.x does not natively support xrange
@@ -52,6 +54,66 @@ def get_param_names(model_obj):
     if model_obj.nest_names is not None:
         all_names = model_obj.nest_names + all_names
     return all_names
+
+
+def get_param_list_for_prediction(model_obj, replicates):
+    """
+    Create the `param_list` argument for use with `model_obj.predict`.
+
+    Parameters
+    ----------
+    model_obj : an instance of an MNDC object.
+        Should have the following attributes:
+        `['ind_var_names', 'intercept_names', 'shape_names', 'nest_names']`.
+        This model should have already undergone a complete estimation process.
+        I.e. its `fit_mle` method should have been called without
+        `just_point=True`.
+    replicates : 2D ndarray.
+        Should represent the set of parameter values that we now wish to
+        partition for use with the `model_obj.predict` method.
+
+    Returns
+    -------
+    param_list : list.
+        Contains four elements, each being a numpy array. Either all of the
+        arrays should be 1D or all of the arrays should be 2D. If 2D, the
+        arrays should have the same number of columns. Each column being a
+        particular set of parameter values that one wants to predict with.
+        The first element in the list should be the index coefficients. The
+        second element should contain the 'outside' intercept parameters if
+        there are any, or None otherwise. The third element should contain
+        the shape parameters if there are any or None otherwise. The fourth
+        element should contain the nest coefficients if there are any or
+        None otherwise. Default == None.
+    """
+    # Check the validity of the passed arguments
+    ensure_samples_is_ndim_ndarray(replicates, ndim=2, name='replicates')
+    # Determine the number of index coefficients, outside intercepts,
+    # shape parameters, and nest parameters
+    num_idx_coefs = len(model_obj.ind_var_names)
+
+    intercept_names = model_obj.intercept_names
+    num_outside_intercepts =\
+        0 if intercept_names is None else len(intercept_names)
+
+    shape_names = model_obj.shape_names
+    num_shapes = 0 if shape_names is None else len(shape_names)
+
+    nest_names = model_obj.nest_names
+    num_nests = 0 if nest_names is None else len(nest_names)
+
+    parameter_numbers =\
+        [num_nests, num_shapes, num_outside_intercepts, num_idx_coefs]
+    current_idx = 0
+    param_list = []
+    for param_num in parameter_numbers:
+        if param_num == 0:
+            param_list.append(None)
+            continue
+        upper_idx = current_idx + param_num
+        param_list.append(replicates[:, current_idx:upper_idx].T)
+        current_idx += param_num
+    return param_list
 
 
 class Boot(object):
@@ -310,11 +372,63 @@ class Boot(object):
             pd.DataFrame(point_replicates, columns=self.mle_params.index)
         return None
 
-    def calc_log_likes_for_replicates(self, replicate='bootstrap'):
-        raise NotImplementedError
-        return None
+    def calc_log_likes_for_replicates(self,
+                                      replicates='bootstrap',
+                                      num_draws=None,
+                                      seed=None):
+        # Check the validity of the replicates kwarg
 
-    def calc_gradient_norm_for_replicates(self, replicate='bootstrap'):
+        # Get the desired type of replicates
+        replicates_array = getattr(self, replicates + "_replicates")
+
+        # Determine the choice column
+        choice_col = self.model_obj.choice_col
+
+        # Split the control flow based on whether we're using a Nested Logit
+        current_model_type = self.model_obj.model_type
+        if current_model_type != model_type_to_display_name["Nested Logit"]:
+            # Get the param list for this set of replicates
+            param_list =\
+                get_param_list_for_prediction(self.model_obj, replicates_array)
+
+            # Get the 'chosen_probs' using the desired set of replicates
+            chosen_probs =\
+                self.model_obj.predict(self.model_obj.data,
+                                       param_list=param_list,
+                                       return_long_probs=False,
+                                       choice_col=choice_col,
+                                       num_draws=num_draws,
+                                       seed=seed)
+        else:
+            # Initialize a list of chosen probs
+            chosen_probs_list = []
+
+            # Populate the list of chosen probabilities for each vector of
+            # parameter values
+            for idx in xrange(replicates_array.shape[0]):
+                # Get the param list for this set of replicates
+                param_list =\
+                    get_param_list_for_prediction(self.model_obj,
+                                                replicates_array[idx][None, :])
+
+                # Get the 'chosen_probs' using the desired set of replicates
+                chosen_probs = chosen_probs =\
+                    self.model_obj.predict(self.model_obj.data,
+                                           param_list=param_list,
+                                           return_long_probs=False,
+                                           choice_col=choice_col)
+
+                # store those chosen prob_results
+                chosen_probs_list.append(chosen_probs)
+
+            # Get the final array of chosen probs
+            chosen_probs = np.concatenate(chosen_probs_list, axis=1)
+
+        # Calculate the log_likelihood
+        log_likelihood = np.log(chosen_probs).sum(axis=0)
+        return log_likelihood
+
+    def calc_gradient_norm_for_replicates(self, replicates='bootstrap'):
         raise NotImplementedError
         return None
 
