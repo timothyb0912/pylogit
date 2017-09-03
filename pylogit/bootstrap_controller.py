@@ -379,7 +379,7 @@ class Boot(object):
         # Check the validity of the replicates kwarg
 
         # Get the desired type of replicates
-        replicates_array = getattr(self, replicates + "_replicates")
+        replicate_vec = getattr(self, replicates + "_replicates")
 
         # Determine the choice column
         choice_col = self.model_obj.choice_col
@@ -389,7 +389,7 @@ class Boot(object):
         if current_model_type != model_type_to_display_name["Nested Logit"]:
             # Get the param list for this set of replicates
             param_list =\
-                get_param_list_for_prediction(self.model_obj, replicates_array)
+                get_param_list_for_prediction(self.model_obj, replicate_vec)
 
             # Get the 'chosen_probs' using the desired set of replicates
             chosen_probs =\
@@ -405,11 +405,11 @@ class Boot(object):
 
             # Populate the list of chosen probabilities for each vector of
             # parameter values
-            for idx in xrange(replicates_array.shape[0]):
+            for idx in xrange(replicate_vec.shape[0]):
                 # Get the param list for this set of replicates
                 param_list =\
                     get_param_list_for_prediction(self.model_obj,
-                                                replicates_array[idx][None, :])
+                                                  replicate_vec[idx][None, :])
 
                 # Get the 'chosen_probs' using the desired set of replicates
                 chosen_probs = chosen_probs =\
@@ -536,8 +536,8 @@ class Boot(object):
             self.all_intervals = pd.concat([self.percentile_interval,
                                             self.bca_interval,
                                             self.abc_interval],
-                                            axis=1,
-                                            ignore_index=True)
+                                           axis=1,
+                                           ignore_index=True)
             # Store the column names for the combined confidence intervals
             self.all_intervals.columns = df_column_index
             self.all_intervals.index = self.mle_params.index
