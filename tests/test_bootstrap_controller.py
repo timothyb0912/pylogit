@@ -10,7 +10,7 @@ import numpy.testing as npt
 import pandas as pd
 from scipy.sparse import csr_matrix, eye
 
-import pylogit.bootstrap_controller as bc
+import pylogit.bootstrap as bc
 import pylogit.asym_logit as asym
 import pylogit.mixed_logit_calcs as mlc
 import pylogit.mixed_logit as mixed_logit
