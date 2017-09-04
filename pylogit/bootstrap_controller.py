@@ -109,10 +109,10 @@ def get_param_list_for_prediction(model_obj, replicates):
     param_list = []
     for param_num in parameter_numbers:
         if param_num == 0:
-            param_list.insert(None, 0)
+            param_list.insert(0, None)
             continue
         upper_idx = current_idx + param_num
-        param_list.insert(replicates[:, current_idx:upper_idx].T, 0)
+        param_list.insert(0, replicates[:, current_idx:upper_idx].T)
         current_idx += param_num
     return param_list
 
