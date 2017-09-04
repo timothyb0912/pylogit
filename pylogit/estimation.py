@@ -91,8 +91,6 @@ class EstimationObj(object):
         self.ridge = ridge
 
         # Store the constrained parameters
-        # Commented out because this feature is not yet supported in logit-type
-        # models.
         self.constrained_pos = constrained_pos
 
         # Store reference to what 'zero vector' is for this model / dataset

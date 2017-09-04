@@ -16,6 +16,7 @@ from . import bootstrap_calcs as bc
 from . import bootstrap_abc as abc
 from .bootstrap_mle import retrieve_point_est
 from .bootstrap_utils import ensure_samples_is_ndim_ndarray
+from .construct_estimator import create_estimation_obj
 
 try:
     # Python 3.x does not natively support xrange
@@ -108,10 +109,10 @@ def get_param_list_for_prediction(model_obj, replicates):
     param_list = []
     for param_num in parameter_numbers:
         if param_num == 0:
-            param_list.append(None)
+            param_list.insert(None, 0)
             continue
         upper_idx = current_idx + param_num
-        param_list.append(replicates[:, current_idx:upper_idx].T)
+        param_list.insert(replicates[:, current_idx:upper_idx].T, 0)
         current_idx += param_num
     return param_list
 
@@ -125,6 +126,7 @@ def ensure_replicates_kwarg_validity(replicate_kwarg):
         msg = "`replicates` MUST be either 'bootstrap' or 'jackknife'."
         raise ValueError(msg)
     return None
+
 
 class Boot(object):
     """
@@ -400,7 +402,7 @@ class Boot(object):
         non_2d_predictions =\
             [model_type_to_display_name["Nested Logit"],
              model_type_to_display_name["Mixed Logit"]]
-        if current_model_type != model_type_to_display_name["Nested Logit"]:
+        if current_model_type not in non_2d_predictions:
             # Get the param list for this set of replicates
             param_list =\
                 get_param_list_for_prediction(self.model_obj, replicate_vec)
@@ -410,9 +412,7 @@ class Boot(object):
                 self.model_obj.predict(self.model_obj.data,
                                        param_list=param_list,
                                        return_long_probs=False,
-                                       choice_col=choice_col,
-                                       num_draws=num_draws,
-                                       seed=seed)
+                                       choice_col=choice_col)
         else:
             # Initialize a list of chosen probs
             chosen_probs_list = []
@@ -424,6 +424,9 @@ class Boot(object):
                 param_list =\
                     get_param_list_for_prediction(self.model_obj,
                                                   replicate_vec[idx][None, :])
+                # Use 1D parameters in the prediction function
+                param_list =\
+                    [x.ravel() if x is not None else x for x in param_list]
 
                 # Get the 'chosen_probs' using the desired set of replicates
                 chosen_probs =\
@@ -444,11 +447,21 @@ class Boot(object):
         log_likelihoods = np.log(chosen_probs).sum(axis=0)
         return log_likelihoods
 
-    def calc_gradient_norm_for_replicates(self, replicates='bootstrap'):
+    def calc_gradient_norm_for_replicates(self,
+                                          replicates='bootstrap',
+                                          ridge=None,
+                                          constrained_pos=None,
+                                          weights=None):
         raise NotImplementedError
         # Check the validity of the kwargs
         ensure_replicates_kwarg_validity(replicates)
         # Create the estimation object
+        estimation_obj =\
+            create_estimation_obj(self.model_obj,
+                                  self.mle_params.values,
+                                  ridge=ridge,
+                                  constrained_pos=constrained_pos,
+                                  weights=weights)
         # Get the array of parameter replicates
         replicate_array = getattr(self, replicates + "_replicates")
         # Determine the number of replicates
@@ -460,7 +473,7 @@ class Boot(object):
         for row in xrange(num_reps):
             current_params = replicate_array[row]
             gradient = estimation_obj.convenience_calc_gradient(current_params)
-            gradient_norms[row] = None
+            gradient_norms[row] = np.linalg.norm(gradient)
         return None
 
     def calc_percentile_interval(self, conf_percentage):
