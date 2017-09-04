@@ -612,10 +612,22 @@ class ComputationalTests(GenericTestCase):
                                  2 * self.ridge * self.fake_betas[0])
         function_gradient_penalized = func(*gradient_args)
 
-        self.assertIsInstance(function_gradient, np.ndarray)
-        self.assertEqual(function_gradient.shape, (self.fake_betas.shape[0],))
+        self.assertIsInstance(function_gradient_penalized, np.ndarray)
+        self.assertEqual(function_gradient_penalized.shape,
+                         (self.fake_betas.shape[0],))
         npt.assert_allclose(function_gradient_penalized, new_expected_gradient)
 
+        # Test the gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        new_expected_gradient_weighted =\
+            2 * expected_gradient - 2 * self.ridge * self.fake_betas[0]
+        func_gradient_penalized_weighted = func(*gradient_args)
+        self.assertIsInstance(func_gradient_penalized_weighted, np.ndarray)
+        self.assertEqual(func_gradient_penalized_weighted.shape,
+                         (self.fake_betas.shape[0],))
+        npt.assert_allclose(func_gradient_penalized_weighted,
+                            new_expected_gradient_weighted)
         return None
 
     def test_calc_gradient_no_shapes(self):
@@ -687,6 +699,17 @@ class ComputationalTests(GenericTestCase):
                           self.fake_intercepts.shape[0],))
         npt.assert_allclose(function_gradient, expected_gradient)
 
+        # Test the gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_gradient_weighted = 2 * expected_gradient
+        func_gradient_weighted = func(*gradient_args)
+        self.assertIsInstance(func_gradient_weighted, np.ndarray)
+        self.assertEqual(func_gradient_weighted.shape,
+                         (self.fake_betas.shape[0] +
+                          self.fake_intercepts.shape[0],))
+        npt.assert_allclose(func_gradient_weighted, expected_gradient_weighted)
+
         return None
 
     def test_calc_gradient_no_intercepts(self):
@@ -756,9 +779,30 @@ class ComputationalTests(GenericTestCase):
         self.assertIsInstance(function_gradient, np.ndarray)
         self.assertEqual(function_gradient.shape,
                          (self.fake_betas.shape[0] +
-                          self.fake_intercepts.shape[0],))
+                          self.fake_shapes.shape[0],))
         npt.assert_allclose(function_gradient, expected_gradient)
 
+        # Perform the tests with a weighted gradient
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_gradient_weighted = 2 * expected_gradient
+        func_gradient_weighted = func(*gradient_args)
+        self.assertIsInstance(func_gradient_weighted, np.ndarray)
+        self.assertEqual(func_gradient_weighted.shape,
+                         (self.fake_betas.shape[0] +
+                          self.fake_shapes.shape[0],))
+        npt.assert_allclose(func_gradient_weighted, expected_gradient_weighted)
+
+        # Test the gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_gradient_weighted = 2 * expected_gradient
+        func_gradient_weighted = func(*gradient_args)
+        self.assertIsInstance(func_gradient_weighted, np.ndarray)
+        self.assertEqual(func_gradient_weighted.shape,
+                         (self.fake_betas.shape[0] +
+                          self.fake_shapes.shape[0],))
+        npt.assert_allclose(func_gradient_weighted, expected_gradient_weighted)
         return None
 
     def test_calc_gradient_shapes_and_intercepts(self):
@@ -835,6 +879,18 @@ class ComputationalTests(GenericTestCase):
                           self.fake_intercepts.shape[0] +
                           self.fake_shapes.shape[0],))
         npt.assert_allclose(function_gradient, expected_gradient)
+
+        # Test the gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_gradient_weighted = 2 * expected_gradient
+        func_gradient_weighted = func(*gradient_args)
+        self.assertIsInstance(func_gradient_weighted, np.ndarray)
+        self.assertEqual(func_gradient_weighted.shape,
+                         (self.fake_betas.shape[0] +
+                          self.fake_intercepts.shape[0] +
+                          self.fake_shapes.shape[0],))
+        npt.assert_allclose(func_gradient_weighted, expected_gradient_weighted)
 
         return None
 
@@ -1028,14 +1084,24 @@ class ComputationalTests(GenericTestCase):
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
 
+        # Test the Fisher info matrix function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*gradient_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
+
         # Test the function with the ridge penalty
-        expected_result -= 2 * self.ridge
+        expected_result_weighted -= 2 * self.ridge
         gradient_args[-2] = self.ridge
         function_result = func(*gradient_args)
 
         self.assertIsInstance(function_result, np.ndarray)
-        self.assertEqual(function_result.shape, expected_result.shape)
-        npt.assert_allclose(function_result, expected_result)
+        self.assertEqual(function_result.shape, expected_result_weighted.shape)
+        npt.assert_allclose(function_result, expected_result_weighted)
 
         return None
 
@@ -1116,6 +1182,16 @@ class ComputationalTests(GenericTestCase):
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
 
+        # Test the Fisher info matrix function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*gradient_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
+
         return None
 
     def test_calc_fisher_info_matrix_no_shapes(self):
@@ -1192,6 +1268,16 @@ class ComputationalTests(GenericTestCase):
         self.assertIsInstance(function_result, np.ndarray)
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
+
+        # Test the Fisher info matrix function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*gradient_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         return None
 
@@ -1274,6 +1360,16 @@ class ComputationalTests(GenericTestCase):
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
 
+        # Test the Fisher info matrix function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        gradient_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*gradient_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
+
         return None
 
     def test_calc_hessian_no_shapes_no_intercept(self):
@@ -1351,14 +1447,24 @@ class ComputationalTests(GenericTestCase):
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
 
+        # Test the Hessian function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        hessian_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*hessian_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
+
         # Test the function with the ridge penalty
-        expected_result -= 2 * self.ridge
+        expected_result_weighted -= 2 * self.ridge
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
         self.assertIsInstance(function_result, np.ndarray)
-        self.assertEqual(function_result.shape, expected_result.shape)
-        npt.assert_allclose(function_result, expected_result)
+        self.assertEqual(function_result.shape, expected_result_weighted.shape)
+        npt.assert_allclose(function_result, expected_result_weighted)
 
         return None
 
@@ -1478,16 +1584,26 @@ class ComputationalTests(GenericTestCase):
                                     np.matrixlib.defmatrix.matrix))
         npt.assert_allclose(function_result, expected_result)
 
+        # Test the Hessian function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        hessian_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*hessian_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
+
         # Test the function with the ridge penalty
-        expected_result -= 2 * self.ridge
+        expected_result_weighted -= 2 * self.ridge
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
         self.assertIsInstance(function_result, np.ndarray)
-        self.assertEqual(function_result.shape, expected_result.shape)
+        self.assertEqual(function_result.shape, expected_result_weighted.shape)
         self.assertFalse(isinstance(function_result,
                                     np.matrixlib.defmatrix.matrix))
-        npt.assert_allclose(function_result, expected_result)
+        npt.assert_allclose(function_result, expected_result_weighted)
 
         return None
 
@@ -1588,6 +1704,16 @@ class ComputationalTests(GenericTestCase):
         self.assertFalse(isinstance(function_result,
                                     np.matrixlib.defmatrix.matrix))
         npt.assert_allclose(function_result, expected_result)
+
+        # Test the Hessian function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        hessian_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*hessian_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         return None
 
@@ -1691,5 +1817,15 @@ class ComputationalTests(GenericTestCase):
         self.assertIsInstance(function_result, np.ndarray)
         self.assertEqual(function_result.shape, expected_result.shape)
         npt.assert_allclose(function_result, expected_result)
+
+        # Test the Hessian function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        hessian_args[-1] = new_weights
+        expected_result_weighted = 2 * expected_result
+        func_result_weighted = func(*hessian_args)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_result_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         return None
