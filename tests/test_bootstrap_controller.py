@@ -13,6 +13,9 @@ from scipy.sparse import csr_matrix, eye
 
 import pylogit.bootstrap_controller as bc
 import pylogit.asym_logit as asym
+import pylogit.mixed_logit_calcs as mlc
+import pylogit.mixed_logit as mixed_logit
+import pylogit.nested_logit as nested_logit
 from pylogit.conditional_logit import MNL
 
 
@@ -230,10 +233,10 @@ class BootstrapTests(unittest.TestCase):
              np.ones(num_replicates)[:, None])
 
         # Create the expected result
-        expected_param_list = [np.ones((2, num_replicates)),
-                               2 * np.ones((3, num_replicates)),
+        expected_param_list = [4 * np.ones((5, num_replicates)),
                                3 * np.ones((1, num_replicates)),
-                               4 * np.ones((5, num_replicates))]
+                               2 * np.ones((3, num_replicates)),
+                               np.ones((2, num_replicates))]
 
         # Alias the function being tested
         func = bc.get_param_list_for_prediction
@@ -256,15 +259,34 @@ class BootstrapTests(unittest.TestCase):
 
         func_result_2 = func(fake_model_obj, fake_replicates[:, -5:])
         expected_result_2 =\
-            [None, None, None, 4 * np.ones((5, num_replicates))]
+            [4 * np.ones((5, num_replicates)), None, None, None]
 
         self.assertIsInstance(func_result_2, list)
-        for pos in xrange(3):
+        for pos in xrange(1, 4):
             self.assertIsNone(func_result_2[pos])
-        self.assertIsInstance(func_result_2[3], np.ndarray)
-        self.assertEqual(func_result_2[3].shape, expected_result_2[3].shape)
-        npt.assert_allclose(func_result_2[3], expected_result_2[3])
+        self.assertIsInstance(func_result_2[0], np.ndarray)
+        self.assertEqual(func_result_2[0].shape, expected_result_2[0].shape)
+        npt.assert_allclose(func_result_2[0], expected_result_2[0])
 
+        return None
+
+    def test_ensure_replicates_kwarg_validity(self):
+        # Create the 'good' and 'bad' arguments for testing
+        good_args = ['bootstrap', 'jackknife']
+        bad_args = ['bad', 2, None]
+        # Alias the function being tested
+        func = bc.ensure_replicates_kwarg_validity
+        # Note the expected error messsage
+        expected_error_msg =\
+            "`replicates` MUST be either 'bootstrap' or 'jackknife'."
+        # Perform the desired tests
+        for good_arg in good_args:
+            self.assertIsNone(func(good_arg))
+        for bad_arg in bad_args:
+            self.assertRaisesRegexp(ValueError,
+                                    expected_error_msg,
+                                    func,
+                                    bad_arg)
         return None
 
     def test_boot_initialization(self):
@@ -693,4 +715,428 @@ class IntervalTests(unittest.TestCase):
                                 func,
                                 self.conf_percentage,
                                 **kwargs)
+        return None
+
+
+class AnalysisTests(unittest.TestCase):
+    def make_asym_model(self):
+        # The set up being used is one where there are two choice situations,
+        # The first having three alternatives, and the second having only two
+        # alternatives. There is one generic variable. Two alternative
+        # specific constants and all three shape parameters are used.
+
+        # Create the betas to be used during the tests
+        fake_betas = np.array([-0.6])
+
+        # Create the fake outside intercepts to be used during the tests
+        fake_intercepts = np.array([1, 0.5])
+
+        # Create names for the intercept parameters
+        fake_intercept_names = ["ASC 1", "ASC 2"]
+
+        # Record the position of the intercept that is not being estimated
+        fake_intercept_ref_pos = 2
+
+        # Create the shape parameters to be used during the tests. Note that
+        # these are the reparameterized shape parameters, thus they will be
+        # exponentiated in the fit_mle process and various calculations.
+        fake_shapes = np.array([-1, 1])
+
+        # Create names for the intercept parameters
+        fake_shape_names = ["Shape 1", "Shape 2"]
+
+        # Record the position of the shape parameter that is being constrained
+        fake_shape_ref_pos = 2
+
+        # Calculate the 'natural' shape parameters
+        natural_shapes = asym._convert_eta_to_c(fake_shapes,
+                                                fake_shape_ref_pos)
+
+        # Create an array of all model parameters
+        fake_all_params = np.concatenate((fake_shapes,
+                                          fake_intercepts,
+                                          fake_betas))
+
+        # The mapping between rows and alternatives is given below.
+        fake_rows_to_alts = csr_matrix(np.array([[1, 0, 0],
+                                                 [0, 1, 0],
+                                                 [0, 0, 1],
+                                                 [1, 0, 0],
+                                                 [0, 0, 1]]))
+
+        # Get the mappping between rows and observations
+        fake_rows_to_obs = csr_matrix(np.array([[1, 0],
+                                                [1, 0],
+                                                [1, 0],
+                                                [0, 1],
+                                                [0, 1]]))
+
+        # Create the fake design matrix with columns denoting X
+        # The intercepts are not included because they are kept outside the
+        # index in the scobit model.
+        fake_design = np.array([[1],
+                                [2],
+                                [3],
+                                [1.5],
+                                [3.5]])
+
+        # Create the index array for this set of choice situations
+        fake_index = fake_design.dot(fake_betas)
+
+        # Create the needed dataframe for the Asymmetric Logit constructor
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2],
+                                "alt_id": [1, 2, 3, 1, 3],
+                                "choice": [0, 1, 0, 0, 1],
+                                "x": fake_design[:, 0],
+                                "intercept": [1 for i in range(5)]})
+
+        # Record the various column names
+        alt_id_col = "alt_id"
+        obs_id_col = "obs_id"
+        choice_col = "choice"
+
+        # Create the index specification  and name dictionaryfor the model
+        fake_specification = OrderedDict()
+        fake_names = OrderedDict()
+        fake_specification["x"] = [[1, 2, 3]]
+        fake_names["x"] = ["x (generic coefficient)"]
+
+        # Bundle args and kwargs used to construct the Asymmetric Logit model.
+        constructor_args = [fake_df,
+                            alt_id_col,
+                            obs_id_col,
+                            choice_col,
+                            fake_specification]
+
+        # Create a variable for the kwargs being passed to the constructor
+        constructor_kwargs = {"intercept_ref_pos": fake_intercept_ref_pos,
+                              "shape_ref_pos": fake_shape_ref_pos,
+                              "names": fake_names,
+                              "intercept_names": fake_intercept_names,
+                               "shape_names": fake_shape_names}
+
+        # Initialize a basic Asymmetric Logit model whose coefficients will be
+        # estimated.
+        model_obj = asym.MNAL(*constructor_args, **constructor_kwargs)
+
+        # Get the fitted probabilities for this model and dataset
+        # Note this relies on the calc_probabilities function being functional.
+        # args = [fake_betas,
+        #         fake_design,
+        #         fake_df[alt_id_col].values,
+        #         fake_rows_to_obs,
+        #         fake_rows_to_alts,
+        #         model_obj.utility_transform]
+        # kwargs = {"intercept_params": fake_intercepts,
+        #           "shape_params": fake_shapes,
+        #           "return_long_probs": True}
+        # model_obj.prob_array =\
+        #     choice_calcs.calc_probabilities(*args, **kwargs)
+
+        model_obj.coefs = pd.Series(fake_betas, index=fake_names["x"])
+        model_obj.intercepts =\
+            pd.Series(fake_intercepts, index=fake_intercept_names)
+        model_obj.shapes = pd.Series(fake_shapes, index=fake_shape_names)
+        model_obj.nests = None
+        model_obj.params =\
+            pd.concat([model_obj.shapes,
+                       model_obj.intercepts,
+                       model_obj.coefs],
+                      axis=0, ignore_index=False)
+        return model_obj
+
+    def make_mixed_model(self):
+        # Fake random draws where Row 1 is for observation 1 and row 2 is
+        # for observation 2. Column 1 is for draw 1 and column 2 is for draw 2
+        fake_draws = mlc.get_normal_draws(2, 2, 1, seed=1)[0]
+        # Create the betas to be used during the tests
+        fake_betas = np.array([0.3, -0.6, 0.2])
+        fake_std = 1
+        fake_betas_ext = np.concatenate((fake_betas,
+                                         np.array([fake_std])),
+                                        axis=0)
+
+        # Create the fake design matrix with columns denoting ASC_1, ASC_2, X
+        fake_design = np.array([[1, 0, 1],
+                               [0, 1, 2],
+                               [0, 0, 3],
+                               [1, 0, 1.5],
+                               [0, 1, 2.5],
+                               [0, 0, 3.5],
+                               [1, 0, 0.5],
+                               [0, 1, 1.0],
+                               [0, 0, 1.5]])
+        # Record what positions in the design matrix are being mixed over
+        mixing_pos = [2]
+
+        # Create the arrays that specify the choice situation, individual id
+        # and alternative ids
+        situation_ids = np.array([1, 1, 1, 2, 2, 2, 3, 3, 3])
+        individual_ids = np.array([1, 1, 1, 1, 1, 1, 2, 2, 2])
+        alternative_ids = np.array([1, 2, 3, 1, 2, 3, 1, 2, 3])
+        # Create a fake array of choices
+        choice_array = np.array([0, 1, 0, 0, 0, 1, 1, 0, 0])
+
+        # Create the 'rows_to_mixers' sparse array for this dataset
+        # Denote the rows that correspond to observation 1 and observation 2
+        obs_1_rows = np.ones(fake_design.shape[0])
+        # Make sure the rows for observation 2 are given a zero in obs_1_rows
+        obs_1_rows[-3:] = 0
+        obs_2_rows = 1 - obs_1_rows
+        # Create the row_to_mixers scipy.sparse matrix
+        fake_rows_to_mixers = csr_matrix(obs_1_rows[:, None] ==
+                                         np.array([1, 0])[None, :])
+        # Create the rows_to_obs scipy.sparse matrix
+        fake_rows_to_obs = csr_matrix(situation_ids[:, None] ==
+                                      np.arange(1, 4)[None, :])
+        # Create the rows_to_alts scipy.sparse matrix
+        fake_rows_to_alts = csr_matrix(alternative_ids[:, None] ==
+                                       np.arange(1, 4)[None, :])
+
+        # Create the design matrix that we should see for draw 1 and draw 2
+        arrays_to_join = (fake_design.copy(),
+                          fake_design.copy()[:, -1][:, None])
+        fake_design_draw_1 = np.concatenate(arrays_to_join, axis=1)
+        fake_design_draw_2 = fake_design_draw_1.copy()
+
+        # Multiply the 'random' coefficient draws by the corresponding variable
+        fake_design_draw_1[:, -1] *= (obs_1_rows *
+                                      fake_draws[0, 0] +
+                                      obs_2_rows *
+                                      fake_draws[1, 0])
+        fake_design_draw_2[:, -1] *= (obs_1_rows *
+                                      fake_draws[0, 1] +
+                                      obs_2_rows *
+                                      fake_draws[1, 1])
+        extended_design_draw_1 = fake_design_draw_1[:, None, :]
+        extended_design_draw_2 = fake_design_draw_2[:, None, :]
+        fake_design_3d = np.concatenate((extended_design_draw_1,
+                                         extended_design_draw_2),
+                                        axis=1)
+
+        # Create the fake systematic utility values
+        sys_utilities_draw_1 = fake_design_draw_1.dot(fake_betas_ext)
+        sys_utilities_draw_2 = fake_design_draw_2.dot(fake_betas_ext)
+
+        #####
+        # Calculate the probabilities of each alternatve in each choice
+        # situation
+        #####
+        long_exp_draw_1 = np.exp(sys_utilities_draw_1)
+        long_exp_draw_2 = np.exp(sys_utilities_draw_2)
+        ind_exp_sums_draw_1 = fake_rows_to_obs.T.dot(long_exp_draw_1)
+        ind_exp_sums_draw_2 = fake_rows_to_obs.T.dot(long_exp_draw_2)
+        long_exp_sum_draw_1 = fake_rows_to_obs.dot(ind_exp_sums_draw_1)
+        long_exp_sum_draw_2 = fake_rows_to_obs.dot(ind_exp_sums_draw_2)
+        long_probs_draw_1 = long_exp_draw_1 / long_exp_sum_draw_1
+        long_probs_draw_2 = long_exp_draw_2 / long_exp_sum_draw_2
+        prob_array = np.concatenate((long_probs_draw_1[:, None],
+                                     long_probs_draw_2[:, None]),
+                                    axis=1)
+
+        ###########
+        # Create a mixed logit object for later use.
+        ##########
+        # Create a fake old long format dataframe for mixed logit model object
+        alt_id_column = "alt_id"
+        situation_id_column = "situation_id"
+        obs_id_column = "observation_id"
+        choice_column = "choice"
+
+        data = {"x": fake_design[:, 2],
+                alt_id_column: alternative_ids,
+                situation_id_column: situation_ids,
+                obs_id_column: individual_ids,
+                choice_column: choice_array}
+        fake_old_df = pd.DataFrame(data)
+        fake_old_df["intercept"] = 1
+
+        # Create a fake specification
+        fake_spec = OrderedDict()
+        fake_names = OrderedDict()
+
+        fake_spec["intercept"] = [1, 2]
+        fake_names["intercept"] = ["ASC 1", "ASC 2"]
+
+        fake_spec["x"] = [[1, 2, 3]]
+        fake_names["x"] = ["beta_x"]
+
+        # Specify the mixing variable
+        fake_mixing_vars = ["beta_x"]
+
+        # Create a fake version of a mixed logit model object
+        args = [fake_old_df,
+                alt_id_column,
+                situation_id_column,
+                choice_column,
+                fake_spec]
+        kwargs = {"names": fake_names,
+                  "mixing_id_col": obs_id_column,
+                  "mixing_vars": fake_mixing_vars}
+        mixl_obj = mixed_logit.MixedLogit(*args, **kwargs)
+
+        # Set all the necessary attributes for prediction:
+        # design_3d, coefs, intercepts, shapes, nests, mixing_pos
+        mixl_obj.design_3d = fake_design_3d
+        mixl_obj.ind_var_names += ["Sigma X"]
+        mixl_obj.coefs =\
+            pd.Series(fake_betas_ext, index=mixl_obj.ind_var_names)
+        mixl_obj.intercepts = None
+        mixl_obj.shapes = None
+        mixl_obj.nests = None
+        mixl_obj.params = mixl_obj.coefs.copy()
+        return mixl_obj
+
+    def make_nested_model(self):
+        # Create the betas to be used during the tests
+        fake_betas = np.array([0.3, -0.6, 0.2])
+        # Create the fake nest coefficients to be used during the tests
+        # Note that these are the 'natural' nest coefficients, i.e. the
+        # inverse of the scale parameters for each nest. They should be bigger
+        # than or equal to 1.
+        natural_nest_coefs = np.array([1 - 1e-16, 0.5])
+        # Create an array of all model parameters
+        fake_all_params = np.concatenate((natural_nest_coefs,
+                                          fake_betas))
+        # The set up being used is one where there are two choice situations,
+        # The first having three alternatives, and the second having only two.
+        # The nest memberships of these alternatives are given below.
+        fake_rows_to_nests = csr_matrix(np.array([[1, 0],
+                                                  [1, 0],
+                                                  [0, 1],
+                                                  [1, 0],
+                                                  [0, 1]]))
+
+        # Create a sparse matrix that maps the rows of the design matrix to the
+        # observatins
+        fake_rows_to_obs = csr_matrix(np.array([[1, 0],
+                                                [1, 0],
+                                                [1, 0],
+                                                [0, 1],
+                                                [0, 1]]))
+
+        # Create the fake design matrix with columns denoting ASC_1, ASC_2, X
+        fake_design = np.array([[1, 0, 1],
+                                [0, 1, 2],
+                                [0, 0, 3],
+                                [1, 0, 1.5],
+                                [0, 0, 3.5]])
+
+        # Create fake versions of the needed arguments for the MNL constructor
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2],
+                                "alt_id": [1, 2, 3, 1, 3],
+                                "choice": [0, 1, 0, 0, 1],
+                                "x": range(5),
+                                "intercept": [1 for i in range(5)]})
+
+        # Record the various column names
+        alt_id_col = "alt_id"
+        obs_id_col = "obs_id"
+        choice_col = "choice"
+
+        # Store the choice array
+        choice_array = fake_df[choice_col].values
+
+        # Create a sparse matrix that maps the chosen rows of the design
+        # matrix to the observatins
+        fake_chosen_rows_to_obs = csr_matrix(np.array([[0, 0],
+                                                       [1, 0],
+                                                       [0, 0],
+                                                       [0, 0],
+                                                       [0, 1]]))
+
+        # Create the index specification  and name dictionaryfor the model
+        fake_specification = OrderedDict()
+        fake_specification["intercept"] = [1, 2]
+        fake_specification["x"] = [[1, 2, 3]]
+        fake_names = OrderedDict()
+        fake_names["intercept"] = ["ASC 1", "ASC 2"]
+        fake_names["x"] = ["x (generic coefficient)"]
+
+        # Create the nesting specification
+        fake_nest_spec = OrderedDict()
+        fake_nest_spec["Nest 1"] = [1, 2]
+        fake_nest_spec["Nest 2"] = [3]
+
+        # Create a nested logit object
+        args = [fake_df,
+                alt_id_col,
+                obs_id_col,
+                choice_col,
+                fake_specification]
+        kwargs = {"names": fake_names,
+                  "nest_spec": fake_nest_spec}
+        model_obj = nested_logit.NestedLogit(*args, **kwargs)
+
+        model_obj.coefs = pd.Series(fake_betas, index=model_obj.ind_var_names)
+        model_obj.intercepts = None
+        model_obj.shapes = None
+
+        def logit(x):
+            return np.log(x / (1 - x))
+        model_obj.nests =\
+            pd.Series(logit(natural_nest_coefs), index=fake_nest_spec.keys())
+        model_obj.params =\
+            pd.concat([model_obj.nests, model_obj.coefs],
+                      axis=0, ignore_index=False)
+
+        # Store a ridge parameter
+        # ridge = 0.5
+
+        # Gather the arguments needed for the calc_nested_probs function
+        # args = [natural_nest_coefs,
+        #         fake_betas,
+        #         model_obj.design,
+        #         fake_rows_to_obs,
+        #         fake_rows_to_nests]
+        # kwargs = {"return_type": "long_probs"}
+        # model_obj.prob_array = nlc.calc_nested_probs(*args, **kwargs)
+        return model_obj
+
+    def setUp(self):
+        """
+        Create the real model objects.
+        """
+        self.asym_model = self.make_asym_model()
+        self.mixed_model = self.make_mixed_model()
+        self.nested_model = self.make_nested_model()
+        return None
+
+    def test_calc_log_likes_for_replicates(self):
+        # Create the keyword arguments needed for the test.
+        kwargs = {'num_draws': 10, 'seed': 932017}
+
+        # Note the objects that are to be tested
+        model_objects = [self.asym_model,
+                         self.mixed_model,
+                         self.nested_model]
+
+        # Iterate over the Asym, MNL, Mixed, and Nested models.
+        for model_obj in model_objects:
+            # Create the bootstrap object based on the model object.
+            boot = bc.Boot(model_obj, model_obj.params.values)
+
+            # Create the bootstrap and jackknife replicate attributes.
+            replicates =\
+                np.concatenate([model_obj.params.values[None, :],
+                                model_obj.params.values[None, :]],
+                               axis=0)
+            boot.bootstrap_replicates = replicates
+            boot.jackknife_replicates = replicates
+
+            # Alias the function being tested.
+            func = boot.calc_log_likes_for_replicates
+
+            for replicate_type in ['bootstrap', 'jackknife']:
+                # Calculate function results using each bootstrap object
+                kwargs["replicates"] = replicate_type
+                func_result = func(**kwargs)
+
+                # Ensure function results have the expected properties
+                self.assertIsInstance(func_result, np.ndarray)
+                self.assertEqual(func_result.ndim, 1)
+                self.assertEqual(func_result.shape, (replicates.shape[0],))
+        return None
+
+    def test_calc_gradient_norm_for_replicates(self):
         return None
