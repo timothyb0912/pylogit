@@ -7,10 +7,7 @@
 """
 from __future__ import absolute_import
 
-from functools import partial
-import warnings
 import numpy as np
-from scipy.sparse import diags
 
 from . import choice_calcs as cc
 from . import base_multinomial_cm_v2 as base_mcm
@@ -52,7 +49,7 @@ display_name_to_model_type = {v : k for k, v in display_name_dict.items()}
 model_type_to_resources =\
     {"MNL": {'estimator': MNLEstimator, 'split_func': mnl_split_params},
      "Asym": {'estimator': AsymEstimator, 'split_func': asym_split_params},
-     "Cloglog": {'estimator': ClogEstimator, 'split_func': asym_split_params},
+     "Cloglog": {'estimator': ClogEstimator, 'split_func': clog_split_params},
      "Scobit": {'estimator': ScobitEstimator,
                 'split_func': scobit_split_params},
      "Uneven": {'estimator': UnevenEstimator,
@@ -77,11 +74,11 @@ def create_estimation_obj(model_obj,
     ----------
     model_obj : an instance or sublcass of the MNDC class.
     init_vals : 1D ndarray.
-        The initial values to start the optimization process with. In the
+        The initial values to start the estimation process with. In the
         following order, there should be one value for each nest coefficient,
         shape parameter, outside intercept parameter, or index coefficient that
         is being estimated.
-    mapping_dict : OrderedDict or None, optional.
+    mappings : OrderedDict or None, optional.
         Keys will be `["rows_to_obs", "rows_to_alts", "chosen_row_to_obs",
         "rows_to_nests"]`. The value for `rows_to_obs` will map the rows of
         the `long_form` to the unique observations (on the columns) in

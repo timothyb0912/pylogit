@@ -2,7 +2,6 @@
 Tests for the bootstrap_controller.py file.
 """
 import unittest
-import warnings
 from collections import OrderedDict
 from copy import deepcopy
 
@@ -719,6 +718,61 @@ class IntervalTests(unittest.TestCase):
 
 
 class AnalysisTests(unittest.TestCase):
+    def make_mnl_model(self):
+        # The set up being used is one where there are two choice situations,
+        # The first having three alternatives, and the second having only two
+        # alternatives. There is one generic variable. Two alternative
+        # specific constants and all three shape parameters are used.
+
+        # Create the betas to be used during the tests
+        fake_betas = np.array([-0.6])
+
+        # Create the fake design matrix with columns denoting X
+        # The intercepts are not included because they are kept outside the
+        # index in the scobit model.
+        fake_design = np.array([[1],
+                                [2],
+                                [3],
+                                [1.5],
+                                [3.5]])
+
+        # Create the index array for this set of choice situations
+        fake_index = fake_design.dot(fake_betas)
+
+        # Create the needed dataframe for the model constructor
+        fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2],
+                                "alt_id": [1, 2, 3, 1, 3],
+                                "choice": [0, 1, 0, 0, 1],
+                                "x": fake_design[:, 0]})
+
+        # Record the various column names
+        alt_id_col = "alt_id"
+        obs_id_col = "obs_id"
+        choice_col = "choice"
+
+        # Create the index specification  and name dictionaryfor the model
+        mnl_spec = OrderedDict()
+        mnl_names = OrderedDict()
+        mnl_spec["x"] = [[1, 2, 3]]
+        mnl_names["x"] = ["x (generic coefficient)"]
+
+        # Bundle args and kwargs used to construct the Asymmetric Logit model.
+        mnl_args = [fake_df, alt_id_col, obs_id_col, choice_col, mnl_spec]
+
+        # Create a variable for the kwargs being passed to the constructor
+        mnl_kwargs = {"names": mnl_names}
+
+        # Initialize a basic choice model.
+        mnl_obj = MNL(*mnl_args, **mnl_kwargs)
+
+        # Create the desired model attributes for the clog log model
+        mnl_obj.coefs = pd.Series(fake_betas, index=mnl_names["x"])
+        mnl_obj.intercepts = None
+        mnl_obj.shapes = None
+        mnl_obj.nests = None
+        mnl_obj.params = mnl_obj.coefs.copy()
+        return mnl_obj
+
     def make_asym_model(self):
         # The set up being used is one where there are two choice situations,
         # The first having three alternatives, and the second having only two
@@ -1097,6 +1151,7 @@ class AnalysisTests(unittest.TestCase):
         """
         Create the real model objects.
         """
+        self.mnl_model = self.make_mnl_model()
         self.asym_model = self.make_asym_model()
         self.mixed_model = self.make_mixed_model()
         self.nested_model = self.make_nested_model()
@@ -1107,7 +1162,8 @@ class AnalysisTests(unittest.TestCase):
         kwargs = {'num_draws': 10, 'seed': 932017}
 
         # Note the objects that are to be tested
-        model_objects = [self.asym_model,
+        model_objects = [self.mnl_model,
+                         self.asym_model,
                          self.mixed_model,
                          self.nested_model]
 
@@ -1139,4 +1195,26 @@ class AnalysisTests(unittest.TestCase):
         return None
 
     def test_calc_gradient_norm_for_replicates(self):
+        # Create the bootstrap object based on the MNL model.
+        base_array = self.mnl_model.params.values
+        base_array_2d = base_array[None, :]
+        boot = bc.Boot(self.mnl_model, base_array)
+
+        # Create the bootstrap and jackknife replicate attributes.
+        replicates = np.concatenate((base_array_2d,
+                                     base_array_2d + 1,
+                                     base_array_2d - 1),
+                                    axis=0)
+        boot.bootstrap_replicates = replicates
+        boot.jackknife_replicates = replicates
+
+        # Alias the function being tested.
+        func = boot.calc_gradient_norm_for_replicates
+
+        # Perform the desired tests.
+        for replicate_type in ['bootstrap', 'jackknife']:
+            func_result = func(replicates=replicate_type)
+            self.assertIsInstance(func_result, np.ndarray)
+            self.assertEqual(func_result.shape, (replicates.shape[0],))
+            self.assertTrue(np.unique(func_result).size == func_result.size)
         return None

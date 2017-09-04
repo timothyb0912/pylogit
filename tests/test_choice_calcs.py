@@ -597,6 +597,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          None,
                          None,
+                         None,
                          None]
         function_gradient = func(*gradient_args)
 
@@ -606,7 +607,7 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(function_gradient, expected_gradient)
 
         # Test the gradient function with the ridge argument
-        gradient_args[-1] = self.ridge
+        gradient_args[-2] = self.ridge
         new_expected_gradient = (expected_gradient -
                                  2 * self.ridge * self.fake_betas[0])
         function_gradient_penalized = func(*gradient_args)
@@ -674,6 +675,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_v,
                          transform_deriv_intercepts,
                          self.fake_intercepts,
+                         None,
                          None,
                          None]
         function_gradient = func(*gradient_args)
@@ -746,6 +748,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          None,
                          self.fake_shapes,
+                         None,
                          None]
         function_gradient = func(*gradient_args)
 
@@ -821,6 +824,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          self.fake_intercepts,
                          self.fake_shapes,
+                         None,
                          None]
         function_gradient = func(*gradient_args)
 
@@ -988,6 +992,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          None,
                          None,
+                         None,
                          None]
 
         gradient_args[1] = self.fake_design[:3, :]
@@ -1025,7 +1030,7 @@ class ComputationalTests(GenericTestCase):
 
         # Test the function with the ridge penalty
         expected_result -= 2 * self.ridge
-        gradient_args[-1] = self.ridge
+        gradient_args[-2] = self.ridge
         function_result = func(*gradient_args)
 
         self.assertIsInstance(function_result, np.ndarray)
@@ -1073,6 +1078,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          None,
                          self.fake_shapes,
+                         None,
                          None]
 
         # Get the gradient, for each observation, separately.
@@ -1148,6 +1154,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_v,
                          transform_deriv_intercepts,
                          self.fake_intercepts,
+                         None,
                          None,
                          None]
 
@@ -1229,6 +1236,7 @@ class ComputationalTests(GenericTestCase):
                          transform_deriv_intercepts,
                          self.fake_intercepts,
                          self.fake_shapes,
+                         None,
                          None]
 
         # Get the gradient, for each observation, separately.
@@ -1324,6 +1332,7 @@ class ComputationalTests(GenericTestCase):
                         matrix_indices,
                         None,
                         None,
+                        None,
                         None]
 
         # Calculate the expected result
@@ -1344,7 +1353,7 @@ class ComputationalTests(GenericTestCase):
 
         # Test the function with the ridge penalty
         expected_result -= 2 * self.ridge
-        hessian_args[-1] = self.ridge
+        hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
         self.assertIsInstance(function_result, np.ndarray)
@@ -1417,6 +1426,7 @@ class ComputationalTests(GenericTestCase):
                         matrix_indices,
                         self.fake_intercepts,
                         self.fake_shapes,
+                        None,
                         None]
 
         # Calculate the derivative of the transformation vector with respect
@@ -1470,7 +1480,7 @@ class ComputationalTests(GenericTestCase):
 
         # Test the function with the ridge penalty
         expected_result -= 2 * self.ridge
-        hessian_args[-1] = self.ridge
+        hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
         self.assertIsInstance(function_result, np.ndarray)
@@ -1542,6 +1552,7 @@ class ComputationalTests(GenericTestCase):
                         transform_deriv_intercepts,
                         matrix_indices,
                         self.fake_intercepts,
+                        None,
                         None,
                         None]
 
@@ -1644,6 +1655,7 @@ class ComputationalTests(GenericTestCase):
                         matrix_indices,
                         None,
                         self.fake_shapes,
+                        None,
                         None]
 
         # Calculate the derivative of the transformation vector with respect

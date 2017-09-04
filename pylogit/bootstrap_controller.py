@@ -452,7 +452,6 @@ class Boot(object):
                                           ridge=None,
                                           constrained_pos=None,
                                           weights=None):
-        raise NotImplementedError
         # Check the validity of the kwargs
         ensure_replicates_kwarg_validity(replicates)
         # Create the estimation object
@@ -462,6 +461,9 @@ class Boot(object):
                                   ridge=ridge,
                                   constrained_pos=constrained_pos,
                                   weights=weights)
+        # Prepare the estimation object to calculate the gradients
+        if hasattr(estimation_obj, "set_derivatives"):
+            estimation_obj.set_derivatives()
         # Get the array of parameter replicates
         replicate_array = getattr(self, replicates + "_replicates")
         # Determine the number of replicates
@@ -474,7 +476,7 @@ class Boot(object):
             current_params = replicate_array[row]
             gradient = estimation_obj.convenience_calc_gradient(current_params)
             gradient_norms[row] = np.linalg.norm(gradient)
-        return None
+        return gradient_norms
 
     def calc_percentile_interval(self, conf_percentage):
         # Get the alpha % that corresponds to the given confidence percentage.

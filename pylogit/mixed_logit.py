@@ -210,6 +210,13 @@ class MixedEstimator(EstimationObj):
         not to change from their initial values. If a list is passed, the
         elements are to be integers where no such integer is greater than
         `init_values.size.` Default == None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
     """
     def __init__(self,
                  model_obj,
@@ -217,13 +224,15 @@ class MixedEstimator(EstimationObj):
                  ridge,
                  zero_vector,
                  split_params,
-                 constrained_pos=None):
+                 constrained_pos=None,
+                 weights=None):
         super(MixedEstimator, self).__init__(model_obj,
                                              mapping_dict,
                                              ridge,
                                              zero_vector,
                                              split_params,
-                                             constrained_pos=constrained_pos)
+                                             constrained_pos=constrained_pos,
+                                             weights=weights)
 
         # Add the 3d design matrix to the object
         self.design_3d = model_obj.design_3d
@@ -293,7 +302,7 @@ class MixedEstimator(EstimationObj):
                 self.choice_vector,
                 self.utility_transform]
 
-        kwargs = {"ridge": self.ridge}
+        kwargs = {"ridge": self.ridge, "weights": self.weights}
         log_likelihood = general_log_likelihood(*args, **kwargs)
 
         return log_likelihood
@@ -313,7 +322,7 @@ class MixedEstimator(EstimationObj):
                 self.choice_vector,
                 self.utility_transform]
 
-        return general_gradient(*args, ridge=self.ridge)
+        return general_gradient(*args, ridge=self.ridge, weights=self.weights)
 
     def convenience_calc_hessian(self, params):
         """
@@ -333,7 +342,8 @@ class MixedEstimator(EstimationObj):
                 self.choice_vector,
                 self.utility_transform]
 
-        approx_hess = general_bhhh(*args, ridge=self.ridge)
+        approx_hess =\
+            general_bhhh(*args, ridge=self.ridge, weights=self.weights)
 
         # Account for the constrained position when presenting the results of
         # the approximate hessian.
@@ -597,7 +607,7 @@ class MixedLogit(base_mcm.MNDC_Model):
                                   gradient_tol,
                                   maxiter,
                                   print_res,
-                                  use_hessian=False,
+                                  use_hessian=True,
                                   just_point=just_point)
 
         if not just_point:

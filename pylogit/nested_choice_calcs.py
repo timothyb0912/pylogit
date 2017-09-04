@@ -270,6 +270,7 @@ def calc_nested_log_likelihood(nest_coefs,
                                rows_to_nests,
                                choice_vector,
                                ridge=None,
+                               weights=None,
                                *args,
                                **kwargs):
     """
@@ -309,6 +310,13 @@ def calc_nested_log_likelihood(nest_coefs,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default = None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -325,8 +333,12 @@ def calc_nested_log_likelihood(nest_coefs,
                                    rows_to_nests,
                                    return_type='long_probs')
 
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = 1
+
     # Calculate the log likelihood
-    log_likelihood = choice_vector.dot(np.log(long_probs))
+    log_likelihood = choice_vector.dot(weights * np.log(long_probs))
 
     if ridge is None:
         return log_likelihood
@@ -492,6 +504,7 @@ def calc_nested_gradient(orig_nest_coefs,
                          rows_to_obs,
                          rows_to_nests,
                          ridge=None,
+                         weights=None,
                          use_jacobian=True,
                          *args,
                          **kwargs):
@@ -531,6 +544,13 @@ def calc_nested_gradient(orig_nest_coefs,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default `== None`.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
     use_jacobian : bool, optional.
         Determines whether or not the jacobian will be used when calculating
         the gradient. When performing model estimation, `use_jacobian` should
@@ -543,6 +563,11 @@ def calc_nested_gradient(orig_nest_coefs,
        The gradient of the log-likelihood with respect to the given nest
        coefficients and index coefficients.
     """
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design.shape[0])
+    weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+
     # Transform the nest coefficients into their "always positive" versions
     nest_coefs = naturalize_nest_coefs(orig_nest_coefs)
 
@@ -575,14 +600,16 @@ def calc_nested_gradient(orig_nest_coefs,
     # with respect to the nest parameters
     nest_gradient_term_1 = ((vector_dict["obs_to_chosen_nests"] -
                              vector_dict["nest_choice_probs"]) *
-                            log_exp_sums).sum(axis=0)
+                            log_exp_sums *
+                            weights_per_obs[:, None]).sum(axis=0)
 
     # Calculate the second term of the derivative of the log-liikelihood
     # with respect to the nest parameters
     half_deriv = ((vector_dict["long_probs"] -
                    vector_dict["long_chosen_nest"] *
                    vector_dict["prob_given_nest"]) *
-                  long_w)
+                  long_w *
+                  weights)
     nest_gradient_term_2 = (rows_to_nests.transpose()
                                          .dot(half_deriv)[:, None]).ravel()
 
@@ -591,7 +618,7 @@ def calc_nested_gradient(orig_nest_coefs,
     nest_gradient_term_3a = (choice_vec -
                              vector_dict["long_chosen_nest"] *
                              vector_dict["prob_given_nest"])
-    nest_gradient_term_3b = ((-1 * nest_gradient_term_3a * long_w) /
+    nest_gradient_term_3b = ((-1 * nest_gradient_term_3a * long_w * weights) /
                              vector_dict["long_nest_params"])
     # Guard against overflow
     inf_idx = np.isposinf(nest_gradient_term_3b)
@@ -621,11 +648,12 @@ def calc_nested_gradient(orig_nest_coefs,
     ##########
     # Calculate d_loglikelihood_d_beta
     ##########
-    beta_gradient_term_1 = (vector_dict["scaled_y"] -
-                            vector_dict["p_tilde_given_nest"] +
-                            vector_dict["p_tilde_given_nest"] *
-                            vector_dict["long_nest_params"] -
-                            vector_dict["long_probs"])[None, :]
+    beta_gradient_term_1 = ((vector_dict["scaled_y"] -
+                             vector_dict["p_tilde_given_nest"] +
+                             vector_dict["p_tilde_given_nest"] *
+                             vector_dict["long_nest_params"] -
+                             vector_dict["long_probs"]) *
+                            weights)[None, :]
     #####
     # Calculate the derivative with respect to beta
     #####
@@ -658,6 +686,7 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
                                     rows_to_obs,
                                     rows_to_nests,
                                     ridge=None,
+                                    weights=None,
                                     use_jacobian=True,
                                     *args,
                                     **kwargs):
@@ -711,6 +740,11 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
        The negative of the sum of the outer products of the gradient of the
        log-likelihood function for each observation.
     """
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design.shape[0])
+    weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+
     # Transform the nest coefficients into their "always positive" versions
     nest_coefs = naturalize_nest_coefs(orig_nest_coefs)
 
@@ -817,7 +851,8 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     # Compute and return the outer product of each row of the gradient
     # with itself. Then sum these individual matrices together. The line below
     # does the same computation just with less memory and time.
-    bhhh_matrix = gradient_matrix.T.dot(gradient_matrix)
+    bhhh_matrix =\
+        gradient_matrix.T.dot(weights_per_obs[:, None] * gradient_matrix)
 
     if ridge is not None:
         # The rational behind adding 2 * ridge is that the information
