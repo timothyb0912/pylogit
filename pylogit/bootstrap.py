@@ -174,7 +174,8 @@ class Boot(object):
                                       maxiter=1000,
                                       ridge=None,
                                       constrained_pos=None,
-                                      boot_seed=None):
+                                      boot_seed=None,
+                                      weights=None):
         """
         Parameters
         ----------
@@ -239,6 +240,13 @@ class Boot(object):
             Denotes the random seed to be used when generating the bootstrap
             samples. If None, the sample generation process will generally be
             non-reproducible. Default == None.
+        weights : 1D ndarray or None, optional.
+            Allows for the calculation of weighted log-likelihoods. The weights
+            can represent various things. In stratified samples, the weights
+            may be the proportion of the observations in a given strata for a
+            sample in relation to the proportion of observations in that strata
+            in the population. In latent class models, the weights may be the
+            probability of being a particular class.
         """
         # Check the passed arguments for validity.
 

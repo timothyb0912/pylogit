@@ -5,6 +5,8 @@
             bootstrap confidence (ABC) intervals.
 """
 import sys
+from copy import deepcopy
+
 import numpy as np
 from scipy.stats import norm
 from scipy.sparse import isspmatrix_csr
@@ -42,6 +44,10 @@ def ensure_rows_to_obs_validity(rows_to_obs):
 
 
 def ensure_wide_weights_is_1D_or_2D_ndarray(wide_weights):
+    """
+    Ensures that `wide_weights` is a 1D or 2D ndarray. Raises a helpful
+    ValueError if otherwise.
+    """
     if not isinstance(wide_weights, np.ndarray):
         msg = "wide_weights MUST be a ndarray."
         raise ValueError(msg)
@@ -134,8 +140,7 @@ def calc_finite_diff_terms_for_abc(model_obj,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -176,6 +181,15 @@ def calc_finite_diff_terms_for_abc(model_obj,
     term_minus = np.empty((num_obs, init_vals.shape[0]), dtype=float)
     # Get the rows_to_obs mapping matrix for this model.
     rows_to_obs = model_obj.get_mappings_for_fit()['rows_to_obs']
+    # Extract the initial weights from the fit kwargs
+    if fit_kwargs is not None and 'weights' in fit_kwargs:
+        orig_weights = fit_kwargs['weights']
+        new_fit_kwargs = deepcopy(fit_kwargs)
+        del new_fit_kwargs['weights']
+    else:
+        orig_weights = 1
+        new_fit_kwargs = fit_kwargs
+
     # Populate the second order influence array
     for obs in xrange(num_obs):
         # Note we create the long weights in a for-loop to avoid creating a
@@ -187,20 +201,20 @@ def calc_finite_diff_terms_for_abc(model_obj,
         current_wide_weights_minus = init_wide_weights_minus.copy()
         current_wide_weights_minus[obs] -= epsilon
         # Get the long format weights for this observation
-        long_weights_plus = create_long_form_weights(model_obj,
-                                                     current_wide_weights_plus,
-                                                     rows_to_obs=rows_to_obs)
+        long_weights_plus =\
+            (create_long_form_weights(model_obj, current_wide_weights_plus,
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         long_weights_minus =\
-            create_long_form_weights(model_obj,
+            (create_long_form_weights(model_obj,
                                      current_wide_weights_minus,
-                                     rows_to_obs=rows_to_obs)
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         # Get the needed influence estimates.
         term_plus[obs] = model_obj.fit_mle(init_vals,
                                            weights=long_weights_plus,
-                                           **fit_kwargs)['x']
+                                           **new_fit_kwargs)['x']
         term_minus[obs] = model_obj.fit_mle(init_vals,
                                             weights=long_weights_minus,
-                                            **fit_kwargs)['x']
+                                            **new_fit_kwargs)['x']
     return term_plus, term_minus
 
 
@@ -360,8 +374,7 @@ def calc_influence_arrays_for_abc(model_obj,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -523,9 +536,7 @@ def calc_quadratic_coef_abc(model_object,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
-
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
     Returns
     -------
     quadratic_coef : 1D ndarray.
@@ -560,26 +571,34 @@ def calc_quadratic_coef_abc(model_object,
     expected_term_shape = (init_vals.shape[0], init_vals.shape[0])
     term_1_array = np.empty(expected_term_shape, dtype=float)
     term_3_array = np.empty(expected_term_shape, dtype=float)
+    # Extract the initial weights from the fit kwargs
+    if fit_kwargs is not None and 'weights' in fit_kwargs:
+        orig_weights = fit_kwargs['weights']
+        new_fit_kwargs = deepcopy(fit_kwargs)
+        del new_fit_kwargs['weights']
+    else:
+        orig_weights = 1
+        new_fit_kwargs = fit_kwargs
     # Calculate the various terms of the quadratic_coef
     for param_id in xrange(expected_term_shape[0]):
         # Get a 'long-format' array of the weights per observation
         term_1_long_weights =\
-            create_long_form_weights(model_object,
+            (create_long_form_weights(model_object,
                                      term_1_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs)
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         term_3_long_weights =\
-            create_long_form_weights(model_object,
+            (create_long_form_weights(model_object,
                                      term_3_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs)
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         # Populate the given row of the term_1 and term_3 arrays.
         term_1_array[param_id] =\
             model_object.fit_mle(init_vals,
                                  weights=term_1_long_weights,
-                                 **fit_kwargs)['x']
+                                 **new_fit_kwargs)['x']
         term_3_array[param_id] =\
             model_object.fit_mle(init_vals,
                                  weights=term_3_long_weights,
-                                 **fit_kwargs)['x']
+                                 **new_fit_kwargs)['x']
     # Extract the desired terms from their 2d arrays
     term_1 = np.diag(term_1_array)
     term_3 = np.diag(term_3_array)
@@ -633,8 +652,7 @@ def efron_quadratic_coef_abc(model_object,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -674,26 +692,34 @@ def efron_quadratic_coef_abc(model_object,
     expected_term_shape = (init_vals.shape[0], init_vals.shape[0])
     term_1_array = np.empty(expected_term_shape, dtype=float)
     term_3_array = np.empty(expected_term_shape, dtype=float)
+    # Extract the initial weights from the fit kwargs
+    if fit_kwargs is not None and 'weights' in fit_kwargs:
+        orig_weights = fit_kwargs['weights']
+        new_fit_kwargs = deepcopy(fit_kwargs)
+        del new_fit_kwargs['weights']
+    else:
+        orig_weights = 1
+        new_fit_kwargs = fit_kwargs
     # Calculate the various terms of the quadratic_coef
     for param_id in xrange(expected_term_shape[0]):
         # Get a 'long-format' array of the weights per observation
         term_1_long_weights =\
-            create_long_form_weights(model_object,
+            (create_long_form_weights(model_object,
                                      term_1_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs)
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         term_3_long_weights =\
-            create_long_form_weights(model_object,
+            (create_long_form_weights(model_object,
                                      term_3_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs)
+                                     rows_to_obs=rows_to_obs) * orig_weights)
         # Populate the given row of the term_1 and term_3 arrays.
         term_1_array[param_id] =\
             model_object.fit_mle(init_vals,
                                  weights=term_1_long_weights,
-                                 **fit_kwargs)['x']
+                                 **new_fit_kwargs)['x']
         term_3_array[param_id] =\
             model_object.fit_mle(init_vals,
                                  weights=term_3_long_weights,
-                                 **fit_kwargs)['x']
+                                 **new_fit_kwargs)['x']
     # Extract the desired terms from their 2d arrays
     term_1 = np.diag(term_1_array)
     term_3 = np.diag(term_3_array)
@@ -812,8 +838,7 @@ def calc_endpoint_from_percentile_abc(model_obj,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -840,9 +865,18 @@ def calc_endpoint_from_percentile_abc(model_obj,
     # Get the necessary weight adjustment term for calculating the endpoint.
     weight_adjustment_wide = (multiplier[None, :] * empirical_influence)
     wide_weights_all_params = init_weights_wide + weight_adjustment_wide
+    # Extract the initial weights from the fit kwargs
+    if fit_kwargs is not None and 'weights' in fit_kwargs:
+        orig_weights = fit_kwargs['weights']
+        new_fit_kwargs = deepcopy(fit_kwargs)
+        del new_fit_kwargs['weights']
+    else:
+        orig_weights = np.ones(model_obj.data.shape[0], dtype=float)
+        new_fit_kwargs = fit_kwargs
     # Get a long format version of the weights needed to compute the endpoints
     long_weights_all_params =\
-        create_long_form_weights(model_obj, wide_weights_all_params)
+        (create_long_form_weights(model_obj, wide_weights_all_params) *
+         orig_weights[:, None])
     # Initialize the array to store the desired enpoints
     num_params = init_vals.shape[0]
     endpoint = np.empty(num_params, dtype=float)
@@ -851,7 +885,7 @@ def calc_endpoint_from_percentile_abc(model_obj,
         current_weights = long_weights_all_params[:, param_id]
         current_estimate = model_obj.fit_mle(init_vals,
                                              weights=current_weights,
-                                             **fit_kwargs)['x']
+                                             **new_fit_kwargs)['x']
         endpoint[param_id] = current_estimate[param_id]
     return endpoint
 
@@ -896,8 +930,7 @@ def efron_endpoint_from_percentile_abc(model_obj,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -932,9 +965,18 @@ def efron_endpoint_from_percentile_abc(model_obj,
     # Get the necessary weight adjustment term for calculating the endpoint.
     weight_adjustment_wide = (multiplier[None, :] * empirical_influence)
     wide_weights_all_params = init_weights_wide + weight_adjustment_wide
+    # Extract the initial weights from the fit kwargs
+    if fit_kwargs is not None and 'weights' in fit_kwargs:
+        orig_weights = fit_kwargs['weights']
+        new_fit_kwargs = deepcopy(fit_kwargs)
+        del new_fit_kwargs['weights']
+    else:
+        orig_weights = np.ones(model_obj.data.shape[0], dtype=float)
+        new_fit_kwargs = fit_kwargs
     # Get a long format version of the weights needed to compute the endpoints
     long_weights_all_params =\
-        create_long_form_weights(model_obj, wide_weights_all_params)
+        (create_long_form_weights(model_obj, wide_weights_all_params) *
+         orig_weights[:, None])
     # Initialize the array to store the desired enpoints
     num_params = init_vals.shape[0]
     endpoint = np.empty(num_params, dtype=float)
@@ -943,7 +985,7 @@ def efron_endpoint_from_percentile_abc(model_obj,
         current_weights = long_weights_all_params[:, param_id]
         current_estimate = model_obj.fit_mle(init_vals,
                                              weights=current_weights,
-                                             **fit_kwargs)['x']
+                                             **new_fit_kwargs)['x']
         endpoint[param_id] = current_estimate[param_id]
     return endpoint
 
@@ -986,8 +1028,7 @@ def efron_endpoint_from_percentile_abc(model_obj,
 #     fit_kwargs : additional keyword arguments, optional.
 #         Should contain any additional kwargs used to alter the default behavior
 #         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-#         was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-#         NOT contain the key 'weights'.
+#         was obtained. Will be passed directly to `model_obj.fit_mle`.
 #
 #     Returns
 #     -------
@@ -1060,8 +1101,7 @@ def efron_endpoints_for_abc_confidence_interval(conf_percentage,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------
@@ -1136,8 +1176,7 @@ def calc_abc_interval(model_obj,
     fit_kwargs : additional keyword arguments, optional.
         Should contain any additional kwargs used to alter the default behavior
         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-        was obtained. Will be passed directly to `model_obj.fit_mle`. Should
-        NOT contain the key 'weights'.
+        was obtained. Will be passed directly to `model_obj.fit_mle`.
 
     Returns
     -------

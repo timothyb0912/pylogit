@@ -227,6 +227,22 @@ class ComputationalTests(unittest.TestCase):
             self.assertIsInstance(func_array, np.ndarray)
             self.assertTrue(func_array.shape, expected_array.shape)
             npt.assert_allclose(func_array, expected_array)
+
+        # Test with an original set of weights
+        kwargs = {'weights': 2 * ones_array}
+        new_func_result = func(fake_model_obj,
+                               fake_mle,
+                               fake_init_vals,
+                               fake_epsilon,
+                               **kwargs)
+        new_expected_result = (2 * expected_result[0], 2 * expected_result[1])
+        self.assertIsInstance(new_func_result, Iterable)
+        self.assertEqual(len(new_func_result), 2)
+        for pos, func_array in enumerate(new_func_result):
+            expected_array = new_expected_result[pos]
+            self.assertIsInstance(func_array, np.ndarray)
+            self.assertTrue(func_array.shape, expected_array.shape)
+            npt.assert_allclose(func_array, expected_array)
         return None
 
     def test_calc_empirical_influence_abc(self):
@@ -395,6 +411,21 @@ class ComputationalTests(unittest.TestCase):
         self.assertEqual(func_result.shape, expected_result.shape)
         npt.assert_allclose(func_result, expected_result)
         npt.assert_allclose(func_result[0], -500)
+
+        # Perform the tests with an array of weights
+        kwargs = {'weights': 2 * np.ones(num_obs)}
+        func_result_2 = func(fake_model_obj,
+                             mle_est,
+                             mle_est,
+                             fake_empirical_influence,
+                             fake_std_error,
+                             fake_epsilon,
+                             **kwargs)
+        self.assertIsInstance(func_result_2, np.ndarray)
+        self.assertEqual(func_result_2.shape, expected_result.shape)
+        # Make sure we get a different set of results than when using the
+        # original weights of zero.
+        self.assertTrue(not np.isclose(func_result_2[0],func_result[0]))
         return None
 
     def test_efron_quadratic_coef_abc(self):
@@ -454,6 +485,21 @@ class ComputationalTests(unittest.TestCase):
         self.assertEqual(func_result.shape, expected_result.shape)
         npt.assert_allclose(func_result, expected_result)
         npt.assert_allclose(func_result[0], 1125)
+
+        # Perform the tests with an array of weights
+        kwargs = {'weights': 2 * np.ones(num_obs)}
+        func_result_2 = func(fake_model_obj,
+                             mle_est,
+                             mle_est,
+                             fake_empirical_influence,
+                             fake_std_error,
+                             fake_epsilon,
+                             **kwargs)
+        self.assertIsInstance(func_result_2, np.ndarray)
+        self.assertEqual(func_result_2.shape, expected_result.shape)
+        # Make sure we get a different set of results than when using the
+        # original weights of zero.
+        self.assertTrue(not np.isclose(func_result_2[0],func_result[0]))
         return None
 
     def test_calc_total_curvature_abc(self):
@@ -527,6 +573,9 @@ class ComputationalTests(unittest.TestCase):
         # Create a fake model class that will implement the T(P) function
         # through it's fit_mle method.
         class FakeModel(object):
+            def __init__(self):
+                self.data = np.ones((num_obs, num_params))
+                return None
             # Create a get_mappings_for_fit function that will allow for
             # successful mocking in this test
             def get_mappings_for_fit(self):
@@ -560,6 +609,23 @@ class ComputationalTests(unittest.TestCase):
         self.assertIsInstance(func_result, np.ndarray)
         self.assertEqual(func_result.shape, expected_result.shape)
         npt.assert_allclose(func_result, expected_result)
+
+        # Perform the tests with an array of weights
+        kwargs = {'weights': 2 * np.ones(num_obs)}
+        func_result_2 = func(*args, **kwargs)
+        self.assertIsInstance(func_result_2, np.ndarray)
+        self.assertEqual(func_result_2.shape, expected_result.shape)
+        # Make sure we get a different set of results than when using the
+        # original weights of zero.
+        self.assertTrue(not np.isclose(func_result_2[0],func_result[0]))
+
+        # Perform the tests with an array of weights
+        kwargs = {'weights': np.ones(num_obs)}
+        func_result_3 = func(*args, **kwargs)
+        self.assertIsInstance(func_result_3, np.ndarray)
+        self.assertEqual(func_result_3.shape, expected_result.shape)
+        # Make sure we get the expected results when using an array of ones.
+        npt.assert_allclose(func_result_3, expected_result)
         return None
 
     def test_efron_endpoint_from_percentile_abc(self):
@@ -584,6 +650,9 @@ class ComputationalTests(unittest.TestCase):
         # Create a fake model class that will implement the T(P) function
         # through it's fit_mle method.
         class FakeModel(object):
+            def __init__(self):
+                self.data = np.ones((num_obs, num_params))
+                return None
             # Create a get_mappings_for_fit function that will allow for
             # successful mocking in this test
             def get_mappings_for_fit(self):
