@@ -14,7 +14,6 @@ from scipy.sparse import isspmatrix_csr
 from .bootstrap_utils import check_conf_percentage_validity
 from .bootstrap_utils import get_alpha_from_conf_percentage
 from .bootstrap_utils import combine_conf_endpoints
-from .bootstrap_utils import ensure_samples_is_ndim_ndarray
 
 # Create a value to be used as 'a very small number' when performing the finite
 # difference calculations needed to estimate the empirical influence function.
@@ -171,8 +170,6 @@ def calc_finite_diff_terms_for_abc(model_obj,
     num_obs = model_obj.data[model_obj.obs_id_col].unique().size
     # Determine the initial weights per observation.
     init_weights_wide = np.ones(num_obs, dtype=float) / num_obs
-    # Create the 'wide' identity matrix for this dataset
-    wide_identity = np.eye(num_obs)
     # Initialize wide weights for elements of the second order influence array.
     init_wide_weights_plus = (1 - epsilon) * init_weights_wide
     init_wide_weights_minus = (1 + epsilon) * init_weights_wide
@@ -182,13 +179,14 @@ def calc_finite_diff_terms_for_abc(model_obj,
     # Get the rows_to_obs mapping matrix for this model.
     rows_to_obs = model_obj.get_mappings_for_fit()['rows_to_obs']
     # Extract the initial weights from the fit kwargs
+    new_fit_kwargs = deepcopy(fit_kwargs)
     if fit_kwargs is not None and 'weights' in fit_kwargs:
         orig_weights = fit_kwargs['weights']
-        new_fit_kwargs = deepcopy(fit_kwargs)
         del new_fit_kwargs['weights']
     else:
         orig_weights = 1
-        new_fit_kwargs = fit_kwargs
+    # Make sure we're just getting the point estimate
+    new_fit_kwargs['just_point'] = True
 
     # Populate the second order influence array
     for obs in xrange(num_obs):
@@ -203,11 +201,11 @@ def calc_finite_diff_terms_for_abc(model_obj,
         # Get the long format weights for this observation
         long_weights_plus =\
             (create_long_form_weights(model_obj, current_wide_weights_plus,
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         long_weights_minus =\
             (create_long_form_weights(model_obj,
-                                     current_wide_weights_minus,
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      current_wide_weights_minus,
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         # Get the needed influence estimates.
         term_plus[obs] = model_obj.fit_mle(init_vals,
                                            weights=long_weights_plus,
@@ -572,24 +570,25 @@ def calc_quadratic_coef_abc(model_object,
     term_1_array = np.empty(expected_term_shape, dtype=float)
     term_3_array = np.empty(expected_term_shape, dtype=float)
     # Extract the initial weights from the fit kwargs
+    new_fit_kwargs = deepcopy(fit_kwargs)
     if fit_kwargs is not None and 'weights' in fit_kwargs:
         orig_weights = fit_kwargs['weights']
-        new_fit_kwargs = deepcopy(fit_kwargs)
         del new_fit_kwargs['weights']
     else:
         orig_weights = 1
-        new_fit_kwargs = fit_kwargs
+    # Make sure we're just getting the point estimate
+    new_fit_kwargs['just_point'] = True
     # Calculate the various terms of the quadratic_coef
     for param_id in xrange(expected_term_shape[0]):
         # Get a 'long-format' array of the weights per observation
         term_1_long_weights =\
             (create_long_form_weights(model_object,
-                                     term_1_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      term_1_wide_weights[:, param_id],
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         term_3_long_weights =\
             (create_long_form_weights(model_object,
-                                     term_3_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      term_3_wide_weights[:, param_id],
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         # Populate the given row of the term_1 and term_3 arrays.
         term_1_array[param_id] =\
             model_object.fit_mle(init_vals,
@@ -693,24 +692,25 @@ def efron_quadratic_coef_abc(model_object,
     term_1_array = np.empty(expected_term_shape, dtype=float)
     term_3_array = np.empty(expected_term_shape, dtype=float)
     # Extract the initial weights from the fit kwargs
+    new_fit_kwargs = deepcopy(fit_kwargs)
     if fit_kwargs is not None and 'weights' in fit_kwargs:
         orig_weights = fit_kwargs['weights']
-        new_fit_kwargs = deepcopy(fit_kwargs)
         del new_fit_kwargs['weights']
     else:
         orig_weights = 1
-        new_fit_kwargs = fit_kwargs
+    # Make sure we're just getting the point estimate
+    new_fit_kwargs['just_point'] = True
     # Calculate the various terms of the quadratic_coef
     for param_id in xrange(expected_term_shape[0]):
         # Get a 'long-format' array of the weights per observation
         term_1_long_weights =\
             (create_long_form_weights(model_object,
-                                     term_1_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      term_1_wide_weights[:, param_id],
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         term_3_long_weights =\
             (create_long_form_weights(model_object,
-                                     term_3_wide_weights[:, param_id],
-                                     rows_to_obs=rows_to_obs) * orig_weights)
+                                      term_3_wide_weights[:, param_id],
+                                      rows_to_obs=rows_to_obs) * orig_weights)
         # Populate the given row of the term_1 and term_3 arrays.
         term_1_array[param_id] =\
             model_object.fit_mle(init_vals,
@@ -866,13 +866,14 @@ def calc_endpoint_from_percentile_abc(model_obj,
     weight_adjustment_wide = (multiplier[None, :] * empirical_influence)
     wide_weights_all_params = init_weights_wide + weight_adjustment_wide
     # Extract the initial weights from the fit kwargs
+    new_fit_kwargs = deepcopy(fit_kwargs)
     if fit_kwargs is not None and 'weights' in fit_kwargs:
         orig_weights = fit_kwargs['weights']
-        new_fit_kwargs = deepcopy(fit_kwargs)
         del new_fit_kwargs['weights']
     else:
         orig_weights = np.ones(model_obj.data.shape[0], dtype=float)
-        new_fit_kwargs = fit_kwargs
+    # Make sure we're just getting the point estimate
+    new_fit_kwargs['just_point'] = True
     # Get a long format version of the weights needed to compute the endpoints
     long_weights_all_params =\
         (create_long_form_weights(model_obj, wide_weights_all_params) *
@@ -966,13 +967,14 @@ def efron_endpoint_from_percentile_abc(model_obj,
     weight_adjustment_wide = (multiplier[None, :] * empirical_influence)
     wide_weights_all_params = init_weights_wide + weight_adjustment_wide
     # Extract the initial weights from the fit kwargs
+    new_fit_kwargs = deepcopy(fit_kwargs)
     if fit_kwargs is not None and 'weights' in fit_kwargs:
         orig_weights = fit_kwargs['weights']
-        new_fit_kwargs = deepcopy(fit_kwargs)
         del new_fit_kwargs['weights']
     else:
         orig_weights = np.ones(model_obj.data.shape[0], dtype=float)
-        new_fit_kwargs = fit_kwargs
+    # Make sure we're just getting the point estimate
+    new_fit_kwargs['just_point'] = True
     # Get a long format version of the weights needed to compute the endpoints
     long_weights_all_params =\
         (create_long_form_weights(model_obj, wide_weights_all_params) *
@@ -1005,8 +1007,8 @@ def efron_endpoint_from_percentile_abc(model_obj,
 #     Parameters
 #     ----------
 #     conf_percentage : scalar in the interval (0.0, 100.0).
-#         Denotes the confidence-level for the returned endpoints. For instance,
-#         to calculate a 95% confidence interval, pass `95`.
+#         Denotes the confidence-level for the returned endpoints. For
+#         instance, to calculate a 95% confidence interval, pass `95`.
 #     model_obj : an instance or sublcass of the MNDC class.
 #         Should be the model object that corresponds to the model we are
 #         constructing the bootstrap confidence intervals for.
@@ -1022,13 +1024,14 @@ def efron_endpoint_from_percentile_abc(model_obj,
 #         confidence intervals.
 #     empirical_influence : 2D ndarray.
 #         Should have one row for each observation. Should have one column for
-#         each parameter in the parameter vector being estimated. Elements should
-#         denote the empirical influence of the associated observation on the
-#         associated parameter.
+#         each parameter in the parameter vector being estimated. Elements
+#         should denote the empirical influence of the associated observation
+#         on the associated parameter.
 #     fit_kwargs : additional keyword arguments, optional.
-#         Should contain any additional kwargs used to alter the default behavior
-#         of `model_obj.fit_mle` and thereby enforce conformity with how the MLE
-#         was obtained. Will be passed directly to `model_obj.fit_mle`.
+#         Should contain any additional kwargs used to alter the default
+#         behavior of `model_obj.fit_mle` and thereby enforce conformity with
+#         how the MLE was obtained. Will be passed directly to
+#         `model_obj.fit_mle`.
 #
 #     Returns
 #     -------

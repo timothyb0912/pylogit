@@ -686,6 +686,14 @@ class ComputationalTests(unittest.TestCase):
         self.assertIsInstance(func_result, np.ndarray)
         self.assertEqual(func_result.shape, expected_result.shape)
         npt.assert_allclose(func_result, expected_result)
+
+        # Perform the tests with an array of weights
+        kwargs = {'weights': np.ones(num_obs)}
+        func_result_2 = func(*args, **kwargs)
+        self.assertIsInstance(func_result_2, np.ndarray)
+        self.assertEqual(func_result_2.shape, expected_result.shape)
+        # Make sure we get the expected results when using an array of ones.
+        npt.assert_allclose(func_result_2, expected_result)
         return None
 
     def test_calc_endpoints_for_abc_confidence_interval(self):
