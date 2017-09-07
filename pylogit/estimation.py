@@ -179,16 +179,12 @@ class EstimationObj(object):
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
 
-        return None
-
     def convenience_calc_log_likelihood(self, params):
         """
         Calculates the log-likelihood for this model and dataset.
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def convenience_calc_gradient(self, params):
         """
@@ -197,16 +193,12 @@ class EstimationObj(object):
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
 
-        return None
-
     def convenience_calc_hessian(self, params):
         """
         Calculates the hessian of the log-likelihood for this model / dataset.
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def convenience_calc_fisher_approx(self, params):
         """
@@ -215,8 +207,6 @@ class EstimationObj(object):
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def calc_neg_log_likelihood_and_neg_gradient(self, params):
         """

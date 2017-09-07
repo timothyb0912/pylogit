@@ -9,8 +9,6 @@ from __future__ import absolute_import
 
 import numpy as np
 
-from . import choice_calcs as cc
-from . import base_multinomial_cm_v2 as base_mcm
 from .display_names import model_type_to_display_name as display_name_dict
 
 from .mixed_logit import MixedEstimator
@@ -34,15 +32,8 @@ from .scobit import split_param_vec as scobit_split_params
 from .uneven_logit import UnevenEstimator
 from .uneven_logit import split_param_vec as uneven_split_params
 
-try:
-    # in Python 3 range returns an iterator instead of list
-    # to maintain backwards compatibility use "old" version of range
-    from past.builtins import range
-except ImportError:
-    pass
-
 # Map the displayed model types to the internal model names.
-display_name_to_model_type = {v : k for k, v in display_name_dict.items()}
+display_name_to_model_type = {v: k for k, v in display_name_dict.items()}
 
 # Map the internal model types to their appropriate estimator and split params
 # functions
