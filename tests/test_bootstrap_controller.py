@@ -1,5 +1,5 @@
 """
-Tests for the bootstrap_controller.py file.
+Tests for the bootstrap.py (formerly bootstrap_controller.py) file.
 """
 import unittest
 from collections import OrderedDict
@@ -301,8 +301,9 @@ class BootstrapTests(unittest.TestCase):
         expected_attrs =\
             ["bootstrap_replicates", "jackknife_replicates",
              "percentile_interval", "bca_interval",
-             "abc_interval", "conf_intervals",
-             "conf_alpha", "summary"]
+             "abc_interval", "all_intervals",
+             "jackknife_log_likehoods",
+             "bootstrap_log_likelihoods"]
         for current_attr in expected_attrs:
             self.assertTrue(hasattr(boot_obj, current_attr))
             self.assertIsNone(getattr(boot_obj, current_attr))
@@ -1174,9 +1175,9 @@ class AnalysisTests(unittest.TestCase):
 
             # Create the bootstrap and jackknife replicate attributes.
             replicates =\
-                np.concatenate([model_obj.params.values[None, :],
-                                model_obj.params.values[None, :]],
-                               axis=0)
+                pd.DataFrame(np.concatenate([model_obj.params.values[None, :],
+                                             model_obj.params.values[None, :]],
+                                            axis=0))
             boot.bootstrap_replicates = replicates
             boot.jackknife_replicates = replicates
 
@@ -1201,10 +1202,10 @@ class AnalysisTests(unittest.TestCase):
         boot = bc.Boot(self.mnl_model, base_array)
 
         # Create the bootstrap and jackknife replicate attributes.
-        replicates = np.concatenate((base_array_2d,
-                                     base_array_2d + 1,
-                                     base_array_2d - 1),
-                                    axis=0)
+        replicates = pd.DataFrame(np.concatenate((base_array_2d,
+                                                  base_array_2d + 1,
+                                                  base_array_2d - 1),
+                                                 axis=0))
         boot.bootstrap_replicates = replicates
         boot.jackknife_replicates = replicates
 

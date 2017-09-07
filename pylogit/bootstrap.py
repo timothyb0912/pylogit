@@ -4,11 +4,15 @@
 @summary:   This module provides functions that will control the bootstrapping
             procedure.
 """
-from copy import deepcopy
+import sys
+import time
 import itertools
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+# Import the following module for progressbar displays
+from tqdm import tqdm
 
 from .display_names import model_type_to_display_name
 from . import bootstrap_sampler as bs
@@ -154,8 +158,9 @@ class Boot(object):
         desired_attributes =\
             ["bootstrap_replicates", "jackknife_replicates",
              "percentile_interval", "bca_interval",
-             "abc_interval", "conf_intervals",
-             "conf_alpha", "summary"]
+             "abc_interval", "all_intervals",
+             "jackknife_log_likehoods",
+             "bootstrap_log_likelihoods"]
         for attr_name in desired_attributes:
             setattr(self, attr_name, None)
 
@@ -248,6 +253,9 @@ class Boot(object):
             in the population. In latent class models, the weights may be the
             probability of being a particular class.
         """
+        print("Generating Bootstrap Replicates")
+        print(time.strftime("%a %m-%d-%Y %I:%M%p"))
+        sys.stdout.flush()
         # Check the passed arguments for validity.
 
         # Create an array of the observation ids
@@ -292,8 +300,13 @@ class Boot(object):
         mnl_spec = None if mnl_obj is None else mnl_obj.specification
         mnl_names = None if mnl_obj is None else mnl_obj.name_spec
 
+        # Create an iterable for iteration
+        iterable_for_iteration = tqdm(xrange(num_samples),
+                                      desc="Creating Bootstrap Replicates",
+                                      total=num_samples)
+
         # Iterate through the bootstrap samples and perform the MLE
-        for row in xrange(num_samples):
+        for row in iterable_for_iteration:
             # Get the bootstrapped dataframe
             bootstrap_df =\
                 bs.create_bootstrap_dataframe(self.model_obj.data,
@@ -322,6 +335,9 @@ class Boot(object):
         self.bootstrap_replicates =\
             pd.DataFrame(point_estimates, columns=self.mle_params.index)
 
+        # Print a 'finished' message for users
+        print("Finished Generating Bootstrap Replicates")
+        print(time.strftime("%a %m-%d-%Y %I:%M%p"))
         return None
 
     def generate_jackknife_replicates(self,
@@ -336,6 +352,9 @@ class Boot(object):
                                       maxiter=1000,
                                       ridge=None,
                                       constrained_pos=None):
+        print("Generating Jackknife Replicates")
+        print(time.strftime("%a %m-%d-%Y %I:%M%p"))
+        sys.stdout.flush()
         # Take note of the observation id column that is to be used
         obs_id_col = self.model_obj.obs_id_col
 
@@ -368,8 +387,13 @@ class Boot(object):
         # Initialize the array of jackknife replicates
         point_replicates = np.empty((num_obs, num_params), dtype=float)
 
+        # Create an iterable for iteration
+        iterable_for_iteration = tqdm(enumerate(unique_obs_ids),
+                                      desc="Creating Jackknife Replicates",
+                                      total=unique_obs_ids.size)
+
         # Populate the array of jackknife replicates
-        for pos, obs_id in enumerate(unique_obs_ids):
+        for pos, obs_id in iterable_for_iteration:
             # Create the dataframe without the current observation
             new_df = self.model_obj.data.loc[orig_obs_id_array != obs_id]
             # Get the point estimate for this new dataset
@@ -390,6 +414,9 @@ class Boot(object):
         # Store the jackknife replicates as a pandas dataframe
         self.jackknife_replicates =\
             pd.DataFrame(point_replicates, columns=self.mle_params.index)
+        # Print a 'finished' message for users
+        print("Finished Generating Bootstrap Replicates")
+        print(time.strftime("%a %m-%d-%Y %I:%M%p"))
         return None
 
     def calc_log_likes_for_replicates(self,
@@ -400,7 +427,7 @@ class Boot(object):
         ensure_replicates_kwarg_validity(replicates)
 
         # Get the desired type of replicates
-        replicate_vec = getattr(self, replicates + "_replicates")
+        replicate_vec = getattr(self, replicates + "_replicates").values
 
         # Determine the choice column
         choice_col = self.model_obj.choice_col
@@ -425,9 +452,14 @@ class Boot(object):
             # Initialize a list of chosen probs
             chosen_probs_list = []
 
+            # Create an iterable for iteration
+            iterable_for_iteration = tqdm(xrange(replicate_vec.shape[0]),
+                                          desc="Calculating Gradient Norms",
+                                          total=replicate_vec.shape[0])
+
             # Populate the list of chosen probabilities for each vector of
             # parameter values
-            for idx in xrange(replicate_vec.shape[0]):
+            for idx in iterable_for_iteration:
                 # Get the param list for this set of replicates
                 param_list =\
                     get_param_list_for_prediction(self.model_obj,
@@ -453,6 +485,11 @@ class Boot(object):
 
         # Calculate the log_likelihood
         log_likelihoods = np.log(chosen_probs).sum(axis=0)
+
+        # Store the log-likelihood values
+        attribute_name = replicates + "_log_likelihoods"
+        log_like_series = pd.Series(log_likelihoods, name=attribute_name)
+        setattr(self, attribute_name, log_like_series)
         return log_likelihoods
 
     def calc_gradient_norm_for_replicates(self,
@@ -473,14 +510,20 @@ class Boot(object):
         if hasattr(estimation_obj, "set_derivatives"):
             estimation_obj.set_derivatives()
         # Get the array of parameter replicates
-        replicate_array = getattr(self, replicates + "_replicates")
+        replicate_array = getattr(self, replicates + "_replicates").values
         # Determine the number of replicates
         num_reps = replicate_array.shape[0]
         # Initialize an empty array to store the gradient norms
         gradient_norms = np.empty((num_reps,), dtype=float)
+
+        # Create an iterable for iteration
+        iterable_for_iteration = tqdm(xrange(num_reps),
+                                      desc="Calculating Gradient Norms",
+                                      total=num_reps)
+
         # Iterate through the rows of the replicates and calculate and store
         # the gradient norm for each replicated parameter vector.
-        for row in xrange(num_reps):
+        for row in iterable_for_iteration:
             current_params = replicate_array[row]
             gradient = estimation_obj.convenience_calc_gradient(current_params)
             gradient_norms[row] = np.linalg.norm(gradient)
@@ -527,8 +570,11 @@ class Boot(object):
     def calc_abc_interval(self,
                           conf_percentage,
                           init_vals,
-                          epsilon=abc.EPSILON,
+                          epsilon=0.001,
                           **fit_kwargs):
+        print("Calculating Approximate Bootstrap Confidence (ABC) Intervals")
+        print(time.strftime("%a %m-%d-%Y %I:%M%p"))
+        sys.stdout.flush()
         # Get the alpha % that corresponds to the given confidence percentage.
         alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
         # Create the column names for the dataframe of confidence intervals
@@ -566,10 +612,15 @@ class Boot(object):
                                    **fit_kwargs)
         elif interval_type == 'all':
             print("Calculating Percentile Confidence Intervals")
+            sys.stdout.flush()
             self.calc_percentile_interval(conf_percentage)
+
             print("Calculating BCa Confidence Intervals")
+            sys.stdout.flush()
             self.calc_bca_interval(conf_percentage)
-            print("Calculating ABC Confidence Intervals")
+
+            # Note we don't print a user message here since that is done in
+            # self.calc_abc_interval().
             self.calc_abc_interval(conf_percentage,
                                    init_vals,
                                    epsilon=epsilon,
