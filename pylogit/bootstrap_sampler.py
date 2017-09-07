@@ -349,9 +349,9 @@ def create_bootstrap_dataframe(orig_df,
     # Populate component_dfs
     for boot_id, obs_id in enumerate(resampled_obs_ids_1d):
         # Extract the dataframe that we desire.
-        extracted_df = groupby_dict[obs_id]
+        extracted_df = groupby_dict[obs_id].copy()
         # Add the bootstrap id value.
-        extracted_df[boot_id_col] = boot_id
+        extracted_df[boot_id_col] = boot_id + 1
         # Store the component dataframe
         component_dfs.append(extracted_df)
 

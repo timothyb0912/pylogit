@@ -276,9 +276,9 @@ class SamplerTests(unittest.TestCase):
 
         # Create the expected result.
         expected_result =\
-            [groupby_dictionary[obs_id] for obs_id in rel_sampled_ids]
+            [groupby_dictionary[obs_id].copy() for obs_id in rel_sampled_ids]
         for pos in xrange(len(expected_result)):
-            expected_result[pos][boot_id_col] = pos
+            expected_result[pos][boot_id_col] = pos + 1
         expected_result = pd.concat(expected_result, axis=0, ignore_index=True)
 
         # Get the function result
