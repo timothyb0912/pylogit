@@ -415,7 +415,7 @@ class Boot(object):
         self.jackknife_replicates =\
             pd.DataFrame(point_replicates, columns=self.mle_params.index)
         # Print a 'finished' message for users
-        print("Finished Generating Bootstrap Replicates")
+        print("Finished Generating Jackknife Replicates")
         print(time.strftime("%a %m-%d-%Y %I:%M%p"))
         return None
 
