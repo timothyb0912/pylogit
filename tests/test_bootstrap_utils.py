@@ -11,7 +11,7 @@ import pylogit.bootstrap_utils as bu
 class UtilityTester(unittest.TestCase):
     def test_check_conf_percentage_validity(self):
         # Create a list of valid and invalid arguments
-        good_args = [80, 95.0, 30L]
+        good_args = [80, 95.0, 30]
         bad_args = [-2, '95', None, (90,)]
         # Note the message that should be displayed in case of errors.
         expected_err_msg =\
