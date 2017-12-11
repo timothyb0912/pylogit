@@ -55,7 +55,7 @@ class UtilityTester(unittest.TestCase):
 
     def test_get_alpha_from_conf_percentage(self):
         # Create a list of valid confidence percentages
-        good_args = [80, 95.0, 30L]
+        good_args = [80, 95.0, 30]
         # Create a list of expected results
         expected_results = [20, 5, 70]
         # Alias the function being tested
