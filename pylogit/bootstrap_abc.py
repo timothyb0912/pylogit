@@ -15,6 +15,12 @@ from .bootstrap_utils import check_conf_percentage_validity
 from .bootstrap_utils import get_alpha_from_conf_percentage
 from .bootstrap_utils import combine_conf_endpoints
 
+try:
+    # Python 3.x does not natively support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
+
 # Create a value to be used as 'a very small number' when performing the finite
 # difference calculations needed to estimate the empirical influence function.
 EPSILON = sys.float_info.epsilon
