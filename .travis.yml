@@ -13,6 +13,7 @@ before_install:
  - "pip install coveralls"
  - "pip install pytest-cov"
  - "pip install future"
+ - "pip install tqdm"
 
 # command to execute test suite
 script: py.test --cov-report= --cov=pylogit/ tests/
