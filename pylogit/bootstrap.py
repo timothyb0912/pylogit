@@ -12,7 +12,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 # Import the following module for progressbar displays
-from tqdm import tqdm
+from tqdm import tqdm, tqdm_notebook
 
 from .display_names import model_type_to_display_name
 from . import bootstrap_sampler as bs
@@ -28,6 +28,19 @@ try:
 except ImportError:
     pass
 
+
+def is_kernel():
+    """
+    Determines whether or not one's code is executed inside of an ipython
+    notebook environment.
+    """
+    if any([x in sys.modules for x in ['ipykernel', 'IPython']]):
+        return True
+    else:
+        return False
+
+# Create a progressbar iterable based on wehther we are in ipython or not.
+PROGRESS = tqdm_notebook if is_kernel() else tqdm
 
 def get_param_names(model_obj):
     """
@@ -182,20 +195,16 @@ class Boot(object):
                                       boot_seed=None,
                                       weights=None):
         """
+        Generates the bootstrap replicates for one's given model and dataset.
+
         Parameters
         ----------
         num_samples : positive int.
             Specifies the number of bootstrap samples that are to be drawn.
-        mnl_spec : OrderedDict or None, optional.
-            If the model that is being estimated is not an MNL, then `mnl_spec`
-            should be passed. This should be the specification used to estimate
-            the MNL model that our desired model is based on.
-            Default == None.
-        mnl_names : OrderedDict or None, optional.
-            If the model that is being estimated is not an MNL, then `mnl_spec`
-            should be passed. This should be the name dictionary used to
-            estimate the MNL model that our desired model is based on.
-            Default == None.
+        mnl_obj : an instance of pylogit.MNL or None, optional.
+            Should be the MNL model object that is used to provide starting
+            values for the final model being estimated. If None, then one's
+            final model should be an MNL model. Default == None.
         mnl_init_vals : 1D ndarray or None, optional.
             If the model that is being estimated is not an MNL, then
             `mnl_init_val` should be passed. Should contain the values used to
@@ -252,6 +261,11 @@ class Boot(object):
             sample in relation to the proportion of observations in that strata
             in the population. In latent class models, the weights may be the
             probability of being a particular class.
+
+        Returns
+        -------
+        None. Will store the bootstrap replicates on the
+        `self.bootstrap_replicates` attribute.
         """
         print("Generating Bootstrap Replicates")
         print(time.strftime("%a %m-%d-%Y %I:%M%p"))
@@ -301,9 +315,9 @@ class Boot(object):
         mnl_names = None if mnl_obj is None else mnl_obj.name_spec
 
         # Create an iterable for iteration
-        iterable_for_iteration = tqdm(xrange(num_samples),
-                                      desc="Creating Bootstrap Replicates",
-                                      total=num_samples)
+        iterable_for_iteration = PROGRESS(xrange(num_samples),
+                                          desc="Creating Bootstrap Replicates",
+                                          total=num_samples)
 
         # Iterate through the bootstrap samples and perform the MLE
         for row in iterable_for_iteration:
@@ -352,6 +366,66 @@ class Boot(object):
                                       maxiter=1000,
                                       ridge=None,
                                       constrained_pos=None):
+        """
+        Generates the jackknife replicates for one's given model and dataset.
+
+        Parameters
+        ----------
+        mnl_obj : an instance of pylogit.MNL or None, optional.
+            Should be the MNL model object that is used to provide starting
+            values for the final model being estimated. If None, then one's
+            final model should be an MNL model. Default == None.
+        mnl_init_vals : 1D ndarray or None, optional.
+            If the model that is being estimated is not an MNL, then
+            `mnl_init_val` should be passed. Should contain the values used to
+            begin the estimation process for the MNL model that is used to
+            provide starting values for our desired model. Default == None.
+        mnl_fit_kwargs : dict or None.
+            If the model that is being estimated is not an MNL, then
+            `mnl_fit_kwargs` should be passed.
+        extract_init_vals : callable or None, optional.
+            Should accept 3 arguments, in the following order. First, it should
+            accept `orig_model_obj`. Second, it should accept a pandas Series
+            of estimated parameters from the MNL model. The Series' index will
+            be the names of the coefficients from `mnl_names`. Thirdly, it
+            should accept an int denoting the number of parameters in the final
+            choice model. The callable should return a 1D ndarray of starting
+            values for the final choice model. Default == None.
+        print_res : bool, optional.
+            Determines whether the timing and initial and final log likelihood
+            results will be printed as they they are determined.
+            Default `== True`.
+        method : str, optional.
+            Should be a valid string for scipy.optimize.minimize. Determines
+            the optimization algorithm that is used for this problem.
+            Default `== 'bfgs'`.
+        loss_tol : float, optional.
+            Determines the tolerance on the difference in objective function
+            values from one iteration to the next that is needed to determine
+            convergence. Default `== 1e-06`.
+        gradient_tol : float, optional.
+            Determines the tolerance on the difference in gradient values from
+            one iteration to the next which is needed to determine convergence.
+            Default `== 1e-06`.
+        maxiter : int, optional.
+            Determines the maximum number of iterations used by the optimizer.
+            Default `== 1000`.
+        ridge : int, float, long, or None, optional.
+            Determines whether or not ridge regression is performed. If a
+            scalar is passed, then that scalar determines the ridge penalty for
+            the optimization. The scalar should be greater than or equal to
+            zero. Default `== None`.
+        constrained_pos : list or None, optional.
+            Denotes the positions of the array of estimated parameters that are
+            not to change from their initial values. If a list is passed, the
+            elements are to be integers where no such integer is greater than
+            `init_vals.size.` Default == None.
+
+        Returns
+        -------
+        None. Will store the bootstrap replicates on the
+        `self.bootstrap_replicates` attribute.
+        """
         print("Generating Jackknife Replicates")
         print(time.strftime("%a %m-%d-%Y %I:%M%p"))
         sys.stdout.flush()
@@ -388,9 +462,9 @@ class Boot(object):
         point_replicates = np.empty((num_obs, num_params), dtype=float)
 
         # Create an iterable for iteration
-        iterable_for_iteration = tqdm(enumerate(unique_obs_ids),
-                                      desc="Creating Jackknife Replicates",
-                                      total=unique_obs_ids.size)
+        iterable_for_iteration = PROGRESS(enumerate(unique_obs_ids),
+                                          desc="Creating Jackknife Replicates",
+                                          total=unique_obs_ids.size)
 
         # Populate the array of jackknife replicates
         for pos, obs_id in iterable_for_iteration:
@@ -423,6 +497,29 @@ class Boot(object):
                                       replicates='bootstrap',
                                       num_draws=None,
                                       seed=None):
+        """
+        Calculate the log-likelihood value of one's replicates, given one's
+        dataset.
+
+        Parameters
+        ----------
+        replicates : str in {'bootstrap', 'jackknife'}.
+            Denotes which set of replicates should have their log-likelihoods
+            calculated.
+        num_draws : int greater than zero or None, optional.
+            Denotes the number of random draws for mixed logit estimation. If
+            None, then no random draws will be made. Default == None.
+        seed : int greater than zero or None, optional.
+            Denotes the random seed to be used for mixed logit estimation.
+            If None, then no random seed will be set. Default == None.
+
+        Returns
+        -------
+        log_likelihoods : 1D ndarray.
+            Each element stores the log-likelihood of the associated parameter
+            values on the model object's dataset. The log-likelihoods are also
+            stored on the `replicates + '_log_likelihoods'` attribute.
+        """
         # Check the validity of the kwargs
         ensure_replicates_kwarg_validity(replicates)
 
@@ -453,9 +550,9 @@ class Boot(object):
             chosen_probs_list = []
 
             # Create an iterable for iteration
-            iterable_for_iteration = tqdm(xrange(replicate_vec.shape[0]),
-                                          desc="Calculating Gradient Norms",
-                                          total=replicate_vec.shape[0])
+            iterable_for_iteration = PROGRESS(xrange(replicate_vec.shape[0]),
+                                              desc="Calculate Gradient Norms",
+                                              total=replicate_vec.shape[0])
 
             # Populate the list of chosen probabilities for each vector of
             # parameter values
@@ -497,6 +594,39 @@ class Boot(object):
                                           ridge=None,
                                           constrained_pos=None,
                                           weights=None):
+        """
+        Calculate the Euclidean-norm of the gradient of one's replicates, given
+        one's dataset.
+
+        Parameters
+        ----------
+        replicates : str in {'bootstrap', 'jackknife'}.
+            Denotes which set of replicates should have their log-likelihoods
+            calculated.
+        ridge : float or None, optional.
+            Denotes the ridge penalty used when estimating the replicates, and
+            to be used when calculating the gradient. If None, no ridge penalty
+            is used. Default == None.
+        constrained_pos : list or None, optional.
+            Denotes the positions of the array of estimated parameters that are
+            not to change from their initial values. If a list is passed, the
+            elements are to be integers where no such integer is greater than
+            `self.mle_params` Default == None.
+        weights : 1D ndarray or None, optional.
+            Allows for the calculation of weighted log-likelihoods. The weights
+            can represent various things. In stratified samples, the weights
+            may be the proportion of the observations in a given strata for a
+            sample in relation to the proportion of observations in that strata
+            in the population. In latent class models, the weights may be the
+            probability of being a particular class.
+
+        Returns
+        -------
+        log_likelihoods : 1D ndarray.
+            Each element stores the log-likelihood of the associated parameter
+            values on the model object's dataset. The log-likelihoods are also
+            stored on the `replicates + '_log_likelihoods'` attribute.
+        """
         # Check the validity of the kwargs
         ensure_replicates_kwarg_validity(replicates)
         # Create the estimation object
@@ -517,9 +647,9 @@ class Boot(object):
         gradient_norms = np.empty((num_reps,), dtype=float)
 
         # Create an iterable for iteration
-        iterable_for_iteration = tqdm(xrange(num_reps),
-                                      desc="Calculating Gradient Norms",
-                                      total=num_reps)
+        iterable_for_iteration = PROGRESS(xrange(num_reps),
+                                          desc="Calculating Gradient Norms",
+                                          total=num_reps)
 
         # Iterate through the rows of the replicates and calculate and store
         # the gradient norm for each replicated parameter vector.
@@ -530,6 +660,23 @@ class Boot(object):
         return gradient_norms
 
     def calc_percentile_interval(self, conf_percentage):
+        """
+        Calculates percentile bootstrap confidence intervals for one's model.
+
+        Parameters
+        ----------
+        conf_percentage : scalar in the interval (0.0, 100.0).
+            Denotes the confidence-level for the returned endpoints. For
+            instance, to calculate a 95% confidence interval, pass `95`.
+
+        Returns
+        -------
+        None. Will store the percentile intervals as `self.percentile_interval`
+
+        Notes
+        -----
+        Must have all ready called `self.generate_bootstrap_replicates`.
+        """
         # Get the alpha % that corresponds to the given confidence percentage.
         alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
         # Create the column names for the dataframe of confidence intervals
@@ -548,6 +695,25 @@ class Boot(object):
         return None
 
     def calc_bca_interval(self, conf_percentage):
+        """
+        Calculates Bias-Corrected and Accelerated (BCa) Bootstrap Confidence
+        Intervals for one's model.
+
+        Parameters
+        ----------
+        conf_percentage : scalar in the interval (0.0, 100.0).
+            Denotes the confidence-level for the returned endpoints. For
+            instance, to calculate a 95% confidence interval, pass `95`.
+
+        Returns
+        -------
+        None. Will store the BCa intervals as `self.abc_interval`.
+
+        Notes
+        -----
+        Must have all ready called `self.generate_bootstrap_replicates` and
+        `self.generate_jackknife_replicates`.
+        """
         # Get the alpha % that corresponds to the given confidence percentage.
         alpha = bc.get_alpha_from_conf_percentage(conf_percentage)
         # Create the column names for the dataframe of confidence intervals
@@ -572,6 +738,31 @@ class Boot(object):
                           init_vals,
                           epsilon=0.001,
                           **fit_kwargs):
+        """
+        Calculates Approximate Bootstrap Confidence Intervals for one's model.
+
+        Parameters
+        ----------
+        conf_percentage : scalar in the interval (0.0, 100.0).
+            Denotes the confidence-level for the returned endpoints. For
+            instance, to calculate a 95% confidence interval, pass `95`.
+        init_vals : 1D ndarray.
+            The initial values used to estimate the one's choice model.
+        epsilon : positive float, optional.
+            Should denote the 'very small' value being used to calculate the
+            desired finite difference approximations to the various influence
+            functions. Should be close to zero.
+            Default == sys.float_info.epsilon.
+        fit_kwargs : additional keyword arguments, optional.
+            Should contain any additional kwargs used to alter the default
+            behavior of `model_obj.fit_mle` and thereby enforce conformity with
+            how the MLE was obtained. Will be passed directly to
+            `model_obj.fit_mle`.
+
+        Returns
+        -------
+        None. Will store the ABC intervals as `self.abc_interval`.
+        """
         print("Calculating Approximate Bootstrap Confidence (ABC) Intervals")
         print(time.strftime("%a %m-%d-%Y %I:%M%p"))
         sys.stdout.flush()
@@ -601,6 +792,40 @@ class Boot(object):
                             init_vals=None,
                             epsilon=abc.EPSILON,
                             **fit_kwargs):
+        """
+        Calculates percentile, bias-corrected and accelerated, and approximate
+        bootstrap confidence intervals.
+
+        Parameters
+        ----------
+        conf_percentage : scalar in the interval (0.0, 100.0).
+            Denotes the confidence-level for the returned endpoints. For
+            instance, to calculate a 95% confidence interval, pass `95`.
+        interval_type : str in {'all', 'pi', 'bca', 'abc'}, optional.
+            Denotes the type of confidence intervals that should be calculated.
+            'all' results in all types of confidence intervals being
+            calculated. 'pi' means 'percentile intervals', 'bca' means
+            'bias-corrected and accelerated', and 'abc' means 'approximate
+            bootstrap confidence' intervals. Default == 'all'.
+        init_vals : 1D ndarray.
+            The initial values used to estimate the one's choice model.
+        epsilon : positive float, optional.
+            Should denote the 'very small' value being used to calculate the
+            desired finite difference approximations to the various influence
+            functions for the 'abc' intervals. Should be close to zero.
+            Default == sys.float_info.epsilon.
+        fit_kwargs : additional keyword arguments, optional.
+            Should contain any additional kwargs used to alter the default
+            behavior of `model_obj.fit_mle` and thereby enforce conformity with
+            how the MLE was obtained. Will be passed directly to
+            `model_obj.fit_mle` when calculating the 'abc' intervals.
+
+        Returns
+        -------
+        None. Will store the confidence intervals on their respective model
+        objects: `self.percentile_interval`, `self.bca_interval`,
+        `self.abc_interval`, or all of these objects.
+        """
         if interval_type == 'pi':
             self.calc_percentile_interval(conf_percentage)
         elif interval_type == 'bca':

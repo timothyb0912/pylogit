@@ -9,6 +9,10 @@ import numpy as np
 
 
 def check_conf_percentage_validity(conf_percentage):
+    """
+    Ensures that `conf_percentage` is in (0, 100). Raises a helpful ValueError
+    if otherwise.
+    """
     condition_1 = isinstance(conf_percentage, Number)
     condition_2 = 0 < conf_percentage < 100
     if not (condition_1 and condition_2):
@@ -18,6 +22,10 @@ def check_conf_percentage_validity(conf_percentage):
 
 
 def ensure_samples_is_ndim_ndarray(samples, name='bootstrap', ndim=2):
+    """
+    Ensures that `samples` is an `ndim` numpy array. Raises a helpful
+    ValueError if otherwise.
+    """
     assert isinstance(ndim, int)
     assert isinstance(name, str)
     if not isinstance(samples, np.ndarray) or not (samples.ndim == ndim):
@@ -28,8 +36,15 @@ def ensure_samples_is_ndim_ndarray(samples, name='bootstrap', ndim=2):
 
 
 def get_alpha_from_conf_percentage(conf_percentage):
+    """
+    Calculates `100 - conf_percentage`, which is useful for calculating alpha
+    levels.
+    """
     return 100.0 - conf_percentage
 
 
 def combine_conf_endpoints(lower_array, upper_array):
+    """
+    Concatenates upper and lower endpoint arrays for a given confidence level.
+    """
     return np.concatenate([lower_array[None, :], upper_array[None, :]], axis=0)
