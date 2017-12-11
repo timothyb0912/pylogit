@@ -26,7 +26,7 @@ Main Features
 
    - completely alternative-specific (i.e. one coefficient per alternative, subject to identification of the coefficients),
    - subset-specific (i.e. one coefficient per subset of alternatives, where each alternative belongs to only one subset, and there are more than 1 but less than J subsets, where J is the maximum number of available alternatives in the dataset),
-   - completely generic (i.e. one coefficient across all alternatives). 
+   - completely generic (i.e. one coefficient across all alternatives).
 
 Where to get it
 ===============
@@ -53,6 +53,21 @@ Modified BSD (3-clause)
 
 Changelog
 =========
+
+0.2.0 (December 10, 2017)
+-------------------------
+- Added support for Python 3.4 - 3.6
+
+- Added AIC and BIC to summary tables of all models.
+
+- Added support for bootstrapping and calculation of bootstrap confidence intervals:
+  - percentile intervals
+  - bias-corrected and accelerated (BCa) bootstrap confidence intervals
+  - approximate bootstrap confidence (ABC) intervals.
+
+- Changed sparse matrix creation to enable estimation of larger datasets.
+
+- Refactored internal code organization and classes for estimation.
 
 0.1.2 (December 4th, 2016)
 --------------------------
