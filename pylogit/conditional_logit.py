@@ -161,6 +161,18 @@ class MNLEstimator(LogitTypeEstimator):
         coefficients. For each of these arrays, if this model does not contain
         the particular type of parameter, the callable should place a `None` in
         its place in the tuple.
+    constrained_pos : list or None, optional.
+        Denotes the positions of the array of estimated parameters that are
+        not to change from their initial values. If a list is passed, the
+        elements are to be integers where no such integer is greater than
+        `num_params` Default == None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
     """
     def set_derivatives(self):
         # Pre-calculate the derivative of the transformation vector with
@@ -299,6 +311,7 @@ class MNL(base_mcm.MNDC_Model):
                 maxiter=1000,
                 ridge=None,
                 constrained_pos=None,
+                just_point=False,
                 **kwargs):
         """
         Parameters
@@ -330,10 +343,18 @@ class MNL(base_mcm.MNDC_Model):
             not to change from their initial values. If a list is passed, the
             elements are to be integers where no such integer is greater than
             `init_vals.size.` Default == None.
+        just_point : bool, optional.
+            Determines whether (True) or not (False) calculations that are non-
+            critical for obtaining the maximum likelihood point estimate will
+            be performed. If True, this function will return the results
+            dictionary from scipy.optimize. Default == False.
 
         Returns
         -------
-        None. Estimation results are saved to the model instance.
+        None or dict.
+            If `just_point` is False, None is returned and the estimation
+            results are saved to the model instance. If `just_point` is True,
+            then the results dictionary from scipy.optimize() is returned.
         """
         # Check integrity of passed arguments
         kwargs_to_be_ignored = ["init_shapes", "init_intercepts", "init_coefs"]
@@ -376,9 +397,13 @@ class MNL(base_mcm.MNDC_Model):
                                   loss_tol,
                                   gradient_tol,
                                   maxiter,
-                                  print_res)
+                                  print_res,
+                                  just_point=just_point)
 
-        # Store the estimation results
-        self.store_fit_results(estimation_res)
+        if not just_point:
+            # Store the estimation results
+            self.store_fit_results(estimation_res)
 
-        return None
+            return None
+        else:
+            return estimation_res

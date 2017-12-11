@@ -166,7 +166,8 @@ class ChoiceObjectTests(GenericTestCase):
         # The print_res = False arguments are to make sure strings aren't
         # printed to the console unnecessarily.
         kwargs = {"ridge": 0.5,
-                  "print_res": False}
+                  "print_res": False,
+                  "method": "bfgs"}
 
         # Test to make sure that the ridge warning message is printed when
         # using the ridge keyword argument
@@ -348,6 +349,20 @@ class ChoiceObjectTests(GenericTestCase):
                                         np.arange(num_coefs),
                                         print_res=False)
 
+        return None
+
+    def test_just_point_kwarg(self):
+        # Alias the function being tested
+        func = self.model_obj.fit_mle
+        # Get the necessary kwargs
+        kwargs = {"just_point": True}
+        # Get the function results
+        func_result = func(self.fake_all_params, **kwargs)
+        # Perform the desired tests to make sure we get back a dictionary with
+        # an "x" key in it and a value that is a ndarray.
+        self.assertIsInstance(func_result, dict)
+        self.assertIn("x", func_result)
+        self.assertIsInstance(func_result["x"], np.ndarray)
         return None
 
 

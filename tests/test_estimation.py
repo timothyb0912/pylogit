@@ -259,3 +259,28 @@ class EstimationObjTests(GenericTestCase):
                                     None)
 
         return None
+
+    def test_ensure_positivity_and_length_of_weights(self):
+        # Create a set of good and bad arguments
+        num_rows = self.fake_design.shape[0]
+        fake_data = pd.DataFrame(self.fake_design, columns=['x'])
+        good_weights = [None, np.ones(num_rows)]
+        bad_weights =\
+            [1, np.ones((3, 3)), np.ones(num_rows + 1), -1 * np.ones(num_rows)]
+        # Alias the function being tested
+        func = estimation.ensure_positivity_and_length_of_weights
+        # Note the error messages that should be raised.
+        msg_1 = '`weights` MUST be a 1D ndarray.'
+        msg_2 = '`weights` must have the same number of rows as `data`.'
+        msg_3 = '`weights` MUST be >= 0.'
+        expected_error_msgs = [msg_1, msg_1, msg_2, msg_3]
+        # Perform the desired tests
+        for weights in good_weights:
+            self.assertIsNone(func(weights, fake_data))
+        for pos, weights in enumerate(bad_weights):
+            self.assertRaisesRegexp(ValueError,
+                                    expected_error_msgs[pos],
+                                    func,
+                                    weights,
+                                    fake_data)
+        return None

@@ -15,7 +15,7 @@ from scipy.linalg import block_diag
 from scipy.sparse import hstack
 
 try:
-    # Python 3.x does support xrange
+    # Python 3.x does not natively support xrange
     from past.builtins import xrange
 except ImportError:
     pass
@@ -297,7 +297,8 @@ def calc_gradient(beta,
                   transform_deriv_alpha,
                   intercept_params,
                   shape_params,
-                  ridge):
+                  ridge,
+                  weights):
     """
     Parameters
     ----------
@@ -367,6 +368,13 @@ def calc_gradient(beta,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -388,6 +396,10 @@ def calc_gradient(beta,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
                                     return_long_probs=True)
+
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = 1
 
     ##########
     # Get the required matrices
@@ -411,7 +423,7 @@ def calc_gradient(beta,
     dh_db = dh_dv.dot(design)
     # Differentiate the log likelihood w/ respect to the transformed utilities
     # Note that d_ll_dh will be a dense 2D numpy array.
-    d_ll_dh = (choice_vector - long_probs)[np.newaxis, :]
+    d_ll_dh = np.multiply(weights, choice_vector - long_probs)[np.newaxis, :]
 
     # Calculate the gradient of the log-likelihood with respect to the betas
     d_ll_d_beta = d_ll_dh.dot(dh_db)
@@ -598,7 +610,8 @@ def calc_hessian(beta,
                  block_matrix_idxs,
                  intercept_params,
                  shape_params,
-                 ridge):
+                 ridge,
+                 weights):
     """
     Parameters
     ----------
@@ -663,6 +676,13 @@ def calc_hessian(beta,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -684,6 +704,11 @@ def calc_hessian(beta,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
                                     return_long_probs=True)
+
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design.shape[0])
+
     ##########
     # Get the required matrices
     ##########
@@ -706,7 +731,7 @@ def calc_hessian(beta,
     # Differentiate the probabilities with respect to the transformed utilities
     # Note that dp_dh will be a 2D dense numpy array
     block_matrices = create_matrix_blocks(long_probs, block_matrix_idxs)
-    dp_dh = block_diag(*block_matrices)
+    dp_dh = block_diag(*block_matrices) * weights[None, :]
 
     ##########
     # Calculate the second and mixed partial derivatives within the hessian
@@ -841,7 +866,8 @@ def calc_fisher_info_matrix(beta,
                             transform_deriv_alpha,
                             intercept_params,
                             shape_params,
-                            ridge):
+                            ridge,
+                            weights):
     """
     Parameters
     ----------
@@ -896,6 +922,13 @@ def calc_fisher_info_matrix(beta,
         Determines whether or not ridge regression is performed. If an int,
         float or long is passed, then that scalar determines the ridge penalty
         for the optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -918,6 +951,12 @@ def calc_fisher_info_matrix(beta,
                                     intercept_params=intercept_params,
                                     shape_params=shape_params,
                                     return_long_probs=True)
+
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design.shape[0])
+    weights_per_obs =\
+        np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
 
     ##########
     # Get the required matrices
@@ -978,7 +1017,8 @@ def calc_fisher_info_matrix(beta,
     # Compute and return the outer product of each row of the gradient
     # with itself. Then sum these individual matrices together. The line below
     # does the same computation just with less memory and time.
-    fisher_matrix = gradient_vec.T.dot(gradient_vec)
+    fisher_matrix =\
+        gradient_vec.T.dot(np.multiply(weights_per_obs[:, None], gradient_vec))
 
     if ridge is not None:
         # The rational behind adding 2 * ridge is that the fisher information

@@ -345,9 +345,18 @@ class ComputationalSetUp(unittest.TestCase):
         function_results = func(*likelihood_args)
         self.assertAlmostEqual(expected_log_likelihood, function_results)
 
-        # Repeat the test with the ridge penalty
+        # Repeat the tests with a weighted log likelihood.
+        weights = 2 * np.ones(self.fake_design.shape[0])
+        likelihood_kwargs["weights"] = weights
+        likelihood_kwargs['ridge'] = None
         function_results_2 = func(*likelihood_args, **likelihood_kwargs)
-        self.assertAlmostEqual(penalized_log_likelihood, function_results_2)
+        self.assertAlmostEqual(2 * expected_log_likelihood, function_results_2)
+        likelihood_kwargs["weights"] = None
+        likelihood_kwargs['ridge'] = self.ridge
+
+        # Repeat the test with the ridge penalty
+        function_results_3 = func(*likelihood_args, **likelihood_kwargs)
+        self.assertAlmostEqual(penalized_log_likelihood, function_results_3)
 
         return None
 
@@ -527,6 +536,16 @@ class ComputationalSetUp(unittest.TestCase):
         self.assertEqual(len(func_results.shape), 1)
         self.assertEqual(func_results.shape, expected_gradient.shape)
         npt.assert_allclose(func_results, expected_gradient)
+
+        # Test the Gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        kwargs = {'weights': new_weights}
+        expected_gradient_weighted = 2 * expected_gradient
+        func_result_weighted = func(*args, **kwargs)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_gradient_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_gradient_weighted)
 
         # Ensure the function works when using a ridge penalty
         # Note we have to create an adjusted array for penalization because we
@@ -807,6 +826,16 @@ class ComputationalSetUp(unittest.TestCase):
         self.assertEqual(len(func_results.shape), 2)
         self.assertEqual(func_results.shape, expected_bhhh.shape)
         npt.assert_allclose(func_results, expected_bhhh)
+
+        # Test the Gradient function with weights
+        new_weights = 2 * np.ones(self.fake_design.shape[0])
+        kwargs = {'weights': new_weights}
+        expected_bhhh_weighted = 2 * expected_bhhh
+        func_result_weighted = func(*args, **kwargs)
+        self.assertIsInstance(func_result_weighted, np.ndarray)
+        self.assertEqual(func_result_weighted.shape,
+                         expected_bhhh_weighted.shape)
+        npt.assert_allclose(func_result_weighted, expected_bhhh_weighted)
 
         # Ensure the function works when using a ridge penalty
         # Note we have to create an adjusted array for penalization because we

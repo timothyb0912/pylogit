@@ -207,6 +207,39 @@ class NestedLogitTests(unittest.TestCase):
 
         return None
 
+    def test_just_point_kwarg(self):
+        """
+        Ensure that calling `fit_mle` with `just_point = True` returns a
+        dictionary with a 'x' key and a corresponding value that is an ndarray.
+        """
+        # Bundle the arguments used to construct the nested logit model
+        constructor_args = [self.fake_df,
+                            self.alt_id_col,
+                            self.obs_id_col,
+                            self.choice_col,
+                            self.fake_specification]
+
+        # Bundle the kwargs for constructing the nested_logit_model
+        constructor_kwargs = {"names": self.fake_names,
+                              "nest_spec": self.fake_nest_spec}
+
+        # Create the mnl model object whose coefficients will be estimated.
+        base_nl = nl.NestedLogit(*constructor_args, **constructor_kwargs)
+        # Create a variable for the arguments to the fit_mle function.
+        fit_args = [self.fake_all_params]
+        # Alias the function being tested
+        func = base_nl.fit_mle
+        # Get the necessary kwargs
+        kwargs = {"just_point": True}
+        # Get the function results
+        func_result = func(*fit_args, **kwargs)
+        # Perform the desired tests to make sure we get back a dictionary with
+        # an "x" key in it and a value that is a ndarray.
+        self.assertIsInstance(func_result, dict)
+        self.assertIn("x", func_result)
+        self.assertIsInstance(func_result["x"], np.ndarray)
+        return None
+
     def test_invalid_init_vals_length_in_estimate(self):
         """
         Ensure that when _estimate() is called, with an init_values argument
