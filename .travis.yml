@@ -19,8 +19,8 @@ script: py.test --cov-report= --cov=pylogit/ tests/
 branches:
   only:
     - master
+    - develop
 
 # Send results of tests to coveralls
 after_success:
  - coveralls
-
