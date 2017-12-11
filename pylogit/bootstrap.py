@@ -42,6 +42,7 @@ def is_kernel():
 # Create a progressbar iterable based on wehther we are in ipython or not.
 PROGRESS = tqdm_notebook if is_kernel() else tqdm
 
+
 def get_param_names(model_obj):
     """
     Extracts all the names to be displayed for the estimated parameters.
