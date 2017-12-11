@@ -54,6 +54,10 @@ Modified BSD (3-clause)
 Changelog
 =========
 
+0.2.1 (December 11, 2017)
+-------------------------
+- Added statsmodels and tqdm as package dependencies to fix errors with 0.2.0.
+
 0.2.0 (December 10, 2017)
 -------------------------
 - Added support for Python 3.4 - 3.6
