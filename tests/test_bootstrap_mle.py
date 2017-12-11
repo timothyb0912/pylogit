@@ -79,7 +79,7 @@ class HelperTests(unittest.TestCase):
         self.assertTrue(all([x in func_results for x in expected_keys]))
 
         self.assertEqual(func_results["model_type"],
-                         bmle.model_type_to_display_name.keys()[0])
+                         list(bmle.model_type_to_display_name.keys())[0])
 
         self.assertEqual(func_results["names"], fake_attr_dict["name_spec"])
 
