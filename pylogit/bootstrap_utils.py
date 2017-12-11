@@ -13,11 +13,14 @@ def check_conf_percentage_validity(conf_percentage):
     Ensures that `conf_percentage` is in (0, 100). Raises a helpful ValueError
     if otherwise.
     """
+    msg = "conf_percentage MUST be a number between 0.0 and 100."
     condition_1 = isinstance(conf_percentage, Number)
-    condition_2 = 0 < conf_percentage < 100
-    if not (condition_1 and condition_2):
-        msg = "conf_percentage MUST be a number between 0.0 and 100."
+    if not condition_1:
         raise ValueError(msg)
+    else:
+        condition_2 = 0 < conf_percentage < 100
+        if not condition_2:
+            raise ValueError(msg)
     return None
 
 

@@ -147,8 +147,8 @@ def create_cross_sectional_bootstrap_samples(obs_id_array,
 
     if seed is not None:
         # Check the validity of the seed argument.
-        if not isinstance(seed, (int, long)):
-            msg = "`boot_seed` MUST be an int or long."
+        if not isinstance(seed, int):
+            msg = "`boot_seed` MUST be an int."
             raise ValueError(msg)
 
         # If desiring reproducibility, set the random seed within numpy

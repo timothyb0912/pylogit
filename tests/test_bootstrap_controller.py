@@ -3,7 +3,6 @@ Tests for the bootstrap.py (formerly bootstrap_controller.py) file.
 """
 import unittest
 from collections import OrderedDict
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
@@ -16,6 +15,12 @@ import pylogit.mixed_logit_calcs as mlc
 import pylogit.mixed_logit as mixed_logit
 import pylogit.nested_logit as nested_logit
 from pylogit.conditional_logit import MNL
+
+try:
+    # Python 3.x does not natively support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
 
 
 class BootstrapTests(unittest.TestCase):

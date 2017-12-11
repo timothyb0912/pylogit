@@ -2,7 +2,6 @@
 Tests for the bootstrap_sampler.py file.
 """
 import unittest
-import warnings
 from collections import OrderedDict
 
 import numpy as np
@@ -10,6 +9,12 @@ import numpy.testing as npt
 import pandas as pd
 
 import pylogit.bootstrap_sampler as bs
+
+try:
+    # Python 3.x does not natively support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
 
 
 class SamplerTests(unittest.TestCase):
