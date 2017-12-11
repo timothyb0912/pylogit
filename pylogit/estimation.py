@@ -7,12 +7,29 @@ from __future__ import absolute_import
 import sys
 import time
 import numpy as np
+import pandas as pd
 from scipy.optimize import minimize
 
 from . import choice_calcs as cc
 from .choice_calcs import create_matrix_block_indices
 from .choice_tools import ensure_ridge_is_scalar_or_none
 from .choice_tools import ensure_contiguity_in_observation_rows
+
+
+def ensure_positivity_and_length_of_weights(weights, data):
+    assert isinstance(data, pd.DataFrame)
+    if weights is None:
+        return None
+    elif not isinstance(weights, np.ndarray) or weights.ndim != 1:
+        msg = '`weights` MUST be a 1D ndarray.'
+        raise ValueError(msg)
+    elif weights.size != data.shape[0]:
+        msg = '`weights` must have the same number of rows as `data`.'
+        raise ValueError(msg)
+    elif (weights < 0).any():
+        msg = '`weights` MUST be >= 0.'
+        raise ValueError(msg)
+    return None
 
 
 class EstimationObj(object):
@@ -59,6 +76,13 @@ class EstimationObj(object):
         not to change from their initial values. If a list is passed, the
         elements are to be integers where no such integer is greater than
         `init_values.size.` Default == None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
     """
     def __init__(self,
                  model_obj,
@@ -66,7 +90,8 @@ class EstimationObj(object):
                  ridge,
                  zero_vector,
                  split_params,
-                 constrained_pos=None):
+                 constrained_pos=None,
+                 weights=None):
         # Store pointers to needed objects
         self.alt_id_vector = model_obj.alt_IDs
         self.choice_vector = model_obj.choices
@@ -86,17 +111,21 @@ class EstimationObj(object):
         ensure_ridge_is_scalar_or_none(ridge)
         # Ensure the dataset has contiguity in rows with the same obs_id
         ensure_contiguity_in_observation_rows(self.obs_id_vector)
+        # Ensure the weights are appropriate for model estimation
+        ensure_positivity_and_length_of_weights(weights, model_obj.data)
 
         # Store the ridge parameter
         self.ridge = ridge
 
         # Store the constrained parameters
-        # Commented out because this feature is not yet supported in logit-type
-        # models.
         self.constrained_pos = constrained_pos
 
         # Store reference to what 'zero vector' is for this model / dataset
         self.zero_vector = zero_vector
+
+        # Store the weights that were passed to the constructor
+        self.weights =\
+            np.ones(self.design.shape[0]) if weights is None else weights
 
         # Store the function that separates the various portions of the
         # parameters being estimated (shape parameters, outside intercepts,
@@ -150,16 +179,12 @@ class EstimationObj(object):
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
 
-        return None
-
     def convenience_calc_log_likelihood(self, params):
         """
         Calculates the log-likelihood for this model and dataset.
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def convenience_calc_gradient(self, params):
         """
@@ -168,16 +193,12 @@ class EstimationObj(object):
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
 
-        return None
-
     def convenience_calc_hessian(self, params):
         """
         Calculates the hessian of the log-likelihood for this model / dataset.
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def convenience_calc_fisher_approx(self, params):
         """
@@ -186,8 +207,6 @@ class EstimationObj(object):
         """
         msg = "Method should be defined by descendant classes"
         raise NotImplementedError(msg)
-
-        return None
 
     def calc_neg_log_likelihood_and_neg_gradient(self, params):
         """
@@ -253,6 +272,13 @@ class LogitTypeEstimator(EstimationObj):
         not to change from their initial values. If a list is passed, the
         elements are to be integers where no such integer is greater than
         `num_params` Default == None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Attributes
     ----------
@@ -266,9 +292,11 @@ class LogitTypeEstimator(EstimationObj):
                  ridge,
                  zero_vector,
                  split_params,
-                 constrained_pos=None):
+                 constrained_pos=None,
+                 weights=None):
 
-        kwargs = {"constrained_pos": constrained_pos}
+        kwargs = {"constrained_pos": constrained_pos,
+                  "weights": weights}
         super(LogitTypeEstimator, self).__init__(model_obj,
                                                  mapping_dict,
                                                  ridge,
@@ -316,7 +344,8 @@ class LogitTypeEstimator(EstimationObj):
 
         kwargs = {"intercept_params": intercepts,
                   "shape_params": shapes,
-                  "ridge": self.ridge}
+                  "ridge": self.ridge,
+                  "weights": self.weights}
         log_likelihood = cc.calc_log_likelihood(*args, **kwargs)
 
         return log_likelihood
@@ -339,7 +368,8 @@ class LogitTypeEstimator(EstimationObj):
                 self.calc_dh_d_alpha,
                 intercepts,
                 shapes,
-                self.ridge]
+                self.ridge,
+                self.weights]
 
         return cc.calc_gradient(*args)
 
@@ -361,7 +391,8 @@ class LogitTypeEstimator(EstimationObj):
                 self.block_matrix_idxs,
                 intercepts,
                 shapes,
-                self.ridge]
+                self.ridge,
+                self.weights]
 
         return cc.calc_hessian(*args)
 
@@ -384,7 +415,8 @@ class LogitTypeEstimator(EstimationObj):
                 self.calc_dh_d_alpha,
                 intercepts,
                 shapes,
-                self.ridge]
+                self.ridge,
+                self.weights]
 
         return cc.calc_fisher_info_matrix(*args)
 
@@ -559,6 +591,7 @@ def estimate(init_values,
              maxiter,
              print_results,
              use_hessian=True,
+             just_point=False,
              **kwargs):
     """
     Estimate the given choice model that is defined by `estimator`.
@@ -595,6 +628,10 @@ def estimate(init_values,
         Logit) use a rather crude (i.e. the BHHH) approximation to the Fisher
         Information Matrix, and users may prefer to not use this approximation
         for the hessian during estimation.
+    just_point : bool, optional.
+        Determines whether or not calculations that are non-critical for
+        obtaining the maximum likelihood point estimate will be performed.
+        Default == False.
 
     Return
     ------
@@ -618,20 +655,23 @@ def estimate(init_values,
           - "final_hessian"
           - "fisher_info"
     """
-    # Perform preliminary calculations
-    log_likelihood_at_zero =\
-        estimator.convenience_calc_log_likelihood(estimator.zero_vector)
+    if not just_point:
+        # Perform preliminary calculations
+        log_likelihood_at_zero =\
+            estimator.convenience_calc_log_likelihood(estimator.zero_vector)
 
-    initial_log_likelihood =\
-        estimator.convenience_calc_log_likelihood(init_values)
+        initial_log_likelihood =\
+            estimator.convenience_calc_log_likelihood(init_values)
 
-    if print_results:
-        # Print the log-likelihood at zero
-        print("Log-likelihood at zero: {:,.4f}".format(log_likelihood_at_zero))
+        if print_results:
+            # Print the log-likelihood at zero
+            null_msg = "Log-likelihood at zero: {:,.4f}"
+            print(null_msg.format(log_likelihood_at_zero))
 
-        # Print the log-likelihood at the starting values
-        print("Initial Log-likelihood: {:,.4f}".format(initial_log_likelihood))
-        sys.stdout.flush()
+            # Print the log-likelihood at the starting values
+            init_msg = "Initial Log-likelihood: {:,.4f}"
+            print(init_msg.format(initial_log_likelihood))
+            sys.stdout.flush()
 
     # Get the hessian fucntion for this estimation process
     hess_func = estimator.calc_neg_hessian if use_hessian else None
@@ -649,22 +689,25 @@ def estimate(init_values,
                                 "maxiter": maxiter},
                        **kwargs)
 
-    # Stop timing the estimation process and report the timing results
-    end_time = time.time()
-    if print_results:
-        elapsed_sec = (end_time - start_time)
-        elapsed_min = elapsed_sec / 60.0
-        if elapsed_min > 1.0:
-            print("Estimation Time: {:.2f} minutes.".format(elapsed_min))
-        else:
-            print("Estimation Time: {:.2f} seconds.".format(elapsed_sec))
-        print("Final log-likelihood: {:,.4f}".format(-1 * results["fun"]))
-        sys.stdout.flush()
+    if not just_point:
+        if print_results:
+            # Stop timing the estimation process and report the timing results
+            end_time = time.time()
+            elapsed_sec = (end_time - start_time)
+            elapsed_min = elapsed_sec / 60.0
+            if elapsed_min > 1.0:
+                msg = "Estimation Time for Point Estimation: {:.2f} minutes."
+                print(msg.format(elapsed_min))
+            else:
+                msg = "Estimation Time for Point Estimation: {:.2f} seconds."
+                print(msg.format(elapsed_sec))
+            print("Final log-likelihood: {:,.4f}".format(-1 * results["fun"]))
+            sys.stdout.flush()
 
-    # Store the log-likelihood at zero
-    results["log_likelihood_null"] = log_likelihood_at_zero
+        # Store the log-likelihood at zero
+        results["log_likelihood_null"] = log_likelihood_at_zero
 
-    # Calculate and store the post-estimation results
-    results = calc_and_store_post_estimation_results(results, estimator)
+        # Calculate and store the post-estimation results
+        results = calc_and_store_post_estimation_results(results, estimator)
 
     return results

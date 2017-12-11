@@ -287,3 +287,26 @@ class ChoiceObjectTests(unittest.TestCase):
         self.assertIsNone(func(np.ones(1)))
 
         return None
+
+    def test_just_point_kwarg(self):
+        # Create a variable for the standard arguments to the MNL constructor.
+        standard_args = [self.fake_df,
+                         self.alt_id_col,
+                         self.obs_id_col,
+                         self.choice_col,
+                         self.fake_specification]
+
+        # Create the mnl model object whose coefficients will be estimated.
+        base_mnl = mnl.MNL(*standard_args)
+        # Alias the function being tested
+        func = base_mnl.fit_mle
+        # Get the necessary kwargs
+        kwargs = {"just_point": True}
+        # Get the function results
+        func_result = func(self.fake_beta, **kwargs)
+        # Perform the desired tests to make sure we get back a dictionary with
+        # an "x" key in it and a value that is a ndarray.
+        self.assertIsInstance(func_result, dict)
+        self.assertIn("x", func_result)
+        self.assertIsInstance(func_result["x"], np.ndarray)
+        return None

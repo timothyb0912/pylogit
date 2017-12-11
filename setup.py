@@ -23,7 +23,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.2',
+    version='0.2.0',
 
     description='Maximum likelihood estimation of conditional logit models',
     long_description=long_description,
@@ -61,7 +61,10 @@ setup(
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7'
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6'
     ],
 
     # What does your project relate to?
@@ -85,7 +88,8 @@ setup(
     install_requires=['pandas >= 0.16.2',
                       'numpy >= 1.10.2',
                       'scipy >= 0.16.1',
-                      'future >= 0.16'],
+                      'future >= 0.16',
+                      'statsmodels >= 0.6.1'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

@@ -79,8 +79,7 @@ def ensure_valid_nums_in_specification_cols(specification, dataframe):
         # This will catch values that are strings.
         if dataframe[col].dtype.kind not in ['f', 'i', 'u']:
             problem_cols.append(col)
-        # The condition below checks for positive or negative inifinity
-        # values.
+        # The condition below checks for positive or negative inifinity values.
         elif np.isinf(dataframe[col]).any():
             problem_cols.append(col)
         # This condition will check for NaN values.
@@ -808,7 +807,7 @@ class MNDC_Model(object):
         # For model identification, ensure that the number of chosen
         # alternatives equals the total number of alternatives available in the
         # dataset. Currently commented out because many tests need to be
-        # rewritten to handle the fact that this constraint is being made explicit.
+        # rewritten to cope with this constraint being made explicit.
         # ensure_all_alternatives_are_chosen(alt_id_col, choice_col, dataframe)
 
         # Check for correct length of shape_names and intercept_names
@@ -1189,7 +1188,7 @@ class MNDC_Model(object):
             Should contain the various types of parameters that were actually
             estimated.
         all_names : list of strings.
-            Should cntain names of each estimated parameter.
+            Should contain names of each estimated parameter.
 
         Returns
         -------

@@ -248,7 +248,8 @@ def calc_mixed_log_likelihood(params,
                               rows_to_mixers,
                               choice_vector,
                               utility_transform,
-                              ridge=None):
+                              ridge=None,
+                              weights=None):
     """
     Parameters
     ----------
@@ -298,6 +299,13 @@ def calc_mixed_log_likelihood(params,
         Determines whether or not ridge regression is performed. If a scalar is
         passed, then that scalar determines the ridge penalty for the
         optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -305,6 +313,12 @@ def calc_mixed_log_likelihood(params,
         The log-likelihood of the mixed logit model evaluated at the passed
         values of `params`.
     """
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design_3d.shape[0])
+    weights_per_obs =\
+        np.max(rows_to_mixers.toarray() * weights[:, None], axis=0)
+
     # Calculate the regular probability array. Note the implicit assumption
     # that params == index coefficients.
     prob_array = general_calc_probabilities(params,
@@ -323,7 +337,7 @@ def calc_mixed_log_likelihood(params,
                                                           rows_to_mixers)
 
     # Calculate the log-likelihood of the dataset
-    log_likelihood = np.log(simulated_sequence_probs).sum(axis=0)
+    log_likelihood = weights_per_obs.dot(np.log(simulated_sequence_probs))
 
     # Adujust for the presence of a ridge estimator. Again, note that we are
     # implicitly assuming that the only model being mixed is the MNL model,
@@ -342,7 +356,8 @@ def calc_mixed_logit_gradient(params,
                               rows_to_mixers,
                               choice_vector,
                               utility_transform,
-                              ridge=None):
+                              ridge=None,
+                              weights=None):
     """
     Parameters
     ----------
@@ -392,6 +407,13 @@ def calc_mixed_logit_gradient(params,
         Determines whether or not ridge regression is performed. If a float is
         passed, then that float determines the ridge penalty for the
         optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -399,6 +421,10 @@ def calc_mixed_logit_gradient(params,
         The returned array is the gradient of the log-likelihood of the mixed
         MNL model with respect to `params`.
     """
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design_3d.shape[0])
+
     # Calculate the regular probability array. Note the implicit assumption
     # that params == index coefficients.
     prob_array = general_calc_probabilities(params,
@@ -436,7 +462,9 @@ def calc_mixed_logit_gradient(params,
     # built in gradient function for logit-type models. Should also refactor
     # the gradient function for logit-type models to be able to handle 2D
     # systematic utility arrays.
-    gradient = (scaled_error[:, :, None] * design_3d).sum(axis=0)
+    gradient = (scaled_error[:, :, None] *
+                design_3d *
+                weights[:, None, None]).sum(axis=0)
 
     gradient = gradient.mean(axis=0)
 
@@ -457,6 +485,7 @@ def calc_neg_log_likelihood_and_neg_gradient(beta,
                                              utility_transform,
                                              constrained_pos,
                                              ridge=None,
+                                             weights=None,
                                              *args):
     """
     Parameters
@@ -511,6 +540,13 @@ def calc_neg_log_likelihood_and_neg_gradient(beta,
         Determines whether or not ridge regression is performed. If a float is
         passed, then that float determines the ridge penalty for the
         optimization. Default = None.
+    weights : 1D ndarray or None.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
 
     Returns
     -------
@@ -529,7 +565,8 @@ def calc_neg_log_likelihood_and_neg_gradient(beta,
                                                         rows_to_mixers,
                                                         choice_vector,
                                                         utility_transform,
-                                                        ridge=ridge)
+                                                        ridge=ridge,
+                                                        weights=weights)
 
     neg_beta_gradient_vec = -1 * calc_mixed_logit_gradient(beta,
                                                            design_3d,
@@ -539,7 +576,8 @@ def calc_neg_log_likelihood_and_neg_gradient(beta,
                                                            rows_to_mixers,
                                                            choice_vector,
                                                            utility_transform,
-                                                           ridge=ridge)
+                                                           ridge=ridge,
+                                                           weights=weights)
 
     if constrained_pos is not None:
         neg_beta_gradient_vec[constrained_pos] = 0
@@ -555,7 +593,8 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
                                                 rows_to_mixers,
                                                 choice_vector,
                                                 utility_transform,
-                                                ridge=None):
+                                                ridge=None,
+                                                weights=None):
     """
     Parameters
     ----------
@@ -605,6 +644,13 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
         Determines whether or not ridge regression is performed. If a float is
         passed, then that float determines the ridge penalty for the
         optimization. Default = None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class. Default == None.
 
     Returns
     -------
@@ -613,6 +659,11 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
         Matrix. I.e it is the negative of the sum of the outer product of
         each individual's gradient with itself.
     """
+    # Calculate the weights for the sample
+    if weights is None:
+        weights = np.ones(design_3d.shape[0])
+    weights_per_obs =\
+        np.max(rows_to_mixers.toarray() * weights[:, None], axis=0)
     # Calculate the regular probability array. Note the implicit assumption
     # that params == index coefficients.
     prob_array = general_calc_probabilities(params,
@@ -655,7 +706,8 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
 
     gradient_per_obs = rows_to_mixers.T.dot(gradient)
 
-    bhhh_matrix = gradient_per_obs.T.dot(gradient_per_obs)
+    bhhh_matrix =\
+        gradient_per_obs.T.dot(weights_per_obs[:, None] * gradient_per_obs)
 
     if ridge is not None:
         bhhh_matrix -= 2 * ridge

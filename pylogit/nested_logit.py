@@ -147,6 +147,14 @@ class NestedEstimator(EstimationObj):
         not to change from their initial values. If a list is passed, the
         elements are to be integers where no such integer is greater than
         `init_values.size.` Default == None.
+    weights : 1D ndarray or None, optional.
+        Allows for the calculation of weighted log-likelihoods. The weights can
+        represent various things. In stratified samples, the weights may be
+        the proportion of the observations in a given strata for a sample in
+        relation to the proportion of observations in that strata in the
+        population. In latent class models, the weights may be the probability
+        of being a particular class.
+
     """
     def __init__(self,
                  model_obj,
@@ -154,13 +162,15 @@ class NestedEstimator(EstimationObj):
                  ridge,
                  zero_vector,
                  split_params,
-                 constrained_pos=None):
+                 constrained_pos=None,
+                 weights=None):
         super(NestedEstimator, self).__init__(model_obj,
                                               mapping_dict,
                                               ridge,
                                               zero_vector,
                                               split_params,
-                                              constrained_pos=constrained_pos)
+                                              constrained_pos=constrained_pos,
+                                              weights=weights)
 
         return None
 
@@ -258,7 +268,7 @@ class NestedEstimator(EstimationObj):
                 self.rows_to_obs,
                 self.rows_to_nests,
                 self.choice_vector]
-        kwargs = {"ridge": self.ridge}
+        kwargs = {"ridge": self.ridge, "weights": self.weights}
 
         log_likelihood = general_log_likelihood(*args, **kwargs)
 
@@ -277,7 +287,7 @@ class NestedEstimator(EstimationObj):
                 self.rows_to_obs,
                 self.rows_to_nests]
 
-        return general_gradient(*args, ridge=self.ridge)
+        return general_gradient(*args, ridge=self.ridge, weights=self.weights)
 
     def convenience_calc_hessian(self, params):
         """
@@ -295,7 +305,8 @@ class NestedEstimator(EstimationObj):
                 self.rows_to_obs,
                 self.rows_to_nests]
 
-        approx_hess = bhhh_approx(*args, ridge=self.ridge)
+        approx_hess =\
+            bhhh_approx(*args, ridge=self.ridge, weights=self.weights)
 
         # Account for the contrained position when presenting the results of
         # the approximate hessian.
@@ -435,6 +446,7 @@ class NestedLogit(base_mcm.MNDC_Model):
                 gradient_tol=1e-06,
                 maxiter=1000,
                 ridge=None,
+                just_point=False,
                 **kwargs):
         """
         Parameters
@@ -469,6 +481,11 @@ class NestedLogit(base_mcm.MNDC_Model):
             Determines whether ridge regression is performed. If a scalar is
             passed, then that scalar determines the ridge penalty for the
             optimization. Default `== None`.
+        just_point : bool, optional.
+            Determines whether (True) or not (False) calculations that are non-
+            critical for obtaining the maximum likelihood point estimate will
+            be performed. If True, this function will return the results
+            dictionary from scipy.optimize. Default == False.
 
         Returns
         -------
@@ -527,9 +544,13 @@ class NestedLogit(base_mcm.MNDC_Model):
                                   gradient_tol,
                                   maxiter,
                                   print_res,
-                                  use_hessian=False)
+                                  use_hessian=True,
+                                  just_point=just_point)
 
-        # Store the estimation results
-        self.store_fit_results(estimation_res)
+        if not just_point:
+            # Store the estimation results
+            self.store_fit_results(estimation_res)
 
-        return None
+            return None
+        else:
+            return estimation_res

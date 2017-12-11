@@ -483,6 +483,20 @@ class MixedLogitCalculations(unittest.TestCase):
         self.assertAlmostEqual(convenience_func(self.fake_betas_ext),
                                true_log_like_w_ridge)
 
+        # Repeat the tests with observation weights
+        weights = 2 * np.ones(self.fake_design_3d.shape[0])
+        args_2.append(weights)
+        weighted_ridge_log_like = (2 * true_log_likelihood -
+                                   self.ridge * (self.fake_betas_ext**2).sum())
+        new_func_log_like = mlc.calc_mixed_log_likelihood(*args_2)
+        self.assertAlmostEqual(weighted_ridge_log_like, new_func_log_like)
+
+        # Use the convenience function with the mixed logit estimator.
+        self.estimator.weights = weights
+        self.assertAlmostEqual(convenience_func(self.fake_betas_ext),
+                               weighted_ridge_log_like)
+        self.estimator.weights = None
+
         return None
 
     def test_calc_mixed_logit_gradient(self):
@@ -543,6 +557,19 @@ class MixedLogitCalculations(unittest.TestCase):
         convenience_func = self.estimator.convenience_calc_gradient
         npt.assert_allclose(new_gradient,
                             convenience_func(self.fake_betas_ext))
+
+        # Repeat the tests with observation weights
+        weights = 2 * np.ones(self.fake_design_3d.shape[0])
+        args.append(weights)
+        weighted_ridge_gradient = (2 * gradient - ridge_penalty)
+        new_func_gradient = mlc.calc_mixed_logit_gradient(*args)
+        npt.assert_allclose(weighted_ridge_gradient, new_func_gradient)
+
+        # Use the convenience function with the mixed logit estimator.
+        self.estimator.weights = weights
+        npt.assert_allclose(convenience_func(self.fake_betas_ext),
+                            weighted_ridge_gradient)
+        self.estimator.weights = None
 
         return None
 
@@ -616,6 +643,19 @@ class MixedLogitCalculations(unittest.TestCase):
         convenience_func = self.estimator.convenience_calc_hessian
         npt.assert_allclose(new_neg_bhhh,
                             convenience_func(self.fake_betas_ext))
+
+        # Repeat the tests with observation weights
+        weights = 2 * np.ones(self.fake_design_3d.shape[0])
+        args.append(weights)
+        weighted_ridge_bhhh = (2 * bhhh_matrix + 2 * self.ridge)
+        new_func_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
+        npt.assert_allclose(weighted_ridge_bhhh, new_func_bhhh)
+
+        # Use the convenience function with the mixed logit estimator.
+        self.estimator.weights = weights
+        npt.assert_allclose(convenience_func(self.fake_betas_ext),
+                            weighted_ridge_bhhh)
+        self.estimator.weights = None
 
         return None
 
@@ -979,6 +1019,26 @@ class MixedLogitCalculations(unittest.TestCase):
             self.assertIsInstance(w[0].category, type(UserWarning))
             self.assertIn(mixed_logit._ridge_warning_msg, str(w[0].message))
 
+        return None
+
+    def test_just_point_kwarg(self):
+        """
+        Ensure that calling `fit_mle` with `just_point = True` returns a
+        dictionary with a 'x' key and a corresponding value that is an ndarray.
+        """
+        # Create a variable for the arguments to the fit_mle function.
+        fit_args = [self.fake_betas_ext, 2]
+        # Alias the function being tested
+        func = self.mixl_obj.fit_mle
+        # Get the necessary kwargs
+        kwargs = {"just_point": True}
+        # Get the function results
+        func_result = func(*fit_args, **kwargs)
+        # Perform the desired tests to make sure we get back a dictionary with
+        # an "x" key in it and a value that is a ndarray.
+        self.assertIsInstance(func_result, dict)
+        self.assertIn("x", func_result)
+        self.assertIsInstance(func_result["x"], np.ndarray)
         return None
 
     def test_outside_intercept_error_in_constructor(self):
