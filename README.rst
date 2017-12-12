@@ -54,6 +54,10 @@ Modified BSD (3-clause)
 Changelog
 =========
 
+0.2.2 (December 11, 2017)
+-------------------------
+- Changed tqdm dependency to allow for anaconda compatibility.
+
 0.2.1 (December 11, 2017)
 -------------------------
 - Added statsmodels and tqdm as package dependencies to fix errors with 0.2.0.
