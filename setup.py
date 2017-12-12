@@ -90,7 +90,7 @@ setup(
                       'scipy >= 0.16.1',
                       'future >= 0.16',
                       'statsmodels >= 0.6.1',
-                      'tqdm >= 4.19.5'],
+                      'tqdm >= 4.15.0'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
