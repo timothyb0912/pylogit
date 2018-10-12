@@ -563,7 +563,7 @@ def calc_quadratic_coef_abc(model_object,
     standardized_influence =\
         empirical_influence / (num_obs**2 * std_error[None, :])
     # Determine the initial weights per observation.
-    init_weights_wide = (np.ones(num_obs, dtype=float) / num_obs)[:, None]
+    init_weights_wide = (np.ones(int(num_obs), dtype=float) / num_obs)[:, None]
     # Create the wide weights for the various terms of the quadratic_coef
     term_1_wide_weights =\
         (1 - epsilon) * init_weights_wide + epsilon * standardized_influence
@@ -687,7 +687,7 @@ def efron_quadratic_coef_abc(model_object,
     standardized_influence =\
         empirical_influence / (num_obs**2 * std_error[None, :])
     # Determine the initial weights per observation.
-    init_weights_wide = (np.ones(num_obs, dtype=float) / num_obs)[:, None]
+    init_weights_wide = (np.ones(int(num_obs), dtype=float) / num_obs)[:, None]
     # Create the wide weights for the various terms of the quadratic_coef
     term_1_wide_weights = init_weights_wide + epsilon * standardized_influence
     term_3_wide_weights = init_weights_wide - epsilon * standardized_influence

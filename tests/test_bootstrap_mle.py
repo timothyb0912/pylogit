@@ -2,7 +2,6 @@
 Tests for the bootstrap_mle.py file.
 """
 import unittest
-import warnings
 from collections import OrderedDict
 from copy import deepcopy
 
@@ -56,7 +55,7 @@ class HelperTests(unittest.TestCase):
                         setattr(self, key, fake_attr[key])
 
         # Create a fake model object for the tests
-        fake_type = bmle.model_type_to_display_name.values()[0]
+        fake_type = list(bmle.model_type_to_display_name.values())[0]
         fake_attr_dict = {"name_spec": OrderedDict([("intercept", "ASC 1")]),
                           "intercept_names": None,
                           "intercept_ref_position": None,
@@ -80,7 +79,7 @@ class HelperTests(unittest.TestCase):
         self.assertTrue(all([x in func_results for x in expected_keys]))
 
         self.assertEqual(func_results["model_type"],
-                         bmle.model_type_to_display_name.keys()[0])
+                         list(bmle.model_type_to_display_name.keys())[0])
 
         self.assertEqual(func_results["names"], fake_attr_dict["name_spec"])
 
@@ -111,7 +110,7 @@ class HelperTests(unittest.TestCase):
         fake_attr_dict = {"intercept_names": mnl_param_names[:3],
                           "ind_var_names": mnl_param_names[3:],
                           "mixing_vars": None}
-        fake_obj = FakeModel(bmle.model_type_to_display_name.values()[0],
+        fake_obj = FakeModel(list(bmle.model_type_to_display_name.values())[0],
                              fake_attr=fake_attr_dict)
 
         # Create the array that we expect to be returned
@@ -127,8 +126,9 @@ class HelperTests(unittest.TestCase):
         # Test the function on a generic model without outside intercepts.
         new_fake_attrs = deepcopy(fake_attr_dict)
         new_fake_attrs["intercept_names"] = None
-        new_fake_obj = FakeModel(bmle.model_type_to_display_name.values()[0],
-                                 fake_attr=new_fake_attrs)
+        new_fake_obj =\
+            FakeModel(list(bmle.model_type_to_display_name.values())[0],
+                      fake_attr=new_fake_attrs)
         new_results = func(new_fake_obj, mnl_point_series, num_params)
         npt.assert_allclose(expected_array, new_results)
 
@@ -136,8 +136,9 @@ class HelperTests(unittest.TestCase):
         new_fake_attrs_2 = deepcopy(fake_attr_dict)
         new_fake_attrs_2["intercept_names"] = None
         new_fake_attrs_2["mixing_vars"] = ["ASC 1"]
-        new_fake_obj = FakeModel(bmle.model_type_to_display_name.values()[0],
-                                 fake_attr=new_fake_attrs_2)
+        new_fake_obj =\
+            FakeModel(list(bmle.model_type_to_display_name.values())[0],
+                      fake_attr=new_fake_attrs_2)
         new_results_2 = func(new_fake_obj, mnl_point_series, num_params)
 
         new_expected_array =\
@@ -150,8 +151,9 @@ class HelperTests(unittest.TestCase):
                             "ind_var_names": mnl_param_names[3:],
                             "mixing_vars": None,
                             "alt_IDs": np.arange(1, 5)}
-        fake_obj_3 = FakeModel(bmle.model_type_to_display_name.values()[1],
-                               fake_attr=fake_attr_dict_3)
+        fake_obj_3 =\
+            FakeModel(list(bmle.model_type_to_display_name.values())[1],
+                      fake_attr=fake_attr_dict_3)
         new_results_3 = func(fake_obj_3, mnl_point_series, num_params_3)
         expected_array_3 =\
             np.concatenate([np.zeros(3),
@@ -265,6 +267,7 @@ class BootstrapEstimationTests(unittest.TestCase):
         self.fake_index = self.fake_design.dot(self.fake_betas)
 
         # Create the needed dataframe for the Asymmetric Logit constructor
+        nrows = self.fake_design.shape[0]
         self.fake_df = pd.DataFrame({"obs_id": [1, 1, 1, 2, 2, 3, 3, 3,
                                                 4, 4, 5, 5, 5, 6, 6, 6],
                                      "alt_id": [1, 2, 3, 1, 3, 1, 2, 3,
@@ -272,8 +275,7 @@ class BootstrapEstimationTests(unittest.TestCase):
                                      "choice": [0, 1, 0, 0, 1, 1, 0, 0,
                                                 1, 0, 1, 0, 0, 0, 0, 1],
                                      "x": self.fake_design[:, 0],
-                                     "intercept":
-                                        np.ones(self.fake_design.shape[0])})
+                                     "intercept": np.ones(nrows)})
 
         # Record the various column names
         self.alt_id_col = "alt_id"
@@ -305,7 +307,7 @@ class BootstrapEstimationTests(unittest.TestCase):
         # Initialize a basic Asymmetric Logit model whose coefficients will be
         # estimated.
         self.asym_model_obj = asym.MNAL(*self.constructor_args,
-                                   **self.constructor_kwargs)
+                                        **self.constructor_kwargs)
 
         self.asym_model_obj.coefs = pd.Series(self.fake_betas)
         self.asym_model_obj.intercepts =\
@@ -316,9 +318,9 @@ class BootstrapEstimationTests(unittest.TestCase):
             pd.Series(np.concatenate([self.fake_shapes,
                                       self.fake_intercepts,
                                       self.fake_betas]),
-                      index=self.fake_shape_names +
-                            self.fake_intercept_names +
-                            self.fake_names["x"])
+                      index=(self.fake_shape_names +
+                             self.fake_intercept_names +
+                             self.fake_names["x"]))
         self.asym_model_obj.nests = None
 
         #####

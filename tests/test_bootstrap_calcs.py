@@ -7,9 +7,15 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 from scipy.stats import norm, gumbel_r
-import scipy.stats
 
 import pylogit.bootstrap_calcs as bc
+
+try:
+    # Python 3.x does not natively support xrange
+    from past.builtins import xrange
+except ImportError:
+    pass
+
 
 class ComputationalTests(unittest.TestCase):
     def setUp(self):
@@ -69,11 +75,11 @@ class ComputationalTests(unittest.TestCase):
         # We should have the value in BR[lower_row, 0] = 3 so that there are 2
         # elements in bootstrap_replicates (BR) that are less than this. I.e.
         # we want lower_row = 2. Note 2.56 rounded down is 2.
-        lower_row = np.floor(alpha / 2.0)
+        lower_row = int(np.floor(alpha / 2.0))
         # 100 - 2.56 is 97.44. Rounded up, this is 98.
         # We want the row such that the value in the first column of that row
         # is 98, i.e. we want the row at index 97.
-        upper_row = np.floor(100 - (alpha / 2.0))
+        upper_row = int(np.floor(100 - (alpha / 2.0)))
         # Create the expected results
         expected_results =\
             bc.combine_conf_endpoints(self.bootstrap_replicates[lower_row],
@@ -81,7 +87,7 @@ class ComputationalTests(unittest.TestCase):
         # Alias the function being tested
         func = bc.calc_percentile_interval
         # Get the function results
-        func_results =func(self.bootstrap_replicates, self.conf_percentage)
+        func_results = func(self.bootstrap_replicates, self.conf_percentage)
         # Perform the desired tests
         self.assertIsInstance(func_results, np.ndarray)
         self.assertEqual(func_results.shape, expected_results.shape)

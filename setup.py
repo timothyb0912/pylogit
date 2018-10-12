@@ -23,7 +23,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.2.1',
+    version='0.2.2',
 
     description='Maximum likelihood estimation of conditional logit models',
     long_description=long_description,
@@ -90,7 +90,7 @@ setup(
                       'scipy >= 0.16.1',
                       'future >= 0.16',
                       'statsmodels >= 0.6.1',
-                      'tqdm >= 4.19.5'],
+                      'tqdm >= 4.15.0'],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,

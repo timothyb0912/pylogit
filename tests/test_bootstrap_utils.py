@@ -8,6 +8,7 @@ import numpy.testing as npt
 
 import pylogit.bootstrap_utils as bu
 
+
 class UtilityTester(unittest.TestCase):
     def test_check_conf_percentage_validity(self):
         # Create a list of valid and invalid arguments
@@ -38,7 +39,7 @@ class UtilityTester(unittest.TestCase):
         fake_name = 'test'
         # Note the message that should be displayed in case of errors.
         expected_err_msg =\
-             "`{}` MUST be a 2D ndarray.".format(fake_name + '_samples')
+            "`{}` MUST be a 2D ndarray.".format(fake_name + '_samples')
         # Alias the function being tested
         func = bu.ensure_samples_is_ndim_ndarray
         # Perform the desired tests
