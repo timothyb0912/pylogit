@@ -685,21 +685,20 @@ def create_design_matrix(long_form,
                 var_names.append("{}_{}".format(variable, alt))
         else:
             for group in specification:
-                if isinstance(group, list):
-                    # Create the variable column
-                    independent_vars.append(
-                                     long_form[alt_id_col].isin(group).values *
-                                     long_form[variable].values)
-                    # Create the column name
-                    var_names.append("{}_{}".format(variable, str(group)))
-
-                else:  # the group is an integer
+                if isinstance(group, Number):
                     # Create the variable column
                     new_col_vals = ((long_form[alt_id_col] == group).values *
                                     long_form[variable].values)
                     independent_vars.append(new_col_vals)
                     # Create the column name
                     var_names.append("{}_{}".format(variable, group))
+                else:  # the group is a list, tuple, or rang
+                    # Create the variable column
+                    independent_vars.append(
+                                     long_form[alt_id_col].isin(group).values *
+                                     long_form[variable].values)
+                    # Create the column name
+                    var_names.append("{}_{}".format(variable, str(group)))
 
     # Create the final design matrix
     design_matrix = np.hstack((x[:, None] for x in independent_vars))
