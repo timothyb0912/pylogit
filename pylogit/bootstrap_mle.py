@@ -4,6 +4,8 @@
 @summary:   This module provides functions that will perform the MLE for each
             of the bootstrap samples.
 """
+from __future__ import absolute_import
+
 import numpy as np
 import pandas as pd
 

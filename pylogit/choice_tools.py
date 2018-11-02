@@ -8,6 +8,8 @@ Created on Mon Feb 22 08:32:48 2016
 @summary:   Contains functions that help prepare one's data for choice model
             estimation or helps speed the estimation process (the 'mappings').
 """
+from __future__ import absolute_import
+
 import warnings
 from collections import OrderedDict
 from collections import Iterable

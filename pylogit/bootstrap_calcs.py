@@ -5,6 +5,8 @@
             confidence intervals using the 'percentile' and
             'bias-corrected and accelerated' methods.
 """
+from __future__ import absolute_import
+
 import numpy as np
 from scipy.stats import norm
 
