@@ -4,6 +4,8 @@
 @summary:   This module provides helpful functions for calculating the
             bootstrap confidence intervals.
 """
+from __future__ import absolute_import
+
 from numbers import Number
 import numpy as np
 

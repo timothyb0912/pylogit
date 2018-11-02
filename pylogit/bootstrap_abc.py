@@ -4,6 +4,8 @@
 @summary:   This module provides functions to calculate the approximate
             bootstrap confidence (ABC) intervals.
 """
+from __future__ import absolute_import
+
 import sys
 from copy import deepcopy
 

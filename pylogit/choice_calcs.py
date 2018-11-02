@@ -8,6 +8,8 @@ Created on Sun Feb 28 09:12:36 2016
 @summary:   Contains generic functions necessary for calculating choice
             probabilities and for estimating the choice models.
 """
+from __future__ import absolute_import
+
 import numpy as np
 import scipy.stats
 import scipy.linalg
