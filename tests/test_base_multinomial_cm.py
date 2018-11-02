@@ -1516,14 +1516,14 @@ class PostEstimationTests(GenericTestCase):
 
             # Only look at the numerical values, (minus the confidence
             # intervals that are tested elsewhere).
-            summary_vals = table_2_df.iloc[0, 1:-1].values.astype(np.float64)
+            summary_vals = table_2_df.iloc[0, 1:5].values.astype(np.float64)
             npt.assert_allclose(summary_vals, expected_values)
 
             # Determine the numeric values in the top of the summary table.
             top_left_summary_vals =\
                 table_1_df.iloc[-2:, 1].astype(float).values
-            top_right_summary_vals = table_1_df.iloc[:, 3].astype(float).values 
-            
+            top_right_summary_vals = table_1_df.iloc[:, 3].astype(float).values
+
             # Test those values against the values that we expect them to be.
             # Note we use rtol=1e-3 because the summary data is displayed without
             # full numerical precision for ease of viewing.
@@ -1531,7 +1531,8 @@ class PostEstimationTests(GenericTestCase):
                                 expected_top_left_values,
                                 rtol=1e-3)
             npt.assert_allclose(top_right_summary_vals,
-                                expected_top_right_values)
+                                expected_top_right_values,
+                                rtol=1e-3)
 
             return None
 
