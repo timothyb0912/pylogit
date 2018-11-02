@@ -68,8 +68,8 @@ def get_normal_draws(num_mixers,
     Returns
     -------
     all_draws : list of 2D ndarrays.
-        The list will have num_vars elements. Each element will be a num_obs by
-        num_draws numpy array of draws from a normal distribution with mean
+        The list will have num_vars elements. Each element will be a num_mixers
+        by num_draws numpy array of draws from a normal distribution with mean
         zero and standard deviation of one.
     """
     # Check the validity of the input arguments
@@ -339,7 +339,7 @@ def calc_mixed_log_likelihood(params,
     # Calculate the log-likelihood of the dataset
     log_likelihood = weights_per_obs.dot(np.log(simulated_sequence_probs))
 
-    # Adujust for the presence of a ridge estimator. Again, note that we are
+    # Adjust for the presence of a ridge estimator. Again, note that we are
     # implicitly assuming that the only model being mixed is the MNL model,
     # such that params == index coefficients.
     if ridge is None:
