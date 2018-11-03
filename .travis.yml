@@ -14,6 +14,7 @@ before_install:
  - "pip install pytest-cov"
  - "pip install future"
  - "pip install tqdm"
+ - "pip install mock"
 
 # command to execute test suite
 script: py.test --cov-report= --cov=pylogit/ tests/
