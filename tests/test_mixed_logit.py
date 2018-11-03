@@ -9,6 +9,7 @@ import unittest
 import warnings
 from collections import OrderedDict
 from copy import deepcopy
+import mock
 
 import numpy as np
 import pandas as pd
@@ -1162,7 +1163,11 @@ class MixedLogitCalculations(unittest.TestCase):
 
         return None
 
-    def test_execution_of_fit_mle(self):
+    # Note we mock to avoid issues with inverting the hessian, especially since
+    # such inversion is not the point of this test.
+    @mock.patch('pylogit.base_multinomial_cm_v2.scipy.linalg.inv',
+                side_effect=lambda x: np.eye(x.shape[0]))
+    def test_execution_of_fit_mle(self, mock_inv):
         """
         This function simply tests whether or not the fit_mle function can
         be run without throwing an error.
