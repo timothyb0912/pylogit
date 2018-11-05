@@ -486,120 +486,6 @@ def calc_gradient(beta,
     return gradient
 
 
-##########
-# The three functions below are used, jointly, to construct dP_dV, the block
-# diagonal matrix that is the derivative of the long probability vector with
-# respect to the long vector of index values = X*beta.
-##########
-def create_matrix_block_indices(row_to_obs):
-    """
-    Parameters
-    ----------
-    row_to_obs: 2D ndarray.
-        There should be one row per observation per available alternative and
-        one column per observation. This matrix maps the rows of the design
-        matrix to the unique observations (on the columns).
-
-    Returns
-    -------
-    output_indices : list of arrays.
-        There will be one array per column in `row_to_obs`. The array will note
-        which rows correspond to which observations.
-    """
-    # Initialize the list of index arrays to be returned
-    output_indices = []
-    # Determine the number of observations in the dataset
-    num_obs = row_to_obs.shape[1]
-    # Get the indices of the non-zero elements and their values
-    row_indices, col_indices, values = scipy.sparse.find(row_to_obs)
-    # Iterate over each observation, i.e. each column in row_to_obs, and
-    # determine which rows belong to that observation (i.e. the rows with ones
-    # in them).
-    for col in xrange(num_obs):
-        # Store the array of row indices belonging to the current observation
-        output_indices.append(row_indices[np.where(col_indices == col)])
-
-    return output_indices
-
-
-def robust_outer_product(vec_1, vec_2):
-    """
-    Calculates a 'robust' outer product of two vectors that may or may not
-    contain very small values.
-
-    Parameters
-    ----------
-    vec_1 : 1D ndarray
-    vec_2 : 1D ndarray
-
-    Returns
-    -------
-    outer_prod : 2D ndarray. The outer product of vec_1 and vec_2
-    """
-    mantissa_1, exponents_1 = np.frexp(vec_1)
-    mantissa_2, exponents_2 = np.frexp(vec_2)
-    new_mantissas = mantissa_1[None, :] * mantissa_2[:, None]
-    new_exponents = exponents_1[None, :] + exponents_2[:, None]
-    return new_mantissas * np.exp2(new_exponents)
-
-
-def create_matrix_blocks(long_probs, matrix_block_indices):
-    """
-    Parameters
-    ----------
-    long_probs : 1D ndarray.
-        There should be one row per observation per available alternative. The
-        elements of the array will indicate the probability of the alternative
-        being the outcome associated with the corresponding observation.
-    matrix_block_indices : list of arrays.
-        There will be one array per observation. The arrays will note which
-        rows correspond to which observations.
-
-    Returns
-    -------
-    output_matrices : list of matrices.
-        Each matrix will contain the derivative of P_i with respect to H_i, and
-        there will be one matrix for each observations i. P_i is the array of
-        probabilities of each observation being associated with its available
-        alternatives. H_i is the array of transformed index values for each
-        alternative that is available to observation i.
-    """
-    # Initialize the list of matrices that is to be returned.
-    output_matrices = []
-    # Iterate over each observation, i.e. over each list of rows that
-    # corresponds to each observation.
-    for indices in matrix_block_indices:
-        # Isolate P_i, the vector of probabilities of each alternative that
-        # is associated with the current observation
-        current_probs = long_probs[indices]
-        # Get the outer product of the current probabilities
-        # probability_outer_product = np.outer(current_probs, current_probs)
-        probability_outer_product = robust_outer_product(current_probs,
-                                                         current_probs)
-
-        # Create the desired dP_i/dh_i matrix
-        dP_i_dh_i = np.diag(current_probs) - probability_outer_product
-        # Ensure that the diagonal is positive and non-zero, since it must be.
-        diag_idx = np.diag_indices_from(dP_i_dh_i)
-        diag_values = dP_i_dh_i[diag_idx].copy()
-        diag_values[diag_values == 0] = min_comp_value
-        dP_i_dh_i[diag_idx] = diag_values
-        # Guard against underflow on the off-diagonals
-        underflow_idxs = np.where(dP_i_dh_i == 0)
-        for i in xrange(underflow_idxs[0].size):
-            row_idx, col_idx = underflow_idxs[0][i], underflow_idxs[1][i]
-            if row_idx != col_idx:
-                # Since this type of underflow essentially comes from
-                # multiplying two very small numbers, just set the overall
-                # result to a small number
-                dP_i_dh_i[row_idx,
-                          col_idx] = -1 * min_comp_value
-        # Store the desired dP_i/dh_i matrix
-        output_matrices.append(dP_i_dh_i)
-
-    return output_matrices
-
-
 def quadratic_prod_wrt_dp_ds(left,
                              right,
                              probs,
@@ -607,7 +493,8 @@ def quadratic_prod_wrt_dp_ds(left,
                              weights=None):
     """
     Calculates `left * diag(weights) * dp_ds * right` in a memory efficient
-    way, avoiding explicit computation of `dp_ds`.
+    way, avoiding explicit computation of `dp_ds`. This allows in memory
+    computation of the hessian.
 
     Parameters
     ----------
@@ -680,7 +567,6 @@ def calc_hessian(beta,
                  transform_first_deriv_c,
                  transform_first_deriv_v,
                  transform_deriv_alpha,
-                 block_matrix_idxs,
                  intercept_params,
                  shape_params,
                  ridge,
@@ -734,9 +620,6 @@ def calc_hessian(beta,
         with respect to the vector of shape parameters. The dimensions of the
         returned vector should be `(design.shape[0], num_alternatives - 1)`. If
         `intercept_params == None`, the callable should return None.
-    block_matrix_idxs : list of arrays.
-        There will be one array per observation. The arrays will note which
-        rows correspond to which observations.
     intercept_params : 1D ndarray.
         Each element should be an int, float, or long. For identifiability,
         there should be J- 1 elements where J is the total number of observed
