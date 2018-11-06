@@ -1,0 +1,590 @@
+\documentclass{article}
+
+\usepackage{hyperref}    % for making the table of contents clickable
+\hypersetup{linktoc=all}
+
+\usepackage{titlesec}     % for changing the format of my titles
+\usepackage[titletoc]{appendix}    % for adding nice appendix title to the table of contents
+
+\usepackage{graphicx}    % for handling figures in the document
+
+\usepackage{tabularx}    % for handling tables with variable width columns and text wrapping
+\usepackage{tabulary}     % for handling tables with variable width columns and text wrapping
+
+\usepackage{array}
+\newcolumntype{K}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}    %for having a single variable width column
+
+\usepackage{booktabs}    % for making tables pretty
+\usepackage{caption}
+
+\usepackage[font=normalsize, skip=5pt]{caption}    % for customizing captions
+
+\usepackage{amsmath}   % for math environments
+\usepackage{amssymb}   % for special math symbols
+\DeclareMathOperator*{\argmax}{arg\,max} %create an argmax operator
+
+\usepackage{color, soul}    % for highlighting
+
+\usepackage[round,
+				    authoryear,
+				    colon]{natbib}    %for the bibliography
+\bibliographystyle{plainnat}
+
+\usepackage{url}    %for handling of urls in bibtex file
+\def\UrlBreaks{\do\/\do-}    %use to break urls at hyphens
+
+\usepackage{pdflscape}    % for landscape orientation of pages
+
+\usepackage[margin=1in]{geometry}    % to get 1-inch margins
+
+
+\title{PyLogit: Maximum Likelihood Estimation for Conditional ``Logit-type'' Models in Python}
+\author{Timothy Brathwaite}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+In many fields---including transportation, marketing, economics, finance, medicine, public health, and operations research---it is necessary to model the occurrence of unordered, discrete outcomes. Often, such outcomes represent an individual's choice from a set of alternatives. A simple way to model such an outcome is with what is ambiguously known as a ``logit model.'' Across the many fields mentioned above, ``logit models'' are also referred to as:
+\begin{enumerate}
+\item \textit{\textbf{binary logistic regression}} or simply \textit{\textbf{logistic regression}} when there are only two alternatives and all covariates are individual specific. These names are often used in statistics, computer science, medicine, and public health.
+
+\item \textit{\textbf{binary logit}} when there are only two alternatives and covariates can vary across alternatives as well as across individuals. This name is often used in transportation, marketing, and economics.
+
+\item \textit{\textbf{polychotomous regression}} or \textit{\textbf{multinomial logistic regression}} when there are two or more (typically more) alternatives and all covariates are individual specific. These names are often used in medicine and public health.
+
+\item \textit{\textbf{softmax regression}} when there are two or more (typically more) alternatives and all covariates are individual specific. This name is often used in computer science and machine learning.
+
+\item \textit{\textbf{conditional logit}} or \textit{\textbf{multinomial logit}} when there are two or more (typically more) alternatives and covariates may vary across alternatives as well as across individuals. These names are often used in transportation, marketing, and economics.
+\end{enumerate}
+
+Of the various logit model varieties listed above, conditional logit models are the most general. Polychotomous/softmax regression is a special case of conditional logit where the covariates only vary across individuals. Binary logit is a special case of conditional logit where there are only two alternatives. Lastly, (binary) logistic regression is a special case of conditional logit where there are only two alternatives and when covariates only vary across individuals.
+
+In Python's scientific-computing ecosystem today, logit models are capable of being estimated by packages such as statsmodels and sci-kit-learn. However, these packages can only estimate binary logistic regression and polychotomous/softmax/multinomial regression where the covariates are individual specific. There are currently no Python packages on the Python Packaging Index (PyPi) that allow one to estimate conditional logit models. Note, the Python Biogeme software is able to estimate conditional logit models. However, Python Biogeme is not available on PyPi, so it cannot easily be installed. Moreover, Python Biogeme is largely a wrapper for routines written in C, and it does not fully accept all Python syntax.
+
+Beyond Python, R is also heavily used for free and open-source scientific-computing. In R, the packages mlogit and mnlogit are capable of estimating conditional logit models. However, these packages cannot estimate conditional logit models when the choice set differs across individual. Additionally, these packages do not directly support the estimation of models where variables are associated with coefficients that vary only across subsets of alternatives. For instance, in a travel-mode choice context, mlogit and mnlogit do not directly support models where the travel time variable has one coefficient in the index of a drive-alone alternative and one coefficient for both the bus and train alternatives.
+
+The pylogit package that is being introduced is capable of
+\begin{itemize}
+\item estimating conditional logit models (as well as other conditional ``logit-type'' models to be defined later)
+\item estimating models using datasets where the choice set differs between individuals
+\item estimating models with very general model specifications where the coefficients for a given variable may be  
+\begin{itemize}
+\item completely alternative-specific (i.e. one coefficient per alternative, subject to identification of the coefficients),
+\item subset-specific (i.e. one coefficient per subset of alternatives, where each alternative belongs to only one subset, and there are more than 1 but less than $J$ subsets, where $J$ is the maximum number of available alternatives in the dataset),
+\item completely generic (i.e. one coefficient across all alternatives).
+\end{itemize}
+\end{itemize}
+
+\section{Logit-type Models}
+This section describes the type of models that are capable of being estimated with PyLogit, and in the process, it introduces some of the notation that will be used later in describing how the maximum likelihood estimation (MLE) is performed for this class of models.
+
+``Logit-type'' models are models where the probability of individual $i$ choosing alternative $j$ (or being associated with outcome $j$) is given by:
+\begin{equation}
+\label{eqn:logit_type}
+\begin{aligned}
+P \left( y_{ij} = 1 | x_{ij}, \beta, \tau, \gamma \right) &= \frac{\exp \left[ S \left( V_{ij} \mid \tau _j, \gamma _j \right) \right]}{ \sum _{\ell \in C_i} \exp \left[ S \left( V_{i \ell} \mid \tau _{\ell}, \gamma _{\ell} \right) \right]}  = \frac{\exp \left( S_{ij} \right)}{ \sum _{\ell \in C_i} \exp \left( S_{i \ell} \right)}\\
+\textrm{where } y_{ij} &= \textrm{a binary (0 or 1) indicator of whether individual $i$} \\
+&\quad \  \textrm{is associated with outcome $j$.} \\
+x_{ij} &= \textrm{a row vector} = r \left( z_j, \zeta _i \right)  \\
+r \left( \cdot  \right) &= \textrm{a function that returns a row vector.} \\
+z _j &= \textrm{attributes of alternative $j$ for individual $i$.} \\
+\zeta _i &= \textrm{characteristics of individual $i$.} \\
+\beta &= \textrm{a column vector of unknown population parameters.} \\
+\tau &= \textrm{a 1-dimensional vector of constants, with one value}\\
+&\quad \ \textrm{for each alternative in the dataset.}\\
+\gamma &= \textrm{a 1-dimensional vector of ``shape parameters'', with}\\
+&\quad \ \textrm{one value for each alternative in the dataset.}\\
+\tau _j &= \textrm{a constant associated with alternative $j$.}\\
+\gamma _j &= \textrm{a ``shape parameter'' associated with alternative $j$.} \\
+V_{ij} &= x_{ij} \beta = \textrm{the \textit{index} for alternative $j$}\\
+S \left( \cdot \right) &= \textrm{a model-specific function of $V_{ij}$, $\tau_j$ and $\gamma_j$.} \\
+&\quad \ \textrm{It is monotonically increasing in $V_{ij}$.}\\
+C_i &= \textrm{the choice set for individual $i$.}
+\end{aligned}
+\end{equation}
+All models estimated by PyLogit have this form. In a standard conditional logit model, $S \left( V_{ij} \mid \tau _j, \gamma _j \right) = \tau _j + V_{ij}$ where $\tau_j$ is the alternative specific constant or intercept term for alternative $j$ and $V_{ij} $ does not contain a constant of its own.
+
+\section{Computation}
+In performing the MLE of logit-type models, PyLogit evaluates as many operations as it can through the use of matrix dot products. In particular, the calculation of the log-likelihood, the gradient of the log-likelihood with respect to the estimated parameters, and the hessian of the log-likelihood of log-likelihood with respect to the estimated parameters are all calculated through the use of one or more matrix dot products. Often, to be able to use dot products to perform the desired calculations, we require the use of ``mapping matrices'': matrices of zeros and ones that map one quantity to another related quantity. More will be said about the mapping matrices later.
+
+\subsection{The log-likelihood}
+
+Maximum likelihood estimation works as follows to find a desired vector of parameters $\hat{\theta}$:
+\begin{equation}
+\label{eqn:log_likelihood}
+\begin{aligned}
+\hat{\theta} &= \argmax_{\theta} \prod _{i = 1} ^N \prod _{j \in C_i} P_{ij} ^{y_{ij}} \\
+&= \argmax_{\theta} \sum _i ^N \sum _{j \in C_i} y_{ij} \ln \left( P_{ij} \right) \\
+&= \argmax_{\theta} Y^T \ln \left( P \right) \\
+&= \argmax_{\theta} \mathcal{L} \left( \theta \right) \\
+\textrm{where } \theta &= \left[ \hat{\gamma} ^T \mid \hat{\tau} ^T \mid \hat{\beta} ^T \right]^T = \textrm{a column vector created by stacking}\\
+&\quad \ \textrm{ $\hat{\gamma}$ on top of $\hat{\tau}$ on top of $\hat{\beta}$. Note that terms with ``hats''} \\
+&\quad \ \textrm{on them are estimates of their corresponding, unknown} \\
+&\quad \ \textrm{quantities.} \\
+P_{ij} &= \textrm{the probability of individual $i$ choosing alternative $j$} \\
+&\quad \ \textrm{or being associated with outcome $j$. This probability is}\\
+&\quad \ \textrm{given in Eqution \ref{eqn:logit_type}.}\\
+Y &= \textrm{a column vector in $\mathbb{R}^{N_r}$, made by vertically stacking the} \\
+&\quad \ \textrm{$y_{ij}$ for every available alternative for each individual.}\\
+N_r &= \sum _i \parallel C_i \parallel \\
+\parallel C_i \parallel &= \textrm{the size of the choice set for individual $i$.}\\
+P &= \textrm{a column vector in $\mathbb{R}^{N_r}$, made by vertically stacking the} \\
+&\quad \ \textrm{ $P_{ij}$ for every available alternative for every individual.}\\
+\ln \left( P \right) &= \textrm{a column vector in $\mathbb{R}^{N_r}$, made by taking the natural} \\
+&\quad \ \textrm{logarithm, element-wise, of all the elements in  $P$.}\\
+\mathcal{L} \left( \theta \right) &= \textrm{the log-likelihood at the current value of $\theta$.} = Y^T \ln \left( P \right)
+\end{aligned}
+\end{equation}
+
+To compute the maximum-likelihood estimate, $\hat{\theta}$, we therefore need at minimum the vectors $Y$ and $P$. While introduced above through the notion of vertically stacking each of the individual elements, $Y$ and $P$ are not typically obtained this way by PyLogit. First, PyLogit requires that all data used to estimate its logit-type models be in so-called ``long-format.'' Long-format data has one row for every available alternative for every individual. Moreover, the column used to indicate the choice or outcome for an individual is required to be a binary column---i.e. filled with zeros and ones. A ``$1$'' indicates that the alternative on the given row was chosen or associated with the corresponding individual for that row. In other words, $Y$ is available directly from the dataset provided to PyLogit.
+
+A series of internal steps is used to efficiently calculate $P$. First, from the specification of the desired index coefficients, $\beta$, the indices those coefficients belong to, and the variables being multiplied by those coefficients, a design matrix $X$ is formed. Second, the vector $V$ of desired index values for each available alternative for each individual is formed through the dot product of $X$ and $\hat{\beta}$. An example of a set of desired index values is given in the \href{https://github.com/timothyb0912/pylogit/blob/master/examples/Main\%20PyLogit\%20Example.ipynb}{``Main PyLogit Example''} ($\leftarrow$ click me). Thirdly, the necessary transformations $S \left( V_{ij} \mid \tau _j, \gamma _j \right)$ are computed. As much as possible, such transformations are vectorized for speed using numpy and scipy. Finally, $P$ is formed through a set of elementwise operations and matrix dot products. Formally,
+
+\begin{equation}
+\label{eqn:index_and_probs}
+\begin{aligned}
+V &= X \hat{\beta} \quad \textrm{and } P = \frac{\exp \left( \vec{S} \right)}{\lambda \lambda^T \exp \left( \vec{S} \right)}\\
+\textrm{where }X &\in \mathbb{R}^{N_r \times E}\\
+X &= \textrm{The design matrix, formed by vertically stacking all} \\
+&\quad \ \textrm{of the $X_{ij}$ on top of each other.} \\
+X_{ij} &\in \mathbb{R}^{1 \times E} \\
+N_r &= \textrm{the number of rows in X. Defined computationally in} \\
+&\quad \ \textrm{Equation \ref{eqn:log_likelihood}.} \\
+E &= \textrm{the number of explanatory variables in the model.}\\
+&\quad \ \textrm{I.e. the number of index coefficients being estimated.} \\
+\vec{S} &\in \mathbb{R}^{N_r \times 1}\\
+\vec{S} &= \textrm{a column vector formed by stacking all of the} \\
+&\quad \ \textrm{$S \left( V_{ij} \mid \hat{\tau _j}, \hat{\gamma _j} \right) = S_{ij}$ on top of each other.}\\
+\exp \left( \vec{S} \right) &= \textrm{a column vector in $\mathbb{R}^{N_r}$, made by raising} \\
+&\quad \ \textrm{the natural number $e$, element-wise, to the power of the}\\
+&\quad \ \textrm{elements in  $\vec{S}$.} \\
+\lambda &\in \mathbb{R}^{N_r \times N} \\
+\lambda &= \textrm{a mapping matrix of zeros and ones that indicates the} \\
+&\quad \ \textrm{observation (given on the columns) that each row of the} \\
+&\quad \ \textrm{design matrix corresponds to.} \\
+N &= \textrm{the number of observations in one's dataset.}
+\end{aligned}
+\end{equation}
+Note that in the formula given above for $P$, the fraction indicates element-wise division.
+
+\subsection{The Gradient, ${\partial \mathcal{L} \left( \hat{\theta} \right)} / {\partial \hat{\theta}}$}
+The gradient of the log-likelihood with respect to our estimates $\hat{\theta}$ is used by many of the optimization algorithms in Scipy to numerically find a local optima of our log-likelihood function. Therefore, we need an efficient way of calculating the gradient.
+
+The gradient of the log-likelihood function with respect to $\hat{\theta}$ is defined as follows:
+\begin{equation*}
+\begin{aligned}
+\nabla \mathcal{L} \left( \hat{\theta} \right) &= \frac{\partial \mathcal{L} \left( \hat{\theta} \right)}{\partial \hat{\theta}} \\
+&= \frac{\partial \left[ Y^T \ln \left( P \right) \right] }{\partial \hat{\theta}} \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} \ln \left( P_{ij} \right) \right], \quad i \in \left\lbrace 1, 2, ..., N \right\rbrace \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} \left( \ln \left[ \exp \left( S_{ij} \right) \right] - \ln \left[ \sum _{\ell \in C_i} \exp \left( S_{i \ell} \right) \right] \right) \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} \left(  S_{ij} - \ln \left[ \sum _{\ell \in C_i} \exp \left( S_{i \ell} \right) \right] \right) \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} S_{ij} - y_{ij} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} S_{ij} -  \sum _i \sum _{j \in C_i} y_{ij} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} S_{ij} -  \sum _i \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \sum _{j \in C_i} y_{ij} \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i \sum _{j \in C_i} y_{ij} S_{ij} -  \sum _i \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \sum _i  \left( \sum _{j \in C_i} y_{ij} S_{ij} \right) -  \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \sum _i  \left[  \frac{\partial}{\partial \hat{\theta}} \left( \sum _{j \in C_i} y_{ij} S_{ij} \right) - \frac{\partial}{\partial \hat{\theta}} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i} \frac{\partial}{\partial \hat{\theta}} \left[ y_{ij} S_{ij} \right] \right)  - \frac{\partial}{\partial \hat{\theta}} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i} \frac{\partial}{\partial S_{ij}} \left[ y_{ij} S_{ij} \right] \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{\partial}{\partial \hat{\theta}} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{\partial}{\partial \hat{\theta}} \ln \left( \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{\partial}{\partial \varphi} \left[ \ln \left( \varphi \right) \right] \frac{\partial \varphi}{\partial \hat{\theta}} \right]  \quad \textrm{where $\varphi =  \sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right] $}\\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{1}{\varphi} \frac{\partial \varphi}{\partial \hat{\theta}} \right]
+\end{aligned} 
+\end{equation*}
+
+\begin{equation}
+\label{eqn:gradient_log_likelihood}
+\begin{aligned}
+\nabla \mathcal{L} \left( \hat{\theta} \right) &= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{1}{\varphi} \frac{\partial}{\partial \hat{\theta}} \left( \sum _{j \in C_i} \exp \left[ S_{ij} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{1}{\varphi} \left( \sum _{j \in C_i} \frac{\partial}{\partial \hat{\theta}} \exp \left[ S_{i j} \right] \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{1}{\varphi} \left( \sum _{j \in C_i} \frac{\partial}{\partial S_{ij}} \exp \left[ S_{i j} \right] \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \frac{1}{\varphi} \left( \sum _{j \in C_i} \exp \left[ S_{i j} \right] \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \left( \sum _{j \in C_i} \frac{\exp \left[ S_{i j} \right]}{\varphi} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \left( \sum _{j \in C_i} \frac{\exp \left[ S_{i j} \right]}{\sum _{\ell \in C_i} \exp \left[ S_{i \ell} \right]} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right)  - \left( \sum _{j \in C_i} P_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \left[ \left( \sum _{j \in C_i}  y_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} - P_{ij} \frac{\partial S_{ij}}{\partial \hat{\theta}} \right) \right] \\
+&= \sum _i  \sum _{j \in C_i}  \left[ \left( y_{ij}  - P_{ij} \right) \frac{\partial S_{ij}}{\partial \hat{\theta}} \right] \\
+&= \left( Y - P \right)^T \frac{\partial \vec{S}}{\partial \hat{\theta}} \\
+&= \left( Y - P \right)^T \left[ \frac{\partial \vec{S}}{\partial \hat{\gamma}} \mid \frac{\partial \vec{S}}{\partial \hat{\tau}} \mid \frac{\partial \vec{S}}{\partial \hat{\beta}} \right] \\
+&= \left( Y - P \right)^T \left[ \frac{\partial \vec{S}}{\partial \hat{\gamma}} \mid \frac{\partial \vec{S}}{\partial \hat{\tau}} \mid \frac{\partial \vec{S}}{\partial V} \frac{\partial V}{\partial \hat{\beta}} \right] \\
+&= \left( Y - P \right)^T \left[ \frac{\partial \vec{S}}{\partial \hat{\gamma}} \mid \frac{\partial \vec{S}}{\partial \hat{\tau}} \mid \frac{\partial \vec{S}}{\partial V} X \right] \\
+&= \left( Y - P \right)^T \left[ \frac{\partial \vec{S}}{\partial \hat{\gamma}} \mid \xi^{(-1)} \mid \frac{\partial \vec{S}}{\partial V} X \right] \\
+\textrm{where } \xi &= \textrm{a mapping matrix of zeros and ones that indicates the} \\
+&\quad \ \textrm{alternative (given on the columns) that each row of the} \\
+&\quad \ \textrm{design matrix corresponds to.} \\
+\xi^{(-1)} &= \textrm{the mapping matrix $\xi$, without the column that corresponds}\\
+&\quad \ \textrm{to the alternative whose intercept, $\tau _j$, is not being estimated.}
+\end{aligned}
+\end{equation}
+Note that by the chain rule, $\dfrac{\partial \mathcal{L} \left( \hat{\theta} \right)}{\partial \hat{\theta}} = \dfrac{\partial \mathcal{L} \left( \hat{\theta} \right)}{\partial \vec{S}} \dfrac{\partial \vec{S}}{\partial \hat{\theta}}$. From above, this implies that $ \dfrac{\partial \mathcal{L} \left( \hat{\theta} \right)}{\partial \vec{S}} = \left( Y - P \right)^T$. \newpage
+
+In PyLogit, the calculation of the gradient is based on Equation \ref{eqn:gradient_log_likelihood}. The vectors $Y$ and $P$ are readily available based on the provided data and Equation \ref{eqn:index_and_probs}. The matrices $\dfrac{\partial \vec{S}}{\partial \hat{\gamma}}$ and $\dfrac{\partial \vec{S}}{\partial V}$ differ from model to model, and custom functions to calculate them must\footnote{Automatic Differentiation or Finite Differences could be used to avoid having to manually write such functions, but the estimation times would increase greatly as a result.} be written for each model that PyLogit supports. $\xi^{(-1)}$ differs from specification to specification, but it can always be easily calculated once per model estimation. Note that in PyLogit, all of the mapping matrices are implemented as Scipy sparse matrices for fast matrix dot products.
+
+\subsection{The Hessian, $\dfrac{\partial ^2 \mathcal{L} \left( \hat{\theta} \right) }{{\partial \hat{\theta}}^2}$}
+Although it is not required by all of the optimizers in scipy.optimize, being able to calculate the Hessian in closed-form is useful for optimizing non-concave log-likelihood functions. Below, the form of the Hessian used by PyLogit is derived for logit-type models.
+
+The hessian is given by:
+\begin{equation}
+\label{eqn:partitioned_hessian}
+\begin{aligned}
+\textrm{Hessian} = \frac{\partial ^2 \mathcal{L} \left( \hat{\theta} \right) }{ {\partial \hat{\theta}}^2 } &= \frac{\partial}{\partial \hat{\theta}} \left[ \frac{\partial \left( Y^T \ln \left[ P \right] \right) }{\partial \hat{\theta}} \right] \\
+&= \frac{\partial}{\partial \hat{\theta}} \left[ \frac{\partial}{\partial \hat{\gamma}}  \left( Y^T \ln \left[ P \right] \right)   \mid \frac{\partial}{\partial \hat{\tau}}  \left( Y^T \ln \left[ P \right] \right) \mid \frac{\partial}{\partial \hat{\beta}}  \left( Y^T \ln \left[ P \right] \right) \right] 
+\\
+&= \left[ \begin{array}{c}
+\frac{\partial}{\partial \hat{\theta}} \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right)
+\\[1.2ex]
+\frac{\partial}{\partial \hat{\theta}} \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\[1.2ex]
+\frac{\partial}{\partial \hat{\theta}} \left( \frac{\partial}{\partial \hat{\beta}} \left[ Y^T \ln \left( P \right) \right] \right)
+\end{array}  \right] 
+\\
+&= \left[ \begin{array}{c|c|c}
+\frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right)  &
+
+\frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right) &
+ 
+\frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right) \\[1.2ex]
+
+ \frac{\partial}{\partial \hat{\gamma}} \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) & 
+
+\frac{\partial}{\partial \hat{\tau}} \left( \frac{ \partial }{ \partial \hat{\tau} }  \left[ Y^T \ln \left( P \right) \right] \right) &
+
+ \frac{\partial}{\partial \hat{\beta}} \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) \\[1.2ex]
+
+ \frac{\partial}{\partial \hat{\gamma}} \left( \frac{\partial}{\partial \hat{\beta}} \left[ Y^T \ln \left( P \right) \right] \right) & 
+
+ \frac{\partial}{\partial \hat{\tau}} \left( \frac{\partial}{\partial \hat{\beta}} \left[ Y^T \ln \left( P \right) \right] \right) & 
+
+\frac{\partial}{\partial \hat{\beta}} \left( \frac{\partial}{\partial \hat{\beta}} \left[ Y^T \ln \left( P \right) \right] \right)
+\end{array}  \right] \\
+&= \left[ \begin{array}{c|c|c}
+H_{11} & H_{12} & H_{13} \\
+H_{21} & H_{22} & H_{23} \\
+H_{31} & H_{32} & H_{33}
+\end{array}  \right]
+\end{aligned}
+\end{equation}
+Based on Equation \ref{eqn:partitioned_hessian}, we can see that the Hessian is actually a partitioned matrix with nine sub-matrices. In the cases where either $\gamma$ and/or $\tau$ do not exist in one's model, the Hessian matrix can be derived from Equation \ref{eqn:partitioned_hessian} by deleting the rows and columns that contain partial derivatives with respect to the parameters that are not present in $\theta$. In the simplest case, where there are no shape parameters ($\gamma$) and no intercept parameters ($\tau$) outside of the index, the Hessian reduces to the usual expression for conditional logit models: $\dfrac{\partial}{\partial \hat{\beta}} \left( \dfrac{\partial}{\partial \hat{\beta}} \left[ Y^T \ln \left( P \right) \right] \right)$.
+
+Below, we will derive expressions for the nine sub-matrices $H_{mn}$ where $m, n \in \left\lbrace 1, 2, 3 \right\rbrace$. Note however, that we do not actually need to derive all nine sub-matrices because mixed partial derivatives of vectors are transposes of each other. Stated more precisely, $\dfrac{\partial}{\partial A} \left[ \dfrac{\partial \alpha \left(A, B \right)}{\partial B} \right] = \left(\dfrac{\partial}{\partial B} \left[ \dfrac{\partial \alpha \left(A, B \right)}{\partial A} \right] \right)^T $ for a function $\alpha \left( \cdot \right)$ that maps input vectors $A$ and $B$ to scalar outputs.
+
+\subsubsection{$H_{11}$}
+\begin{equation}
+\begin{aligned}
+H_{11} &= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{12}$}
+\begin{equation}
+\begin{aligned}
+H_{12} &= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial P}{\partial \vec{S}} \xi^{(-1)}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{13}$}
+\begin{equation}
+\begin{aligned}
+H_{13} &= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \hat{\gamma}}  \left[ Y^T \ln \left( P \right) \right] \right)
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial \hat{\gamma}} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial V} X
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{21}$}
+\begin{equation}
+\begin{aligned}
+H_{21} &= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\tau}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= - \left( \xi^{(-1)} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{22}$}
+\begin{equation}
+\begin{aligned}
+H_{22} &= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\tau}} \right)
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\tau}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= - \left( \xi^{(-1)} \right)^T \frac{\partial P}{\partial \vec{S}} \xi^{(-1)}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{23}$}
+\begin{equation}
+\begin{aligned}
+H_{23} &= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \hat{\tau}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\tau}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\tau}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= - \left( \xi^{(-1)} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} \\
+&= - \left( \xi^{(-1)} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial V} X
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{31}$}
+\begin{equation}
+\begin{aligned}
+H_{31} &= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \hat{\beta}}  \left[ Y^T \ln \left( P \right) \right] \right)
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\gamma}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)^T \frac{\partial P}{\partial \vec{S}}  \frac{\partial \vec{S}}{\partial \hat{\gamma}}
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial V} X \right)^T \frac{\partial P}{\partial \vec{S}}  \frac{\partial \vec{S}}{\partial \hat{\gamma}} 
+ \\
+&= - X^T  \left( \frac{\partial \vec{S}}{\partial V} \right)^T \frac{\partial P}{\partial \vec{S}}  \frac{\partial \vec{S}}{\partial \hat{\gamma}}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{32}$}
+\begin{equation}
+\begin{aligned}
+H_{32} &= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \hat{\beta}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) 
+\\
+&= \frac{\partial}{\partial \hat{\tau}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\tau}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)^T \frac{\partial P}{\partial \vec{S}} \xi^{(-1)}  \\
+&= - \left( \frac{\partial \vec{S}}{\partial V} X  \right)^T \frac{\partial P}{\partial \vec{S}} \xi^{(-1)} \\
+&= - X^T \left( \frac{\partial \vec{S}}{\partial V} \right)^T \frac{\partial P}{\partial \vec{S}} \xi^{(-1)}
+\end{aligned}
+\end{equation}
+
+\subsubsection{$H_{33}$}
+\begin{equation}
+\begin{aligned}
+H_{33} &= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \hat{\beta}}  \left[ Y^T \ln \left( P \right) \right] \right) 
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \frac{\partial}{\partial \vec{S}}  \left[ Y^T \ln \left( P \right) \right] \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)
+\\
+&= \frac{\partial}{\partial \hat{\beta}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) 
+\\
+&= \frac{\partial}{\partial \vec{S}}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \frac{\partial}{\partial \left( Y - P \right)}  \left( \left[ Y - P \right]^T \frac{\partial \vec{S}}{\partial \hat{\beta}} \right) \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= \left( \frac{\partial \vec{S}}{\partial \hat{\beta}} \right)^T \frac{\partial \left( Y - P \right)}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial \hat{\beta}} 
+\\
+&= - \left( \frac{\partial \vec{S}}{\partial V} X \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial V} X \\
+&= - X^T \left( \frac{\partial \vec{S}}{\partial V} \right)^T \frac{\partial P}{\partial \vec{S}} \frac{\partial \vec{S}}{\partial V} X
+\end{aligned}
+\end{equation}
+
+\subsubsection{$\dfrac{\partial P}{\partial \vec{S}}$}
+The last nine sub-sections showed that it is possible to express all of the sub-matrices of the Hessian in terms of dot products of matrices that were used to form the gradient and one unknown matrix $\dfrac{\partial P}{\partial \vec{S}}$. Below, we derive an expression for $\dfrac{\partial P}{\partial \vec{S}}$, thereby allowing us to compute a closed-form solution for the Hessian of the logit-type models used in PyLogit.
+
+First, note that we can write:
+\begin{equation*}
+\begin{aligned}
+P &= \left[ \begin{array}{c}
+P_1 \\
+P_2 \\
+ ... \\
+ P_N 
+\end{array} \right] \\
+\textrm{where } P_i &= \left[ \begin{array}{c}
+P_{i1} \\
+P_{i2} \\
+ ... \\
+ P_{ij} 
+\end{array} \right], \quad j \in C_i
+\end{aligned}
+\end{equation*}
+It then follows that
+\begin{equation}
+\frac{\partial P}{\partial \vec{S}} = \left[ \begin{array}{c} 
+\frac{\partial P_1}{\partial \vec{S}} \\[1.2ex]
+\frac{\partial P_2}{\partial \vec{S}} \\
+... \\
+\frac{\partial P_N}{\partial \vec{S}}
+\end{array} \right]
+\end{equation}
+A generic partition, $\dfrac{\partial P_i}{\partial \vec{S}}$ of $\dfrac{\partial P}{\partial \vec{S}}$ can further be decomposed as follows:
+\begin{equation}
+\begin{aligned}
+\frac{\partial P_i}{\partial \vec{S}} &= \left[ \frac{\partial P_i}{\partial \vec{S}_1} \mid \frac{\partial P_i}{\partial \vec{S}_2} \mid ... \mid \frac{\partial P_i}{\partial \vec{S}_N} \right] \\
+\textrm{where } \frac{\partial P_i}{\partial \vec{S}_{i'}} &= \vec{0}_{i, i'}, \quad \forall i' \neq i 
+\\
+\vec{0}_{i, i'} &\in \mathbb{R}^{ \parallel C_i \parallel \times \parallel C_{i'} \parallel} 
+\\
+i, i' &\in \left\lbrace 1, 2, ... N \right\rbrace 
+\\
+\vec{S}_i &= \left[ S_{i1} \mid S_{i2} \mid ... \mid S_{ij} \right]^T, \quad j \in C_i
+\end{aligned}
+\end{equation}
+Because $\dfrac{\partial P_i}{\partial \vec{S}_{i'}} = \vec{0}_{i, i'}, \  \forall i' \neq i$, we can focus on computing $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$.
+\begin{equation}
+\frac{\partial P_i}{\partial \vec{S}_{i}} = \left[ \begin{array}{cccc}
+\frac{\partial P_{i1}}{\partial S_{i1}} & \frac{\partial P_{i1}}{\partial S_{i2}} & ... & \frac{\partial P_{i1}}{\partial S_{ij}}
+\\[1.2ex]
+\frac{\partial P_{i2}}{\partial S_{i1}} & \frac{\partial P_{i2}}{\partial S_{i2}} & ... & \frac{\partial P_{i2}}{\partial S_{ij}}
+\\
+... & ... & ... & ...
+\\[1.2ex]
+\frac{\partial P_{ij}}{\partial S_{i1}} & \frac{\partial P_{ij}}{\partial S_{i2}} & ... & \frac{\partial P_{ij}}{\partial S_{ij}}
+\end{array} \right] \quad j \in C_i
+\end{equation}
+The individual elements of $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$ can be computed as follows:
+\begin{equation*}
+\begin{aligned}
+\frac{\partial P_{i \ell}}{\partial S_{i \ell}} &= \frac{\partial}{\partial S_{i \ell}} \left[ \frac{ \exp \left( S_{i \ell} \right) }{\sum _{k \in C_i} \exp \left( S_{i k} \right) } \right] 
+\\
+&= \frac{ \left[ \sum _{k \in C_i} \exp \left( S_{i k} \right) \right] \exp \left( S_{i \ell} \right) - \exp \left( S_{i \ell} \right) \exp \left( S_{i \ell} \right) }{ \left[ \sum _{k \in C_i} \exp \left( S_{i k} \right) \right]^2 }
+ \\
+&= P_{i \ell} - \left( P_{i \ell} \right)^2 
+\\
+\frac{\partial P_{i \ell}}{\partial S_{i \ell'}} &= \frac{\partial}{\partial S_{i \ell'}} \left[ \frac{ \exp \left( S_{i \ell} \right) }{\sum _{k \in C_i} \exp \left( S_{i k} \right) } \right] \quad \forall \ell' \neq \ell
+\\
+&=  \frac{ \left[ \sum _{k \in C_i} \exp \left( S_{i k} \right) \right] * 0 - \exp \left( S_{i \ell} \right) \exp \left( S_{i \ell'} \right) }{ \left[ \sum _{k \in C_i} \exp \left( S_{i k} \right) \right]^2 }
+\\
+&= -P_{i \ell} P_{i \ell'}
+\end{aligned}
+\end{equation*}
+With these results in hand, $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$ can be rewritten as follows:
+\begin{equation}
+\label{eqn:dp_ds_submatrices}
+\begin{aligned}
+\frac{\partial P_i}{\partial \vec{S}_{i}} &= \left[ \begin{array}{cccc}
+\frac{\partial P_{i1}}{\partial S_{i1}} & \frac{\partial P_{i1}}{\partial S_{i2}} & ... & \frac{\partial P_{i1}}{\partial S_{ij}}
+\\[1.2ex]
+\frac{\partial P_{i2}}{\partial S_{i1}} & \frac{\partial P_{i2}}{\partial S_{i2}} & ... & \frac{\partial P_{i2}}{\partial S_{ij}}
+\\
+... & ... & ... & ...
+\\[1.2ex]
+\frac{\partial P_{ij}}{\partial S_{i1}} & \frac{\partial P_{ij}}{\partial S_{i2}} & ... & \frac{\partial P_{ij}}{\partial S_{ij}}
+\end{array} \right], \quad j \in C_i
+\\
+&= \left[ \begin{array}{cccc}
+P_{i 1} - \left( P_{i 1} \right)^2 &-P_{i 1} P_{i 2} & ... & -P_{i 1} P_{i j}
+\\[1.2ex]
+-P_{i 1} P_{i 2}& P_{i 2} - \left( P_{i 2} \right)^2 & ... & -P_{i 2} P_{i j}
+\\
+... & ... & ... & ...
+\\[1.2ex]
+-P_{i 1} P_{i j} & -P_{i 2} P_{i j} & ... & P_{i j} - \left( P_{i j} \right)^2
+\end{array} \right]
+\\
+&= \textrm{diag} \left( P_i \right) - P_i {P_i}^T
+\\
+\textrm{where diag} \left( \cdot \right) &= \textrm{a diagonal matrix with the entries of the argument}
+\\
+&\quad \ \textrm{on the main diagonal.}
+\end{aligned}
+\end{equation}
+Returning finally to $\dfrac{\partial P}{\partial \vec{S}}$ we can convince ourselves that $\dfrac{\partial P}{\partial \vec{S}}$ is a block diagonal matrix formed by the submatrices $\dfrac{\partial P_i}{\partial \vec{S}_i}$ for $i \in \left\lbrace 1, 2, ..., N \right\rbrace$. 
+\begin{equation}
+\label{eqn:dp_ds}
+\begin{aligned}
+\frac{\partial P}{\partial \vec{S}} &= \left[ \begin{array}{c} 
+\frac{\partial P_1}{\partial \vec{S}} \\[1.2ex]
+\frac{\partial P_2}{\partial \vec{S}} \\
+... \\
+\frac{\partial P_N}{\partial \vec{S}}
+\end{array} \right]
+\\
+&= \left[ \begin{array}{cccc} 
+\frac{\partial P_1}{\partial \vec{S}_1} & \vec{0}_{1, 2}  & \cdots &  \vec{0}_{1, N}\\[1.2ex]
+\vec{0}_{2, 1} & \frac{\partial P_2}{\partial \vec{S}_2}  & \cdots &  \vec{0}_{2, N}\\
+\cdots & \cdots & \ddots & \cdots \\
+\vec{0}_{N, 1} & \vec{0}_{N, 1} & \cdots & \frac{\partial P_N}{\partial \vec{S}_N}
+\end{array} \right]
+\end{aligned}
+\end{equation}
+
+As written above, we only have a vectorized implementation of $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$. To compute $\dfrac{\partial P}{\partial \vec{S}}$, a for-loop would need to be employed to create each $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$ and to assemble them block-diagonally. Aside from being computationally inefficient, this would also be memory inefficient since $\dfrac{\partial P}{\partial \vec{S}}$ will have shape $N_r \times N_r$.
+
+To avoid these difficulties, we'll first extend the vectorized implementation of $\dfrac{\partial P_i}{\partial \vec{S}_{i}}$ from individuals to the entire dataset. In particular, to form $\dfrac{\partial P}{\partial \vec{S}}$, we use
+\begin{equation}
+\label{eq:dp-ds-vectorized}
+\begin{aligned}
+\frac{\partial P}{\partial \vec{S}} &= \textrm{diag} \left( P \right) - \left[ \textrm{diag} \left( P \right) \lambda \right] \left[ \textrm{diag} \left( P \right) \lambda \right]^T\\
+\textrm{where } \lambda &\in \mathbb{R}^{N_r \times N} \\
+\lambda &= \textrm{a mapping matrix of zeros and ones that indicates the} \\
+&\quad \ \textrm{observation (given on the columns) that each row of the} \\
+&\quad \ \textrm{design matrix corresponds to.} \\
+N_r &= \textrm{The number of rows in $X$.}\\
+N &= \textrm{The number of decision makers in the dataset.}
+\end{aligned}
+\end{equation}
+
+Next, we note that matrix multiplication is associative, so we can calculate the hessian without explicitly calculating $\dfrac{\partial P}{\partial \vec{S}}$. To do so, we distribute all matrix multiplication operations across the terms in Equation \ref{eq:dp-ds-vectorized}: $\textrm{diag} \left( P \right)$, $\left[ \textrm{diag} \left( P \right) \lambda \right]$, and $\left[ \textrm{diag} \left( P \right) \lambda \right]^T$.
+\end{document}
