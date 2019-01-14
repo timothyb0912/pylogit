@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+©# -*- coding: utf-8 -*-
 """
 Created on Sun Feb 28 09:12:36 2016
 
@@ -817,7 +817,7 @@ def calc_hessian(beta,
         hess = d2_ll_db2
 
     if ridge is not None:
-        hess -= 2 * ridge
+        hess -= 2 * ridge * np.identity(hess.shape[0])
 
     # Make sure we are returning standard numpy arrays
     if isinstance(hess, np.matrixlib.defmatrix.matrix):
