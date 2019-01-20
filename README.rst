@@ -43,7 +43,7 @@ For More Information
 For more information about the asymmetric models that can be estimated with PyLogit, see the following paper
     Brathwaite, T., & Walker, J. L. (2018). Asymmetric, closed-form, finite-parameter models of multinomial choice. Journal of Choice Modelling, 29, 78–112. https://doi.org/10.1016/j.jocm.2018.01.002
 
-A free and better formatted version is available at `http://arxiv.org/abs/1606.05900 <http://arxiv.org/abs/1606.05900>`.
+A free and better formatted version is available at http://arxiv.org/abs/1606.05900.
 
 Attribution
 ===========
