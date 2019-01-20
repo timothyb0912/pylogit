@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This module provides a general "estimate" function and EstimationObj class for
 pylogit's logit-type models.

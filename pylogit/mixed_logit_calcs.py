@@ -710,7 +710,7 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
         gradient_per_obs.T.dot(weights_per_obs[:, None] * gradient_per_obs)
 
     if ridge is not None:
-        bhhh_matrix -= 2 * ridge
+        bhhh_matrix -= 2 * ridge * np.identity(bhhh_matrix.shape[0])
 
     # Note the "-1" is because we are approximating the Fisher information
     # matrix which has a negative one in the front of it?

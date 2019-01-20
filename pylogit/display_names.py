@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This file declares the strings that will be displayed for each model type based
 on the abbriviated model type string that is passed to the choice model

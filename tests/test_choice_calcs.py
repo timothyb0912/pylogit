@@ -975,7 +975,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         gradient_args[-2] = self.ridge
         function_result = func(*gradient_args)
 
@@ -1335,7 +1336,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
@@ -1469,7 +1471,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 

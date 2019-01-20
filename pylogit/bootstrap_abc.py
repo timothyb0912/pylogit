@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 @author:    Timothy Brathwaite
 @name:      Bootstrap ABC
