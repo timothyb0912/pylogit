@@ -861,7 +861,7 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
         # by negative one afterwards. I don't know if this is the correct way
         # to calculate the Fisher Information Matrix in ridge regression
         # models.
-        bhhh_matrix += 2 * ridge
+        bhhh_matrix += 2 * ridge * np.identity(bhhh_matrix.shape[0])
 
     # Note the "-1" is because we are approximating the Fisher information
     # matrix which has a negative one in the front of it?

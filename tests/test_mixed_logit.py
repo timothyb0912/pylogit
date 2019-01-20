@@ -635,7 +635,8 @@ class MixedLogitCalculations(unittest.TestCase):
         # Perform the test with the ridge coefficient
         args.append(self.ridge)
         func_res2 = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
-        new_neg_bhhh = bhhh_matrix + 2 * self.ridge
+        new_neg_bhhh =\
+            bhhh_matrix + 2 * self.ridge * np.identity(bhhh_matrix.shape[0])
 
         npt.assert_allclose(new_neg_bhhh, func_res2)
 
@@ -648,7 +649,9 @@ class MixedLogitCalculations(unittest.TestCase):
         # Repeat the tests with observation weights
         weights = 2 * np.ones(self.fake_design_3d.shape[0])
         args.append(weights)
-        weighted_ridge_bhhh = (2 * bhhh_matrix + 2 * self.ridge)
+        weighted_ridge_bhhh =\
+            (2 * bhhh_matrix +
+             2 * self.ridge * np.identity(bhhh_matrix.shape[0]))
         new_func_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
         npt.assert_allclose(weighted_ridge_bhhh, new_func_bhhh)
 
