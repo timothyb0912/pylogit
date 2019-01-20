@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 @name:      Estimator Constructor
 @author:    Timothy Brathwaite
