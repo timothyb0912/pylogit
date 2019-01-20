@@ -997,7 +997,7 @@ def calc_fisher_info_matrix(beta,
         # matrix should approximate the hessian and in the hessian we add
         # 2 * ridge at the end. I don't know if this is the correct way to
         # calculate the Fisher Information in ridge regression models.
-        fisher_matrix -= 2 * ridge
+        fisher_matrix -= 2 * ridge * np.identity(fisher_matrix.shape[0])
 
     return fisher_matrix
 
