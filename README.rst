@@ -1,7 +1,6 @@
-.. image:: images/PyLogit_Final-01.svg
-    :scale: 10 %
-    :alt: PyLogit logo
-    :align: center
+.. raw:: html
+    <img src="./images/PyLogit_Final.png" height="50px">
+
 |Build Status| |Coverage|
 
 What PyLogit is
