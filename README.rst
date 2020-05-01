@@ -1,5 +1,5 @@
 .. image:: images/PyLogit_Final.png
-    :height: 50px
+    :height: 25px
     :alt: PyLogit logo
     :align: center
 |Build Status| |Coverage|
