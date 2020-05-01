@@ -1,5 +1,5 @@
 .. raw:: html
-    <img src="https://raw.githubusercontent.com/timothyb0912/pylogit/blob/update-logo/images/PyLogit_Final.png" height="200px">
+    <img src="https://github.com/timothyb0912/pylogit/blob/update-logo/images/PyLogit_Final.png" height="200px">
 
 |Build Status| |Coverage|
 
