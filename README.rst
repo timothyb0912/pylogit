@@ -1,6 +1,8 @@
-.. image:: https://travis-ci.org/timothyb0912/pylogit.svg?branch=master
-    :target: https://travis-ci.org/timothyb0912/pylogit
-.. image:: https://coveralls.io/repos/github/timothyb0912/pylogit/badge.svg?branch=master
+.. image:: images/PyLogit_Final.png
+    :height: 200px
+    :alt: PyLogit logo
+    :align: center
+|Build Status| |Coverage|
 
 What PyLogit is
 ===============
@@ -124,3 +126,7 @@ Changelog
 0.0.0 (March 15th, 2016)
 -------------------------
 - Initial package release with support for the conditional logit (MNL) model.
+
+.. |Build status| image:: https://travis-ci.org/timothyb0912/pylogit.svg?branch=master
+    :target: https://travis-ci.org/timothyb0912/pylogit
+.. |Coverage| image:: https://coveralls.io/repos/github/timothyb0912/pylogit/badge.svg?branch=master
