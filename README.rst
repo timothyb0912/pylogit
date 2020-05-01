@@ -1,5 +1,5 @@
 .. image:: images/PyLogit_Final-small-02.png
-    :height: 100px
+    :scale: 100 %
     :alt: PyLogit logo
     :align: center
 
