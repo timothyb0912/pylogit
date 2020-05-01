@@ -1,4 +1,4 @@
-.. image:: ./imagesPyLogit_Final-small-03.png
+.. image:: ./images/PyLogit_Final-small-03.png
     :scale: 100 %
     :alt: PyLogit logo
     :align: center
