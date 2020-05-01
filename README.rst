@@ -1,8 +1,3 @@
-.. image:: ./images/PyLogit_Final-small-03.png
-    :scale: 100 %
-    :alt: PyLogit logo
-    :align: center
-
 .. image:: ./images/PyLogit_Final-small-04.png
     :scale: 100 %
     :alt: PyLogit logo-2
@@ -11,11 +6,6 @@
 .. image:: ./images/PyLogit_Final-small-05.png
     :scale: 100 %
     :alt: PyLogit logo-3
-    :align: center
-
-.. image:: ./images/PyLogit_Final-small-06.png
-    :scale: 100 %
-    :alt: PyLogit logo-4
     :align: center
 
 |Build Status| |Coverage|
