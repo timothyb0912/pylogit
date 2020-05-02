@@ -363,7 +363,7 @@ class ChoiceObjectTests(GenericTestCase):
                 # This should trigger a UserWarning
                 clog_obj = clog.MNCL(*standard_args, **bad_kwargs)
                 # Check that the warning has been created.
-                self.assertEqual(len(context), pos + 1)
+                self.assertGreaterEqual(len(context), pos + 1)
                 self.assertIsInstance(context[-1].category, type(UserWarning))
                 self.assertIn(clog._shape_ignore_msg, str(context[-1].message))
 

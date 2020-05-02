@@ -148,7 +148,7 @@ class ChoiceObjectTests(GenericTestCase):
             # This should trigger a UserWarning
             uneven_obj = uneven.MNUL(*self.constructor_args, **kwargs)
             # Check that the warning has been created.
-            self.assertEqual(len(context), 1)
+            self.assertGreaterEqual(len(context), 1)
             self.assertIsInstance(context[-1].category, type(UserWarning))
             self.assertIn(uneven._shape_ref_msg, str(context[-1].message))
 

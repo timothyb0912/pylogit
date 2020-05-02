@@ -173,7 +173,7 @@ class ChoiceObjectTests(unittest.TestCase):
                 # This should trigger a UserWarning
                 mnl_obj = mnl.MNL(*standard_args, **bad_kwargs)
                 # Check that the warning has been created.
-                self.assertEqual(len(context), pos + 1)
+                self.assertGreaterEqual(len(context), pos + 1)
                 self.assertIsInstance(context[-1].category, type(UserWarning))
                 self.assertIn(mnl._shape_ignore_msg, str(context[-1].message))
 
