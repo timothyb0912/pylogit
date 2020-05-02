@@ -11,3 +11,5 @@ Professor Paul Waddell has graciously provided the financial support that
 helped ensure continued progress on this package.
 
 Oleksandr Lysenko ported PyLogit to Python >= 3.4.
+
+Eunice Poon designed the logo.
