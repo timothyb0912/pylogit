@@ -5,15 +5,22 @@
 #    pip-compile requirements.in
 #
 attrs==20.3.0             # via pytest
+certifi==2020.12.5        # via requests
+chardet==4.0.0            # via requests
 click==7.1.2              # via pip-tools
 coverage==5.3.1           # via pytest-cov
+docopt==0.6.2             # via pipreqs
 future==0.18.2            # via -r requirements.in
+idna==2.10                # via requests
 importlib-metadata==3.3.0  # via pluggy, pytest
 iniconfig==1.1.1          # via pytest
-numpy==1.19.4             # via -r requirements.in, pandas, scipy
+mock==4.0.3               # via -r requirements.in
+numpy==1.19.4             # via -r requirements.in, pandas, patsy, scipy, statsmodels
 packaging==20.8           # via pytest
-pandas==1.1.5             # via -r requirements.in
+pandas==1.1.5             # via -r requirements.in, statsmodels
+patsy==0.5.1              # via statsmodels
 pip-tools==5.4.0          # via -r requirements.in
+pipreqs==0.4.10           # via -r requirements.in
 pluggy==0.13.1            # via pytest
 py==1.10.0                # via pytest
 pyparsing==2.4.7          # via packaging
@@ -21,10 +28,15 @@ pytest-cov==2.10.1        # via -r requirements.in
 pytest==6.2.1             # via -r requirements.in, pytest-cov
 python-dateutil==2.8.1    # via pandas
 pytz==2020.5              # via pandas
-scipy==1.5.4              # via -r requirements.in
-six==1.15.0               # via pip-tools, python-dateutil
+requests==2.25.1          # via yarg
+scipy==1.5.4              # via -r requirements.in, statsmodels
+six==1.15.0               # via patsy, pip-tools, python-dateutil
+statsmodels==0.12.1       # via -r requirements.in
 toml==0.10.2              # via pytest
+tqdm==4.55.0              # via -r requirements.in
 typing-extensions==3.7.4.3  # via importlib-metadata
+urllib3==1.26.2           # via requests
+yarg==0.1.9               # via pipreqs
 zipp==3.4.0               # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
