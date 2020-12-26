@@ -701,7 +701,7 @@ def create_design_matrix(long_form,
                     var_names.append("{}_{}".format(variable, str(group)))
 
     # Create the final design matrix
-    design_matrix = np.hstack((x[:, None] for x in independent_vars))
+    design_matrix = np.hstack(tuple(x[:, None] for x in independent_vars))
 
     # Use the list of names passed by the user, if the user passed such a list
     if names is not None:
