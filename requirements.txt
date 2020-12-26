@@ -4,15 +4,28 @@
 #
 #    pip-compile requirements.in
 #
+attrs==20.3.0             # via pytest
 click==7.1.2              # via pip-tools
+coverage==5.3.1           # via pytest-cov
 future==0.18.2            # via -r requirements.in
+importlib-metadata==3.3.0  # via pluggy, pytest
+iniconfig==1.1.1          # via pytest
 numpy==1.19.4             # via -r requirements.in, pandas, scipy
+packaging==20.8           # via pytest
 pandas==1.1.5             # via -r requirements.in
 pip-tools==5.4.0          # via -r requirements.in
+pluggy==0.13.1            # via pytest
+py==1.10.0                # via pytest
+pyparsing==2.4.7          # via packaging
+pytest-cov==2.10.1        # via -r requirements.in
+pytest==6.2.1             # via -r requirements.in, pytest-cov
 python-dateutil==2.8.1    # via pandas
 pytz==2020.5              # via pandas
 scipy==1.5.4              # via -r requirements.in
 six==1.15.0               # via pip-tools, python-dateutil
+toml==0.10.2              # via pytest
+typing-extensions==3.7.4.3  # via importlib-metadata
+zipp==3.4.0               # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

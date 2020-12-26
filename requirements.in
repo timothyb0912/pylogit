@@ -2,4 +2,6 @@ future
 numpy
 pandas
 pip-tools
+pytest
+pytest-cov
 scipy
