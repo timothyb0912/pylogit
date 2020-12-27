@@ -6,6 +6,7 @@
 #
 appdirs==1.4.4            # via virtualenv
 attrs==20.3.0             # via pytest
+bump2version==1.0.1       # via -r requirements.in
 certifi==2020.12.5        # via requests
 chardet==4.0.0            # via requests
 click==7.1.2              # via pip-tools, towncrier
