@@ -12,4 +12,4 @@ from .bootstrap import Boot
 from .choice_tools import convert_wide_to_long
 from .choice_tools import convert_long_to_wide
 
-__version__ = "0.2.2"
+__version__ = "1.0.0"
