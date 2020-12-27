@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Pylogit 1.0.0 (2020-12-27)
 ==========================
 
+Removed from package
+--------------------
+
+- Support for python2.7 or any python 3 version below 3.6. (#67)
+
+
 Bug fixes
 ---------
 
