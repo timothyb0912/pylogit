@@ -10,4 +10,6 @@ pytest-cov
 scipy
 statsmodels
 towncrier
+tox
+tox-conda
 tqdm
