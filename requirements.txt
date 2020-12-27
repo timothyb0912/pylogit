@@ -45,7 +45,8 @@ six==1.15.0               # via patsy, pip-tools, python-dateutil, tox, virtuale
 statsmodels==0.12.1       # via -r requirements.in
 toml==0.10.2              # via pytest, towncrier, tox
 towncrier==19.2.0         # via -r requirements.in
-tox==3.20.1               # via -r requirements.in
+tox-conda==0.4.1          # via -r requirements.in
+tox==3.20.1               # via -r requirements.in, tox-conda
 tqdm==4.55.0              # via -r requirements.in
 urllib3==1.26.2           # via requests
 virtualenv==20.2.2        # via tox
