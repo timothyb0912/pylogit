@@ -21,6 +21,9 @@ build
 # Files produced when tracking statement coverage of code.
 .coverage
 
+# Files produced when testing code
+.tox
+
 # Folder that stores deprecated code.
 deprecated_code
 deprecated_code/
