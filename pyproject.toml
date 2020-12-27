@@ -84,3 +84,17 @@ all_bullets = true
     directory = "trivial"
     name = "Trivial/Internal Changes"
     showcontent = true
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = True
+envlist = py36, py37, py38
+requires = tox-conda
+
+[testenv]
+deps = pytest >= 3.3.0
+commands =
+    make install
+    pytest
+"""
