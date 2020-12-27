@@ -1,0 +1,100 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "pylogit"
+author = "Timothy Brathwaite"
+author-email = "timothyb0912@gmail.com"
+home-page = "https://github.com/timothyb0912/pylogit"
+description-file = "README.md"
+requires = [
+    "pandas >= 0.16.2",
+    "numpy >= 1.10.2",
+    "scipy >= 0.16.1",
+    "future >= 0.16",
+    "statsmodels >= 0.6.1",
+    "tqdm >= 4.15.0",
+]
+requires-python = ">=3.6"
+keywords = "conditional logit,discrete choice,econometrics,choice models"
+license = "BSD-3-Clause"
+classifiers = [
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Environment :: Console",
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: BSD License",
+]
+
+[tool.flit.sdist]
+exclude = ["src/pylogit/newsfragments/"]
+
+[tool.towncrier]
+package = "pylogit"
+package_dir = "src/"
+filename = "CHANGELOG.rst"
+title_format = "{name} {version} ({project_date})"
+wrap = true  # Wrap text to 79 characters
+all_bullets = true
+
+    [[tool.towncrier.type]]
+    directory = "added"
+    name = "Added new features"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "changed"
+    name = "Changed existing functionality"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "deprecated"
+    name = "Marked for removal"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "removed"
+    name = "Removed from package"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "fixed"
+    name = "Bug fixes"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "security"
+    name = "Patched vulnerabilities"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "doc"
+    name = "Improved Documentation"
+    showcontent = true
+
+    [[tool.towncrier.type]]
+    directory = "trivial"
+    name = "Trivial/Internal Changes"
+    showcontent = true
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = True
+envlist = py36, py37, py38
+requires = tox-conda
+
+[testenv]
+deps = pytest >= 3.3.0
+commands =
+    make install
+    pytest
+"""

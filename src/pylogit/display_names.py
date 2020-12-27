@@ -1,8 +1,11 @@
+# -*- coding: utf-8 -*-
 """
 This file declares the strings that will be displayed for each model type based
 on the abbriviated model type string that is passed to the choice model
 constructor.
 """
+from __future__ import absolute_import
+
 from collections import OrderedDict
 model_type_to_display_name = OrderedDict()
 model_type_to_display_name["MNL"] = "Multinomial Logit Model"

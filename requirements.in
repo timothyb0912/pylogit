@@ -1,0 +1,16 @@
+bump2version
+flit
+future
+mock
+numpy
+pandas
+pipreqs
+pip-tools
+pytest
+pytest-cov
+scipy
+statsmodels
+towncrier
+tox
+tox-conda
+tqdm

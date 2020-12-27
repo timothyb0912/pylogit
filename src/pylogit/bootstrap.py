@@ -1,9 +1,12 @@
+# -*- coding: utf-8 -*-
 """
 @author:    Timothy Brathwaite
 @name:      Bootstrap Controller
 @summary:   This module provides functions that will control the bootstrapping
             procedure.
 """
+from __future__ import absolute_import
+
 import sys
 import time
 import itertools

@@ -894,126 +894,6 @@ class ComputationalTests(GenericTestCase):
 
         return None
 
-    def test_create_matrix_block_indices(self):
-        """
-        Ensure that create_matrix_block_indices returns the expected results.
-        """
-        # Note that we have two observations, the first with three alternatives
-        # and the second with two alternatives.
-        expected_results = [np.array([0, 1, 2]), np.array([3, 4])]
-
-        # Get the results of the function being tested
-        results = cc.create_matrix_block_indices(self.fake_rows_to_obs)
-
-        # Test that the two sets of results are equal
-        self.assertIsInstance(results, list)
-        self.assertTrue(all([isinstance(x, np.ndarray) for x in results]))
-        npt.assert_allclose(expected_results[0], results[0])
-        npt.assert_allclose(expected_results[1], results[1])
-
-        return None
-
-    def test_robust_outer_product(self):
-        """
-        Ensure that robust_outer_product returns the expected results.
-        Unfortunately, I cannot find a good case now where using the regular
-        outer product gives incorrect results. However without a compelling
-        reason to remove the function, I'll trust my earlier judgement in
-        creating it in the first place.
-        """
-        # Define a vector whose outer product we want to take
-        x = np.array([1e-100, 0.01])
-        outer_product = np.outer(x, x)
-        robust_outer_product = cc.robust_outer_product(x, x)
-
-        # Perform the desired tests
-        self.assertIsInstance(robust_outer_product, np.ndarray)
-        self.assertEqual(robust_outer_product.shape, outer_product.shape)
-        npt.assert_allclose(outer_product, robust_outer_product)
-
-        return None
-
-    def test_create_matrix_blocks(self):
-        """
-        Ensure that create_matrix_blocks returns expected results when not
-        having to correct for underflow.
-        """
-        # Designate a utility transform for this test
-        utility_transform = mnl._mnl_utility_transform
-
-        # Collect the arguments needed for this function
-        args = [self.fake_betas,
-                self.fake_design,
-                self.fake_df[self.alt_id_col].values,
-                self.fake_rows_to_obs,
-                self.fake_rows_to_alts,
-                utility_transform]
-        kwargs = {"intercept_params": self.fake_intercepts,
-                  "shape_params": self.fake_shapes,
-                  "return_long_probs": True}
-        # Get the long-format probabilities
-        long_probs = cc.calc_probabilities(*args, **kwargs)
-
-        # Get the matrix-block indices
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
-
-        # Create the matrix block for individual 1.
-        matrix_block_1 = (np.diag(long_probs[:3]) -
-                          np.outer(long_probs[:3], long_probs[:3]))
-        matrix_block_2 = (np.diag(long_probs[3:]) -
-                          np.outer(long_probs[3:], long_probs[3:]))
-        # Create a list of the expected results
-        expected_results = [matrix_block_1, matrix_block_2]
-
-        # Get the function results
-        func_results = cc.create_matrix_blocks(long_probs, matrix_indices)
-        for pos, result in enumerate(func_results):
-            self.assertIsInstance(result, np.ndarray)
-            self.assertEqual(result.shape, expected_results[pos].shape)
-            npt.assert_allclose(result, expected_results[pos])
-
-        return None
-
-    def test_create_matrix_blocks_with_underflow(self):
-        """
-        Ensure that create_matrix_blocks returns expected results when also
-        having to correct for underflow.
-        """
-        # Get the long-format probabilities
-        long_probs = np.array([cc.min_comp_value,
-                               cc.min_comp_value,
-                               1.0,
-                               cc.min_comp_value,
-                               1.0])
-
-        # Get the matrix-block indices
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
-
-        # Create the matrix block for individual 1.
-        row_1 = [cc.min_comp_value, -cc.min_comp_value, -cc.min_comp_value]
-        row_2 = [-cc.min_comp_value, cc.min_comp_value, -cc.min_comp_value]
-        row_3 = [-cc.min_comp_value, -cc.min_comp_value, cc.min_comp_value]
-        matrix_block_1 = np.array([row_1, row_2, row_3])
-
-        matrix_block_2 = (np.diag(long_probs[3:]) -
-                          np.outer(long_probs[3:], long_probs[3:]))
-        # Assuming that no probabilities should actually be zero or one,
-        # the underflow guard would set the last value to a very small,
-        # positive number
-        matrix_block_2[-1, -1] = cc.min_comp_value
-
-        # Create a list of the expected results
-        expected_results = [matrix_block_1, matrix_block_2]
-
-        # Get the function results
-        func_results = cc.create_matrix_blocks(long_probs, matrix_indices)
-        for pos, result in enumerate(func_results):
-            self.assertIsInstance(result, np.ndarray)
-            self.assertEqual(result.shape, expected_results[pos].shape)
-            npt.assert_allclose(result, expected_results[pos])
-
-        return None
-
     def test_calc_fisher_info_matrix_no_shapes_no_intercepts(self):
         """
         Ensure that calc_fisher_info_matrix returns the expected values when
@@ -1095,7 +975,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         gradient_args[-2] = self.ridge
         function_result = func(*gradient_args)
 
@@ -1379,8 +1260,6 @@ class ComputationalTests(GenericTestCase):
         """
         # Alias the design matrix
         design = self.fake_design
-        # Get the matrix block indices for the test
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
         # Calculate the probabilities for this test.
         args = [self.fake_betas,
                 self.fake_design,
@@ -1392,12 +1271,12 @@ class ComputationalTests(GenericTestCase):
                   "shape_params": self.fake_shapes,
                   "return_long_probs": True}
         probs = cc.calc_probabilities(*args, **kwargs)
-        # Get the matrix blocks for dP_i_dH_i
-        matrix_blocks = cc.create_matrix_blocks(probs, matrix_indices)
         # Create the dP_dH matrix that represents the derivative of the
         # long probabilities with respect to the array of transformed index
         # values / systematic utilities
-        dP_dH = block_diag(matrix_blocks)
+        dP_dH = (np.diag(probs) -
+                 self.fake_rows_to_obs.multiply(probs[:, None])
+                     .dot(self.fake_rows_to_obs.multiply(probs[:, None]).T))
 
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
@@ -1425,7 +1304,6 @@ class ComputationalTests(GenericTestCase):
                         transform_deriv_shapes,
                         transform_deriv_v,
                         transform_deriv_intercepts,
-                        matrix_indices,
                         None,
                         None,
                         None,
@@ -1458,7 +1336,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
@@ -1475,8 +1354,6 @@ class ComputationalTests(GenericTestCase):
         """
         # Alias the design matrix
         design = self.fake_design
-        # Get the matrix block indices for the test
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
         # Calculate the probabilities for this test.
         args = [self.fake_betas,
                 self.fake_design,
@@ -1488,12 +1365,12 @@ class ComputationalTests(GenericTestCase):
                   "shape_params": self.fake_shapes,
                   "return_long_probs": True}
         probs = cc.calc_probabilities(*args, **kwargs)
-        # Get the matrix blocks for dP_i_dH_i
-        matrix_blocks = cc.create_matrix_blocks(probs, matrix_indices)
         # Create the dP_dH matrix that represents the derivative of the
         # long probabilities with respect to the array of transformed index
         # values / systematic utilities
-        dP_dH = block_diag(matrix_blocks)
+        dP_dH = (np.diag(probs) -
+                 self.fake_rows_to_obs.multiply(probs[:, None])
+                     .dot(self.fake_rows_to_obs.multiply(probs[:, None]).T))
 
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
@@ -1529,7 +1406,6 @@ class ComputationalTests(GenericTestCase):
                         transform_deriv_shapes,
                         transform_deriv_v,
                         transform_deriv_intercepts,
-                        matrix_indices,
                         self.fake_intercepts,
                         self.fake_shapes,
                         None,
@@ -1595,7 +1471,8 @@ class ComputationalTests(GenericTestCase):
         npt.assert_allclose(func_result_weighted, expected_result_weighted)
 
         # Test the function with the ridge penalty
-        expected_result_weighted -= 2 * self.ridge
+        expected_result_weighted -=\
+            2 * self.ridge * np.identity(expected_result_weighted.shape[0])
         hessian_args[-2] = self.ridge
         function_result = func(*hessian_args)
 
@@ -1614,8 +1491,6 @@ class ComputationalTests(GenericTestCase):
         """
         # Alias the design matrix
         design = self.fake_design
-        # Get the matrix block indices for the test
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
         # Calculate the probabilities for this test.
         args = [self.fake_betas,
                 self.fake_design,
@@ -1627,12 +1502,12 @@ class ComputationalTests(GenericTestCase):
                   "shape_params": self.fake_shapes,
                   "return_long_probs": True}
         probs = cc.calc_probabilities(*args, **kwargs)
-        # Get the matrix blocks for dP_i_dH_i
-        matrix_blocks = cc.create_matrix_blocks(probs, matrix_indices)
         # Create the dP_dH matrix that represents the derivative of the
         # long probabilities with respect to the array of transformed index
         # values / systematic utilities
-        dP_dH = block_diag(matrix_blocks)
+        dP_dH = (np.diag(probs) -
+                 self.fake_rows_to_obs.multiply(probs[:, None])
+                     .dot(self.fake_rows_to_obs.multiply(probs[:, None]).T))
 
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
@@ -1666,7 +1541,6 @@ class ComputationalTests(GenericTestCase):
                         transform_deriv_shapes,
                         transform_deriv_v,
                         transform_deriv_intercepts,
-                        matrix_indices,
                         self.fake_intercepts,
                         None,
                         None,
@@ -1724,8 +1598,6 @@ class ComputationalTests(GenericTestCase):
         """
         # Alias the design matrix
         design = self.fake_design
-        # Get the matrix block indices for the test
-        matrix_indices = cc.create_matrix_block_indices(self.fake_rows_to_obs)
         # Calculate the probabilities for this test.
         args = [self.fake_betas,
                 self.fake_design,
@@ -1737,12 +1609,12 @@ class ComputationalTests(GenericTestCase):
                   "shape_params": self.fake_shapes,
                   "return_long_probs": True}
         probs = cc.calc_probabilities(*args, **kwargs)
-        # Get the matrix blocks for dP_i_dH_i
-        matrix_blocks = cc.create_matrix_blocks(probs, matrix_indices)
         # Create the dP_dH matrix that represents the derivative of the
         # long probabilities with respect to the array of transformed index
         # values / systematic utilities
-        dP_dH = block_diag(matrix_blocks)
+        dP_dH = (np.diag(probs) -
+                 self.fake_rows_to_obs.multiply(probs[:, None])
+                     .dot(self.fake_rows_to_obs.multiply(probs[:, None]).T))
 
         # Designate a function that calculates the parital derivative of the
         # transformed index values, with respect to the index.
@@ -1778,7 +1650,6 @@ class ComputationalTests(GenericTestCase):
                         transform_deriv_shapes,
                         transform_deriv_v,
                         transform_deriv_intercepts,
-                        matrix_indices,
                         None,
                         self.fake_shapes,
                         None,

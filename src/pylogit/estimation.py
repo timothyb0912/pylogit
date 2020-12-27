@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This module provides a general "estimate" function and EstimationObj class for
 pylogit's logit-type models.
@@ -11,7 +12,6 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from . import choice_calcs as cc
-from .choice_calcs import create_matrix_block_indices
 from .choice_tools import ensure_ridge_is_scalar_or_none
 from .choice_tools import ensure_contiguity_in_observation_rows
 
@@ -134,9 +134,6 @@ class EstimationObj(object):
 
         # Store the function that calculates the transformation of the index
         self.utility_transform = model_obj.utility_transform
-
-        # Get the block matrix indices for the hessian matrix.
-        self.block_matrix_idxs = create_matrix_block_indices(self.rows_to_obs)
 
         # Note the following attributes should be set to actual callables that
         # calculate the necessary derivatives in the classes that inherit from
@@ -388,7 +385,6 @@ class LogitTypeEstimator(EstimationObj):
                 self.calc_dh_d_shape,
                 self.calc_dh_dv,
                 self.calc_dh_d_alpha,
-                self.block_matrix_idxs,
                 intercepts,
                 shapes,
                 self.ridge,

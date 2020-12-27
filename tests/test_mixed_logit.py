@@ -9,6 +9,7 @@ import unittest
 import warnings
 from collections import OrderedDict
 from copy import deepcopy
+import mock
 
 import numpy as np
 import pandas as pd
@@ -634,7 +635,8 @@ class MixedLogitCalculations(unittest.TestCase):
         # Perform the test with the ridge coefficient
         args.append(self.ridge)
         func_res2 = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
-        new_neg_bhhh = bhhh_matrix + 2 * self.ridge
+        new_neg_bhhh =\
+            bhhh_matrix + 2 * self.ridge * np.identity(bhhh_matrix.shape[0])
 
         npt.assert_allclose(new_neg_bhhh, func_res2)
 
@@ -647,7 +649,9 @@ class MixedLogitCalculations(unittest.TestCase):
         # Repeat the tests with observation weights
         weights = 2 * np.ones(self.fake_design_3d.shape[0])
         args.append(weights)
-        weighted_ridge_bhhh = (2 * bhhh_matrix + 2 * self.ridge)
+        weighted_ridge_bhhh =\
+            (2 * bhhh_matrix +
+             2 * self.ridge * np.identity(bhhh_matrix.shape[0]))
         new_func_bhhh = mlc.calc_bhhh_hessian_approximation_mixed_logit(*args)
         npt.assert_allclose(weighted_ridge_bhhh, new_func_bhhh)
 
@@ -1162,7 +1166,11 @@ class MixedLogitCalculations(unittest.TestCase):
 
         return None
 
-    def test_execution_of_fit_mle(self):
+    # Note we mock to avoid issues with inverting the hessian, especially since
+    # such inversion is not the point of this test.
+    @mock.patch('pylogit.base_multinomial_cm_v2.scipy.linalg.inv',
+                side_effect=lambda x: np.eye(x.shape[0]))
+    def test_execution_of_fit_mle(self, mock_inv):
         """
         This function simply tests whether or not the fit_mle function can
         be run without throwing an error.

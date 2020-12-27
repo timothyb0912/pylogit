@@ -1,0 +1,55 @@
+# Build and test the package
+name: Testing
+
+# Run this workflow every time a new commit is pushed or a pull-request is
+# merged to your repository's master branch
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+
+jobs:
+  # Set the job key. The key is displayed as the job name
+  # when a job name is not provided
+  project-workflow:
+    # Name the Job
+    name: Build and test the package
+    # Set the type of machine to run on
+    runs-on: ubuntu-latest
+    # Set the python versions to use
+    strategy:
+      matrix:
+        python: [3.6]
+
+    steps:
+      # Step 1: Check out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Step 2: Make sure conda is installed, with mamba for speed
+      - name: Setup Python with Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ matrix.python }}
+          mamba-version: "*"
+          channels: conda-forge,anaconda,defaults
+          channel-priority: true
+          activate-environment: pylogit
+          auto-activate-base: false
+
+      # Step 3: Make sure the project is installed locally & can commit if needed
+      - name: Install package locally
+        shell: bash -l {0}
+        run: |
+          make install
+
+      # Step 4: Run the project's tests
+      - name: Run project tests
+        shell: bash -l {0}
+        run: |
+          tox

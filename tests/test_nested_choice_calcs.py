@@ -840,7 +840,7 @@ class ComputationalSetUp(unittest.TestCase):
         # Ensure the function works when using a ridge penalty
         # Note we have to create an adjusted array for penalization because we
         # have reparameterized the nest coefficients
-        ridge_penalty = 2 * self.ridge
+        ridge_penalty = 2 * self.ridge  * np.identity(expected_bhhh.shape[0])
         penalized_bhhh = expected_bhhh - ridge_penalty
 
         kwargs = {"ridge": self.ridge}

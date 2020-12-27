@@ -8,6 +8,8 @@ Created on Mon Feb 22 08:32:48 2016
 @summary:   Contains functions that help prepare one's data for choice model
             estimation or helps speed the estimation process (the 'mappings').
 """
+from __future__ import absolute_import
+
 import warnings
 from collections import OrderedDict
 from collections import Iterable
@@ -683,7 +685,14 @@ def create_design_matrix(long_form,
                 var_names.append("{}_{}".format(variable, alt))
         else:
             for group in specification:
-                if isinstance(group, list):
+                if isinstance(group, Number):
+                    # Create the variable column
+                    new_col_vals = ((long_form[alt_id_col] == group).values *
+                                    long_form[variable].values)
+                    independent_vars.append(new_col_vals)
+                    # Create the column name
+                    var_names.append("{}_{}".format(variable, group))
+                else:  # the group is a list, tuple, or rang
                     # Create the variable column
                     independent_vars.append(
                                      long_form[alt_id_col].isin(group).values *
@@ -691,16 +700,8 @@ def create_design_matrix(long_form,
                     # Create the column name
                     var_names.append("{}_{}".format(variable, str(group)))
 
-                else:  # the group is an integer
-                    # Create the variable column
-                    new_col_vals = ((long_form[alt_id_col] == group).values *
-                                    long_form[variable].values)
-                    independent_vars.append(new_col_vals)
-                    # Create the column name
-                    var_names.append("{}_{}".format(variable, group))
-
     # Create the final design matrix
-    design_matrix = np.hstack((x[:, None] for x in independent_vars))
+    design_matrix = np.hstack(tuple(x[:, None] for x in independent_vars))
 
     # Use the list of names passed by the user, if the user passed such a list
     if names is not None:

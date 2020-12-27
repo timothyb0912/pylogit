@@ -1,9 +1,12 @@
+# -*- coding: utf-8 -*-
 """
 @author:    Timothy Brathwaite
 @name:      Bootstrap Sampler
 @summary:   This module provides functions that will perform the stratified
             resampling needed for the bootstrapping procedure.
 """
+from __future__ import absolute_import
+
 from collections import OrderedDict
 
 import numpy as np

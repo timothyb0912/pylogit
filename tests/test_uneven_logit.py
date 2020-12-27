@@ -8,6 +8,7 @@ import unittest
 from collections import OrderedDict
 from copy import deepcopy
 
+import mock
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -153,7 +154,11 @@ class ChoiceObjectTests(GenericTestCase):
 
         return None
 
-    def test_ridge_warning_in_fit_mle(self):
+    # Note we mock to avoid issues with inverting the hessian, especially since
+    # such inversion is not the point of this test.
+    @mock.patch('pylogit.base_multinomial_cm_v2.scipy.linalg.inv',
+                side_effect=lambda x: np.eye(x.shape[0]))
+    def test_ridge_warning_in_fit_mle(self, mock_inv):
         """
         Ensure that a UserWarning is raised when one passes the ridge keyword
         argument to the `fit_mle` method of an Uneven Logit model object.

@@ -167,7 +167,6 @@ class EstimationObjTests(GenericTestCase):
                       "zero_vector",
                       "split_params",
                       "utility_transform",
-                      "block_matrix_idxs",
                       "calc_dh_dv",
                       "calc_dh_d_alpha",
                       "calc_dh_d_shape"]
