@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 .. towncrier release notes start
 
+Pylogit 1.0.0 (2020-12-27)
+==========================
+
+Bug fixes
+---------
+
+- Resolving import issues with the pylogit.bootstrap submodule. (#27)
+- Fixed flaky tests causing continuous integration build errors. (#29)
+- Fixed Hessian calculation so only the diagonal is penalized during ridge
+  regression. (#33)
+
+
+Improved Documentation
+----------------------
+
+- Made example notebooks py2 and py3 compatible. (#28)
+
+
+Trivial/Internal Changes
+------------------------
+
+- Included license file in source distribution. (#18)
+- Refactored the Hessian calculation to use less memory-intensive operations
+  based on linear-algebra decompositions. (#30)
+- Added journal reference for the accompanying paper in the project README.
+  (#35)
+- Added project logo to the repository. (#46)
+- Switched to pip-tools for specifying development dependencies. (#58)
+- Added Makefile to standardize development installation. (#59)
+- Switched to flit for packaging. (#60)
+- Added towncrier to repository. (#61)
+- Added tox to the repository for cross-version testing of PyLogit. (#63)
+- Added GitHub Actions workflow for Continuous Integration. (#64)
+- Converted the README.rst file to README.md. (#65)
+- Adding bump2version to development requirements. (#66)
+
+
 Pylogit 0.2.2 (2017-12-11)
 ==========================
 
