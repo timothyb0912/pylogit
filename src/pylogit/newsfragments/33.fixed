@@ -1,0 +1,1 @@
+Fixed Hessian calculation so only the diagonal is penalized during ridge regression.

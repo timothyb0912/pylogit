@@ -1,0 +1,1 @@
+Refactored the Hessian calculation to use less memory-intensive operations based on linear-algebra decompositions.
