@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 .. towncrier release notes start
 
+Pylogit 1.0.1 (2020-12-27)
+==========================
+
+Trivial/Internal Changes
+------------------------
+
+- Removed setup.py from repository in favor of pyproject.toml. (#68)
+
+
 Pylogit 1.0.0 (2020-12-27)
 ==========================
 
