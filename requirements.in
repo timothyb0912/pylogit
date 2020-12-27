@@ -9,4 +9,5 @@ pytest
 pytest-cov
 scipy
 statsmodels
+towncrier
 tqdm
