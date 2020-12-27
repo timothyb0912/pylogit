@@ -12,7 +12,6 @@ coverage==5.3.1           # via pytest-cov
 docopt==0.6.2             # via pipreqs
 future==0.18.2            # via -r requirements.in
 idna==2.10                # via requests
-importlib-metadata==3.3.0  # via pluggy, pytest
 iniconfig==1.1.1          # via pytest
 mock==4.0.3               # via -r requirements.in
 numpy==1.19.4             # via -r requirements.in, pandas, patsy, scipy, statsmodels
@@ -34,10 +33,8 @@ six==1.15.0               # via patsy, pip-tools, python-dateutil
 statsmodels==0.12.1       # via -r requirements.in
 toml==0.10.2              # via pytest
 tqdm==4.55.0              # via -r requirements.in
-typing-extensions==3.7.4.3  # via importlib-metadata
 urllib3==1.26.2           # via requests
 yarg==0.1.9               # via pipreqs
-zipp==3.4.0               # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
