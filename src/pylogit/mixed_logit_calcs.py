@@ -662,8 +662,9 @@ def calc_bhhh_hessian_approximation_mixed_logit(params,
     # Calculate the weights for the sample
     if weights is None:
         weights = np.ones(design_3d.shape[0])
-    weights_per_obs =\
-        np.max(rows_to_mixers.toarray() * weights[:, None], axis=0)
+        
+    M = rows_to_obs.multiply(weights.reshape(-1,1))
+    weights_per_obs = np.max(M, axis=0).toarray().reshape(-1)
     # Calculate the regular probability array. Note the implicit assumption
     # that params == index coefficients.
     prob_array = general_calc_probabilities(params,
