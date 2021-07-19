@@ -22,6 +22,103 @@ def identity_matrix_assert_equal(a1, a2):
     assert a1.n == a2.n
 
 
+class IdentityMatrixConstructorTests(unittest.TestCase):
+    """
+    Contains the tests for the `identity_matrix` constructor
+    """
+
+    def setUp(self):
+        """Create the input data needed to test the `identity_matrix`"""
+        
+        # Set number rows/columns of an identity matrix
+        self.n = 3
+
+        # Set negative number of rows which will throw an error
+        self.neg_n = -3
+
+        # Set shape for an identity matrix
+        self.shape = (3, 3)
+
+        # Set non-square shape which will lead to a ValueError
+        self.non_square_shape = (3, 4)
+
+        # Set wrong shape not consisting of ints
+        self.string_shape = ('hello', 'world')
+
+        # Set wrong shape not consisting of ints but whose elements are the same
+        # If the elements are the same and the type is not checked, the code
+        # will act as if it's a square shape because the elements are the same.
+        self.string_square_shape = ('hello', 'hello')
+
+        # Set 1-element tuple which will raise a ValueError because the tuple has to contain two elements
+        self.tuple1 = (1,)
+
+        # Set 3-element tuple which will raise a ValueError because the tuple has to contain two elements
+        self.tuple3 = (1, 2, 3)
+
+        # Set identity_matrix which can be used to create another identity matrix with the same shape
+        self.I = identity_matrix(2)
+
+        # Set arbitrary object type not supported by `identity_matrix`
+        self.wrong_arg1 = object()
+    
+    def test_construct_int(self):
+        """Test that constructor works for a valid `int` input"""
+        I = identity_matrix(self.n)
+        identity_matrix_assert_equal(I, identity_matrix(self.n))
+
+    def test_construct_zero(self):
+        """Test that constructor works for `0` input (this is a trivial 0-by-0 matrix)"""
+        I = identity_matrix(self.n)
+        identity_matrix_assert_equal(I, identity_matrix(self.n))
+
+    def test_construct_neg_int_raises(self):
+        """Test that constructor throws ValueError upon a negative `int` input"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.neg_n)
+ 
+    def test_construct_shape(self):
+        """Test that constructor works for a valid square `shape` input"""
+        I = identity_matrix(self.shape)
+        identity_matrix_assert_equal(I, identity_matrix(self.shape[0]))
+    
+    def test_construct_non_square_shape_raises(self):
+        """Test that constructor throws a ValueError upon a non-square `shape` input"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.non_square_shape)
+
+    def test_construct_non_int_shape(self):
+        """Test that constructor throws a ValueError upon non-int elements in a `shape` input"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.string_shape)
+
+    def test_construct_non_int_square_shape(self):
+        """Test that constructor throws a ValueError upon non-int elements in a `shape` input,
+        also when the `shape` is 'square' because the two elements are equal"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.string_square_shape)
+
+    def test_construct_1_tuple(self):
+        """Test that constructor throws a ValueError when a 1-tuple is entered rather than a 2-tuple"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.tuple1)
+
+    def test_construct_3_tuple(self):
+        """Test that constructor throws a ValueError when a 3-tuple is entered rather than a 2-tuple"""
+        with self.assertRaises(ValueError):
+            I = identity_matrix(self.tuple3)
+
+    def test_construct_identity_matrix(self):
+        """Test that constructor works when another `identity_matrix` is entered"""
+        I = identity_matrix(self.I)
+        identity_matrix_assert_equal(I, self.I)
+    
+    def test_construct_wrong_type(self):
+        """Test that constructor throws a TypeError when a wrong type is entered"""
+        with self.assertRaises(TypeError):
+            I = identity_matrix(self.wrong_arg1)
+
+
 class IdentityMatrixTests(unittest.TestCase):
     """
     Contains the tests of the `identity_matrix` class

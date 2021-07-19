@@ -37,6 +37,9 @@ class identity_matrix(spmatrix):
     def __init__(self, arg1, copy=False):
         super().__init__()
         if isinstance(arg1, int):
+            if arg1 < 0:
+                raise ValueError(f"The number of rows `n` cannot be negative. "
+                                 f"Got a value of {arg1}")
             self.n = arg1
         elif isinstance(arg1, type(self)):
             self.n = arg1.n
@@ -50,7 +53,7 @@ class identity_matrix(spmatrix):
                 raise ValueError("Only a square shape is valid.")
         else:
             raise TypeError(f"Invalid input to constructor. Expected an object of "
-                            f"type `int` or {type(self)}")
+                            f"type `int`, `tuple`, or {type(self)}")
     
     def set_shape(self, shape):
         return super().set_shape(shape)
