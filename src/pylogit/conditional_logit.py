@@ -16,6 +16,8 @@ import warnings
 import numpy as np
 from scipy.sparse import diags
 
+from pylogit.scipy_utils import identity_matrix
+
 from . import choice_calcs as cc
 from . import base_multinomial_cm_v2 as base_mcm
 from .estimation import LogitTypeEstimator
@@ -177,7 +179,7 @@ class MNLEstimator(LogitTypeEstimator):
     def set_derivatives(self):
         # Pre-calculate the derivative of the transformation vector with
         # respect to the vector of systematic utilities
-        dh_dv = diags(np.ones(self.design.shape[0]), 0, format='csr')
+        dh_dv = identity_matrix(self.design.shape[0])
 
         # Create a function to calculate dh_dv which will return the
         # pre-calculated result when called

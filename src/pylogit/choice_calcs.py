@@ -927,8 +927,9 @@ def calc_fisher_info_matrix(beta,
     # Calculate the weights for the sample
     if weights is None:
         weights = np.ones(design.shape[0])
-    weights_per_obs =\
-        np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+
+    M = rows_to_obs.multiply(weights.reshape(-1,1))
+    weights_per_obs = np.max(M, axis=0).toarray().reshape(-1)
 
     ##########
     # Get the required matrices
