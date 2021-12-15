@@ -925,10 +925,11 @@ def calc_fisher_info_matrix(beta,
                                     return_long_probs=True)
 
     # Calculate the weights for the sample
-    if weights is None:
-        weights = np.ones(design.shape[0])
-    weights_per_obs =\
-        np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+    if weights is None or np.all(weights == 1):
+        weights_per_obs = np.ones(rows_to_obs.shape[1])
+    else:
+        weights_per_obs = \
+            np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
 
     ##########
     # Get the required matrices
