@@ -12,7 +12,7 @@ from __future__ import absolute_import
 
 import warnings
 from collections import OrderedDict
-from collections import Iterable
+from collections.abc import Iterable
 from numbers import Number
 
 import numpy as np
