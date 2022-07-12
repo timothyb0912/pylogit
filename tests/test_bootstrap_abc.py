@@ -2,7 +2,7 @@
 Tests for the bootstrap_abc.py file.
 """
 import unittest
-from collections import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import numpy.testing as npt
