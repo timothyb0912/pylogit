@@ -141,7 +141,7 @@ class ComputationalSetUp(unittest.TestCase):
             args[pos] = array_2d
 
             # Ensure that the appropriate error is raised.
-            self.assertRaisesRegexp(NotImplementedError,
+            self.assertRaisesRegex(NotImplementedError,
                                     msg,
                                     func,
                                     *args)
@@ -174,7 +174,7 @@ class ComputationalSetUp(unittest.TestCase):
         kwargs = {"return_type": "long_probs"}
         for return_string in bad_return_types:
             kwargs["return_type"] = return_string
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     msg,
                                     func,
                                     *args,
@@ -206,7 +206,7 @@ class ComputationalSetUp(unittest.TestCase):
                   "chosen_row_to_obs": None}
         for return_string in bad_return_types:
             kwargs["return_type"] = return_string
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     msg,
                                     func,
                                     *args,

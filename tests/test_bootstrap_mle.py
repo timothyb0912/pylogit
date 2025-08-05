@@ -38,7 +38,7 @@ class HelperTests(unittest.TestCase):
 
         # Perform a test that should fail. Ensure the correct error is raised.
         current_obj = FakeModel(bad_type)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 err_msg,
                                 func,
                                 current_obj)

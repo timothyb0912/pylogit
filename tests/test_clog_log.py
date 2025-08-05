@@ -249,7 +249,7 @@ class HelperFuncTests(GenericTestCase):
         # derivative should be 1.
         test_index = np.array([-40, 1, 7])
         # Note we use a compressed sparse-row matrix so that we can easily
-        # convert the output matrix to a numpy array using the '.A' attribute.
+        # convert the output matrix to a numpy array using the '.toarray()' attribute.
         test_output = diags(np.ones(test_index.shape[0]),
                             0, format='csr')
 
@@ -274,7 +274,7 @@ class HelperFuncTests(GenericTestCase):
         self.assertIsInstance(derivative, type(test_output))
         self.assertEqual(len(derivative.shape), 2)
         self.assertEqual(derivative.shape, (3, 3))
-        npt.assert_allclose(correct_derivatives, derivative.A)
+        npt.assert_allclose(correct_derivatives, derivative.toarray())
 
         return None
 
@@ -314,7 +314,7 @@ class HelperFuncTests(GenericTestCase):
             if test_output is None:
                 self.assertIsNone(derivative_results)
             else:
-                npt.assert_allclose(test_output.A, derivative_results.A)
+                npt.assert_allclose(test_output.toarray(), derivative_results.toarray())
 
         return None
 
@@ -495,7 +495,7 @@ class ChoiceObjectTests(GenericTestCase):
         # Test to ensure that the raised Value Err is printed when using
         # either of these two kwargs
         for kwargs in [kwargs_1, kwargs_2]:
-            self.assertRaisesRegexp(TypeError,
+            self.assertRaisesRegex(TypeError,
                                     "ridge",
                                     self.base_clog.fit_mle,
                                     *fit_args,
@@ -525,7 +525,7 @@ class ChoiceObjectTests(GenericTestCase):
         for bad_kwargs in [kwargs, kwargs_2]:
             # Test to ensure that the ValueError when not passing
             # kwarg with an incorrect number of parameters
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "must pass init_coefs",
                                     self.base_clog.fit_mle,
                                     *fit_args, **bad_kwargs)
@@ -546,7 +546,7 @@ class ChoiceObjectTests(GenericTestCase):
 
                 # Test to ensure that the ValueError when using an
                 # init_intercepts kwarg with an incorrect number of parameters
-                self.assertRaisesRegexp(ValueError,
+                self.assertRaisesRegex(ValueError,
                                         "dimension",
                                         self.base_clog.fit_mle,
                                         np.arange(num_coefs),

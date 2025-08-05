@@ -281,10 +281,10 @@ class ConstructorTests(unittest.TestCase):
         for good_example in test_types:
             self.assertIsNone(func(good_example, test_types))
         for bad_example in bad_types:
-            self.assertRaisesRegexp(ValueError,
-                                    partial_error_msg,
-                                    func,
-                                    bad_example,
-                                    test_types)
+            self.assertRaisesRegex(ValueError,
+                                   partial_error_msg,
+                                   func,
+                                   bad_example,
+                                   test_types)
 
         return None

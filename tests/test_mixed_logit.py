@@ -313,7 +313,7 @@ class MixedLogitCalculations(unittest.TestCase):
         # Ensre that a ValueError is raised if we execute
         # mlc.create_expanded_design_for_mixing with the wrong arguments.
         args[2] = [2, 3, 4]
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 "mixing_pos",
                                 mlc.create_expanded_design_for_mixing,
                                 *args)
@@ -331,13 +331,13 @@ class MixedLogitCalculations(unittest.TestCase):
 
         for i in [-1, 1]:
             init_vals = np.ones(self.fake_design_3d.shape[2] + i)
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "wrong dimension",
                                     func,
                                     self.fake_design_3d,
                                     init_vals)
 
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "wrong dimension",
                                     func_2,
                                     init_vals)
@@ -442,7 +442,7 @@ class MixedLogitCalculations(unittest.TestCase):
         # Ensure that the approrpriate error is raised if we execute
         # calc_choice_sequence_probs() with incorrect arguments.
         args[-1] = "foo"
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 "return_type",
                                 mlc.calc_choice_sequence_probs,
                                 *args)
@@ -895,7 +895,7 @@ class MixedLogitCalculations(unittest.TestCase):
             del new_predictive_df[col]
 
             # Ensure the panel_predict function raises an error
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "not in data.columns",
                                     self.mixl_obj.panel_predict,
                                     new_predictive_df,
@@ -916,7 +916,7 @@ class MixedLogitCalculations(unittest.TestCase):
         args = [None, 20]
 
         msg = "choice_col is None AND return_long_probs == False"
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg,
                                 func,
                                 *args,

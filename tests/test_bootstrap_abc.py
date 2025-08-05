@@ -2,7 +2,10 @@
 Tests for the bootstrap_abc.py file.
 """
 import unittest
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 import numpy as np
 import numpy.testing as npt
@@ -33,7 +36,7 @@ class HelperFuncTests(unittest.TestCase):
 
         # Perform the desired tests
         self.assertIsNone(func(good_obj))
-        self.assertRaisesRegexp(ValueError, err_msg, func, bad_obj)
+        self.assertRaisesRegex(ValueError, err_msg, func, bad_obj)
         return None
 
     def test_ensure_rows_to_obs_validity(self):
@@ -49,7 +52,7 @@ class HelperFuncTests(unittest.TestCase):
         for good_obj in good_objects:
             self.assertIsNone(func(good_obj))
         for bad_obj in bad_objects:
-            self.assertRaisesRegexp(ValueError, err_msg, func, bad_obj)
+            self.assertRaisesRegex(ValueError, err_msg, func, bad_obj)
         return None
 
     def test_ensure_wide_weights_is_1D_or_2D_ndarray(self):
@@ -68,7 +71,7 @@ class HelperFuncTests(unittest.TestCase):
             self.assertIsNone(func(good_obj))
         for pos, bad_obj in enumerate(bad_objects):
             err_msg = err_msgs[pos]
-            self.assertRaisesRegexp(ValueError, err_msg, func, bad_obj)
+            self.assertRaisesRegex(ValueError, err_msg, func, bad_obj)
         return None
 
 

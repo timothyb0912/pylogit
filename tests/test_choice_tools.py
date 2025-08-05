@@ -756,11 +756,11 @@ class ArgumentValidationTests(GenericTestCase):
 
         # Perform the tests
         self.assertIsNone(func(good_obs_ids))
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 "are not contiguous:",
                                 func,
                                 bad_obs_ids)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 "[2]",
                                 func,
                                 bad_obs_ids)
@@ -782,7 +782,7 @@ class ArgumentValidationTests(GenericTestCase):
         # 'bad' objects.
         self.assertIsNone(func(good_obj, "test_object"))
         for bad_obj in bad_objects:
-            self.assertRaisesRegexp(TypeError,
+            self.assertRaisesRegex(TypeError,
                                     "must be a string.",
                                     func,
                                     bad_obj,
@@ -805,7 +805,7 @@ class ArgumentValidationTests(GenericTestCase):
         # 'bad' objects.
         self.assertIsNone(func(good_obj, "test_object"))
         for bad_obj in bad_objects:
-            self.assertRaisesRegexp(TypeError,
+            self.assertRaisesRegex(TypeError,
                                     "must be a np.ndarray.",
                                     func,
                                     bad_obj,
@@ -866,9 +866,9 @@ class ArgumentValidationTests(GenericTestCase):
         self.assertTrue(isspmatrix_csr(sorted_results))
         self.assertTrue(isspmatrix_csr(null_results))
 
-        npt.assert_allclose(orig_order_mapping, orig_order_results.A)
-        npt.assert_allclose(sorted_mapping, sorted_results.A)
-        npt.assert_allclose(null_id_mapping, null_results.A)
+        npt.assert_allclose(orig_order_mapping, orig_order_results.toarray())
+        npt.assert_allclose(sorted_mapping, sorted_results.toarray())
+        npt.assert_allclose(null_id_mapping, null_results.toarray())
 
         return None
 

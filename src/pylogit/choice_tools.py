@@ -12,7 +12,10 @@ from __future__ import absolute_import
 
 import warnings
 from collections import OrderedDict
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from numbers import Number
 
 import numpy as np
@@ -971,7 +974,7 @@ def create_long_form_mappings(long_form,
     if dense:
         for key in mapping_dict:
             if mapping_dict[key] is not None:
-                mapping_dict[key] = mapping_dict[key].A
+                mapping_dict[key] = mapping_dict[key].toarray()
 
     return mapping_dict
 
