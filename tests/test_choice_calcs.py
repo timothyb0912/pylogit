@@ -268,7 +268,7 @@ class ComputationalTests(GenericTestCase):
         msg_2 = " 2D coefficient array."
         msg = msg_1 + msg_2
 
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg,
                                 func,
                                 *args)
@@ -297,7 +297,7 @@ class ComputationalTests(GenericTestCase):
         # Note the error message that should be shown.
         msg = "chosen_row_to_obs is None AND return_long_probs is False"
 
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg,
                                 func,
                                 *args)
@@ -669,7 +669,7 @@ class ComputationalTests(GenericTestCase):
         # and finally to (Y- P)'[dh_d_intercept | dh_dv * X]
         error_vec = (self.choice_array - probs)[None, :]
         dh_d_beta = dh_dv.dot(self.fake_design)
-        dh_d_theta = np.concatenate((dh_d_intercept.A, dh_d_beta), axis=1)
+        dh_d_theta = np.concatenate((dh_d_intercept.toarray(), dh_d_beta), axis=1)
         expected_gradient = error_vec.dot(dh_d_theta).ravel()
 
         # Alias the function being tested
@@ -752,7 +752,7 @@ class ComputationalTests(GenericTestCase):
         # and finally to (Y- P)'[dh_d_shape | dh_dv * X]
         error_vec = (self.choice_array - probs)[None, :]
         dh_d_beta = dh_dv.dot(self.fake_design)
-        dh_d_theta = np.concatenate((dh_d_shape.A, dh_d_beta), axis=1)
+        dh_d_theta = np.concatenate((dh_d_shape.toarray(), dh_d_beta), axis=1)
         expected_gradient = error_vec.dot(dh_d_theta).ravel()
 
         # Alias the function being tested
@@ -847,8 +847,8 @@ class ComputationalTests(GenericTestCase):
         # and finally to (Y- P)'[dh_d_shape | dh_d_intercept | dh_dv * X]
         error_vec = (self.choice_array - probs)[None, :]
         dh_d_beta = dh_dv.dot(self.fake_design)
-        dh_d_theta = np.concatenate((dh_d_shape.A,
-                                     dh_d_intercept.A,
+        dh_d_theta = np.concatenate((dh_d_shape.toarray(),
+                                     dh_d_intercept.toarray(),
                                      dh_d_beta), axis=1)
         expected_gradient = error_vec.dot(dh_d_theta).ravel()
 
@@ -1430,16 +1430,16 @@ class ComputationalTests(GenericTestCase):
         # h_33 is -X^T * dP_dH * X. This is the hessian in the standard MNL
         h_33 = np.asarray(-1 * design.T.dot(dP_dH.dot(design)))
         # h_32 is -X^T * dH_dV^T * dP_dH * dH_d_intercept
-        h_32 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_intercept.A)))
+        h_32 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_intercept.toarray())))
         # h_31 is -X^T * dH_dV^T * dP_dH * dH_d_shape
-        h_31 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_shape.A)))
+        h_31 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_shape.toarray())))
         # h_21 = -dH_d_intercept^T * dP_dH * dH_d_shape
-        h_21 = np.asarray(-1 * dh_d_intercept.T.dot(dP_dH.dot(dh_d_shape.A)))
+        h_21 = np.asarray(-1 * dh_d_intercept.T.dot(dP_dH.dot(dh_d_shape.toarray())))
         # h_22 = -dH_d_intercept^T * dP_dH * dH_d_intercept
         h_22 = np.asarray(-1 *
-                          dh_d_intercept.T.dot(dP_dH.dot(dh_d_intercept.A)))
+                          dh_d_intercept.T.dot(dP_dH.dot(dh_d_intercept.toarray())))
         # h_11 = -dH_d_shape^T * dP_dH * dH_d_shape
-        h_11 = np.asarray(-1 * dh_d_shape.T.dot(dP_dH.dot(dh_d_shape.A)))
+        h_11 = np.asarray(-1 * dh_d_shape.T.dot(dP_dH.dot(dh_d_shape.toarray())))
 
         # Create the final hessian
         top_row = np.concatenate((h_11, h_21.T, h_31.T), axis=1)
@@ -1557,10 +1557,10 @@ class ComputationalTests(GenericTestCase):
         # h_33 is -X^T * dP_dH * X. This is the hessian in the standard MNL
         h_33 = np.asarray(-1 * design.T.dot(dP_dH.dot(design)))
         # h_32 is -X^T * dH_dV^T * dP_dH * dH_d_intercept
-        h_32 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_intercept.A)))
+        h_32 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_intercept.toarray())))
         # h_22 = -dH_d_intercept^T * dP_dH * dH_d_intercept
         h_22 = np.asarray(-1 *
-                          dh_d_intercept.T.dot(dP_dH.dot(dh_d_intercept.A)))
+                          dh_d_intercept.T.dot(dP_dH.dot(dh_d_intercept.toarray())))
 
         # Create the final hessian
         middle_row = np.concatenate((h_22, h_32.T), axis=1)
@@ -1670,9 +1670,9 @@ class ComputationalTests(GenericTestCase):
         # h_33 is -X^T * dP_dH * X. This is the hessian in the standard MNL
         h_33 = np.asarray(-1 * design.T.dot(dP_dH.dot(design)))
         # h_31 is -X^T * dH_dV^T * dP_dH * dH_d_shape
-        h_31 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_shape.A)))
+        h_31 = np.asarray(-1 * design.T.dot(dP_dH.dot(dh_d_shape.toarray())))
         # h_11 = -dH_d_shape^T * dP_dH * dH_d_shape
-        h_11 = np.asarray(-1 * dh_d_shape.T.dot(dP_dH.dot(dh_d_shape.A)))
+        h_11 = np.asarray(-1 * dh_d_shape.T.dot(dP_dH.dot(dh_d_shape.toarray())))
 
         # Create the final hessian
         top_row = np.concatenate((h_11, h_31.T), axis=1)

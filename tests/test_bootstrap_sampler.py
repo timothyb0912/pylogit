@@ -220,7 +220,7 @@ class SamplerTests(unittest.TestCase):
                        "in `df.columns`.")
 
             self.assertIsNone(func(col, fake_df, **current_good_kwargs))
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     pattern,
                                     func,
                                     col,
@@ -244,7 +244,7 @@ class SamplerTests(unittest.TestCase):
 
         # Perform the desired tests
         self.assertIsNone(func(good_resampled_obs_ids, fake_orig_obs_ids))
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 expected_err_msg,
                                 func,
                                 bad_resampled_obs_ids,

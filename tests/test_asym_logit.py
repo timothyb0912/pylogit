@@ -321,7 +321,7 @@ class ChoiceObjectTests(GenericTestCase):
         # create the init_vals object since the ridge error check is after
         # the creation of this argurment.
         for kwargs in [kwargs_1, kwargs_2]:
-            self.assertRaisesRegexp(TypeError,
+            self.assertRaisesRegex(TypeError,
                                     "ridge",
                                     self.model_obj.fit_mle,
                                     *fit_args,
@@ -343,7 +343,7 @@ class ChoiceObjectTests(GenericTestCase):
 
                 # Test to ensure that the ValueError when using an
                 # init_intercepts kwarg with an incorrect number of parameters
-                self.assertRaisesRegexp(ValueError,
+                self.assertRaisesRegex(ValueError,
                                         "dimension",
                                         self.model_obj.fit_mle,
                                         np.arange(num_coefs),
@@ -786,7 +786,7 @@ class HelperFuncTests(GenericTestCase):
             self.assertIsInstance(derivative, type(output))
             self.assertEqual(len(derivative.shape), 2)
             self.assertEqual(derivative.shape, (num_rows, num_rows))
-            npt.assert_allclose(np.diag(derivative.A), results)
+            npt.assert_allclose(np.diag(derivative.toarray()), results)
 
         return None
 
@@ -811,7 +811,7 @@ class HelperFuncTests(GenericTestCase):
             if test_output is None:
                 self.assertIsNone(derivative_results)
             else:
-                npt.assert_allclose(test_output.A, derivative_results.A)
+                npt.assert_allclose(test_output.toarray(), derivative_results.toarray())
 
         return None
 
@@ -957,12 +957,15 @@ class HelperFuncTests(GenericTestCase):
             interim_results = self.fake_rows_to_alts.multiply(interim_results)
 
             # Calculate the correct results
-            results = interim_results.A.dot(dc_d_eta)
+            results = interim_results.toarray().dot(dc_d_eta)
 
             # Ensure the results are as expected
             self.assertIsInstance(derivative, type(output))
             self.assertEqual(len(derivative.shape), 2)
             self.assertEqual(derivative.shape, (num_rows, num_alts - 1))
-            npt.assert_allclose(derivative.A, results)
+            if isinstance(derivative, np.matrixlib.defmatrix.matrix):
+                npt.assert_allclose(np.asarray(derivative), results)
+            else:
+                npt.assert_allclose(derivative.toarray(), results)
 
         return None

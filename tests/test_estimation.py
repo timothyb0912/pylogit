@@ -202,7 +202,7 @@ class EstimationObjTests(GenericTestCase):
             # Get the mapping matrix as stored on the model object.
             matrix_on_object = getattr(estimation_object, attr)
             if matrix_on_object is not None:
-                npt.assert_allclose(matrix_on_object.A, mapping_dict[attr].A)
+                npt.assert_allclose(matrix_on_object.toarray(), mapping_dict[attr].toarray())
             else:
                 self.assertIsNone(mapping_dict[attr])
 
@@ -252,7 +252,7 @@ class EstimationObjTests(GenericTestCase):
         for method_name in example_methods:
             func = getattr(estimation_object, method_name)
             error_msg = "Method should be defined by descendant classes"
-            self.assertRaisesRegexp(NotImplementedError,
+            self.assertRaisesRegex(NotImplementedError,
                                     error_msg,
                                     func,
                                     None)
@@ -277,7 +277,7 @@ class EstimationObjTests(GenericTestCase):
         for weights in good_weights:
             self.assertIsNone(func(weights, fake_data))
         for pos, weights in enumerate(bad_weights):
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     expected_error_msgs[pos],
                                     func,
                                     weights,

@@ -524,9 +524,8 @@ def quadratic_prod_wrt_dp_ds(left,
     if weights is None:
         weights = np.ones(probs.shape[0])
     # Convert matrixlib objects to ndarrays
-    left = left.A if isinstance(left, np.matrixlib.defmatrix.matrix) else left
-    right =\
-        right.A if isinstance(right, np.matrixlib.defmatrix.matrix) else right
+    left = np.asarray(left) if isinstance(left, np.matrixlib.defmatrix.matrix) else left
+    right = np.asarray(right) if isinstance(right, np.matrixlib.defmatrix.matrix) else right
     # Determine properties of left and right
     left_is_ndarray = isinstance(left, np.ndarray)
     left_is_sparse, right_is_sparse = issparse(left), issparse(right)
@@ -957,8 +956,8 @@ def calc_fisher_info_matrix(beta,
     ##########
     if shape_params is not None and intercept_params is not None:
         if isinstance(dh_dc, np.matrixlib.defmatrix.matrix):
-            # Note that the '.A' transforms the matrix into a numpy ndarray
-            gradient_vec = d_ll_dh.T * np.concatenate((dh_dc.A,
+            # Note that the 'np.asarray()' transforms the matrix into a numpy ndarray
+            gradient_vec = d_ll_dh.T * np.concatenate((np.asarray(dh_dc),
                                                        dh_d_alpha.toarray(),
                                                        dh_db), axis=1)
         else:
@@ -967,8 +966,8 @@ def calc_fisher_info_matrix(beta,
                                                        dh_db), axis=1)
     elif shape_params is not None and intercept_params is None:
         if isinstance(dh_dc, np.matrixlib.defmatrix.matrix):
-            # Note that the '.A' transforms the matrix into a numpy ndarray
-            gradient_vec = d_ll_dh.T * np.concatenate((dh_dc.A, dh_db), axis=1)
+            # Note that the 'np.asarray()' transforms the matrix into a numpy ndarray
+            gradient_vec = d_ll_dh.T * np.concatenate((np.asarray(dh_dc), dh_db), axis=1)
         else:
             gradient_vec = d_ll_dh.T * np.concatenate((dh_dc.toarray(),
                                                        dh_db), axis=1)

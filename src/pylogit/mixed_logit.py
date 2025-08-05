@@ -662,7 +662,7 @@ class MixedLogit(base_mcm.MNDC_Model):
                 orig_map = past_mappings[key]
                 # Initialize the resultant array that is desired
                 new_map = orig_map.multiply(np.tile(mask_array,
-                                                    (1, orig_map.shape[1]))).A
+                                                    (1, orig_map.shape[1]))).toarray()
                 # Perform the desired filtering
                 current_filter = (new_map.sum(axis=1) != 0)
                 if current_filter.shape[0] > 0:

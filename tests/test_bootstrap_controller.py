@@ -287,7 +287,7 @@ class BootstrapTests(unittest.TestCase):
         for good_arg in good_args:
             self.assertIsNone(func(good_arg))
         for bad_arg in bad_args:
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     expected_error_msg,
                                     func,
                                     bad_arg)
@@ -715,7 +715,7 @@ class IntervalTests(unittest.TestCase):
             "interval_type MUST be in `\['pi', 'bca', 'abc', 'all'\]`"
 
         # Ensure that the appropriate errors are raised.
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 expected_error_msg,
                                 func,
                                 self.conf_percentage,

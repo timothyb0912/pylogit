@@ -209,7 +209,7 @@ class InitializationTests(GenericTestCase):
         """
         # Create a variety of "bad" columns for 'x'
         bad_exogs = [np.array(['foo', 'bar', 'gerbil', 'sat', 'sun']),
-                     np.array([1, 2, 3, np.NaN, 1]),
+                     np.array([1, 2, 3, np.nan, 1]),
                      np.array([1, 2, np.inf, 0.5, 0.9]),
                      np.array([1, 2, -np.inf, 0.5, 0.9]),
                      np.array([1, 'foo', -np.inf, 0.5, 0.9])]
@@ -461,13 +461,13 @@ class InitializationTests(GenericTestCase):
                           bad_mixing_vars,
                           name_dict,
                           independent_variable_names)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg_with_name_dict,
                                 func,
                                 bad_mixing_vars,
                                 name_dict,
                                 independent_variable_names)
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg_without_name_dict,
                                 func,
                                 bad_mixing_vars,
@@ -496,7 +496,7 @@ class InitializationTests(GenericTestCase):
 
         # Perform the requisite tests
         self.assertIsNone(func("alt_id", "choice", good_df))
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 "The following alternative ID's were not"
                                 " chosen in any choice situation:",
                                 func,
@@ -688,7 +688,7 @@ class PredictHelperTests(GenericTestCase):
         for arg_set in good_args:
             self.assertIsNone(func(*arg_set))
 
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegex(ValueError,
                                 msg,
                                 func,
                                 *bad_args)
@@ -937,7 +937,7 @@ class PostEstimationTests(GenericTestCase):
             # Delete the needed key from the dictionary
             del base_dict[key]
             # Make sure that we get a value error when testing the function
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "keys are missing",
                                     func,
                                     base_dict)
@@ -979,7 +979,7 @@ class PostEstimationTests(GenericTestCase):
         for attr in needed_attributes:
             delattr(self.model_obj, attr)
             # Make sure that we get a value error when testing the function
-            self.assertRaisesRegexp(NotImplementedError,
+            self.assertRaisesRegex(NotImplementedError,
                                     msg,
                                     func)
             # Set the attribute back
@@ -1029,7 +1029,7 @@ class PostEstimationTests(GenericTestCase):
             msg = "Call this function only after setting/calculating all other"
             msg_2 = " estimation results attributes"
             error_msg = msg + msg_2
-            self.assertRaisesRegexp(NotImplementedError,
+            self.assertRaisesRegex(NotImplementedError,
                                     error_msg,
                                     func)
             # Put the attribute back.
@@ -1094,7 +1094,7 @@ class PostEstimationTests(GenericTestCase):
             msg = "Call this function only after setting/calculating all other"
             msg_2 = " estimation results attributes"
             error_msg = msg + msg_2
-            self.assertRaisesRegexp(NotImplementedError,
+            self.assertRaisesRegex(NotImplementedError,
                                     error_msg,
                                     func)
             # Put the attribute back.

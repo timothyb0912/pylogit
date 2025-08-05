@@ -23,7 +23,7 @@ class UtilityTester(unittest.TestCase):
         for arg in good_args:
             self.assertIsNone(func(arg))
         for arg in bad_args:
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     expected_err_msg,
                                     func,
                                     arg)
@@ -46,7 +46,7 @@ class UtilityTester(unittest.TestCase):
         for arg in good_args:
             self.assertIsNone(func(arg, name=fake_name))
         for arg in bad_args:
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     expected_err_msg,
                                     func,
                                     arg,

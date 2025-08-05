@@ -173,12 +173,14 @@ def calc_nested_probs(nest_coefs,
         long_exp_sums_per_nest = np.asarray(long_exp_sums_per_nest)
 
     # Get the relevant log-sum for each row of the long-format data
-    # Note the .A converts the numpy matrix into a numpy array
+    # Note the .toarray() converts the numpy matrix into a numpy array
     # This is sum _{j \in C_m} exp(V_{ij} / \lambda_m) for the nest
     # belonging to each row
-    long_exp_sums = (rows_to_nests.multiply(long_exp_sums_per_nest)
-                                  .sum(axis=1)
-                                  .A).ravel()
+    long_exp_sums_temp = rows_to_nests.multiply(long_exp_sums_per_nest).sum(axis=1)
+    if isinstance(long_exp_sums_temp, np.matrixlib.defmatrix.matrix):
+        long_exp_sums = np.asarray(long_exp_sums_temp).ravel()
+    else:
+        long_exp_sums = long_exp_sums_temp.toarray().ravel()
 
     # Get the denominators for each individual
     ind_denom = (np.power(ind_exp_sums_per_nest,
@@ -255,7 +257,7 @@ def calc_nested_probs(nest_coefs,
         zero_idx = (nest_choice_probs == 0)
         nest_choice_probs[zero_idx] = min_comp_value
         # Return dictionary.
-        # Note the ".A" converts the numpy matrix into a numpy array
+        # Note the ".toarray()" converts the numpy matrix into a numpy array
         prob_dict["prob_given_nest"] = prob_given_nest
         prob_dict["nest_choice_probs"] = nest_choice_probs
         prob_dict["ind_sums_per_nest"] = ind_exp_sums_per_nest
@@ -407,10 +409,11 @@ def prep_vectors_for_gradient(nest_coefs,
     # Create the "long_nest_parameters" which is an array with one element per
     # alternative per observation, where each element is the nest parameter for
     # the alternative corresponding to the given row
-    long_nest_params = (rows_to_nests.multiply(nest_coefs[None, :])
-                                     .sum(axis=1)
-                                     .A
-                                     .ravel())
+    long_nest_params_temp = rows_to_nests.multiply(nest_coefs[None, :]).sum(axis=1)
+    if isinstance(long_nest_params_temp, np.matrixlib.defmatrix.matrix):
+        long_nest_params = np.asarray(long_nest_params_temp).ravel()
+    else:
+        long_nest_params = long_nest_params_temp.toarray().ravel()
 
     # Calculate y-tilde
     scaled_y = choice_vec / long_nest_params
@@ -420,14 +423,19 @@ def prep_vectors_for_gradient(nest_coefs,
 
     # Determine which nest was chosen by each row's individual.
     # Resulting matrix has shape (num_rows, num_nests)
-    obs_to_chosen_nests = (rows_to_obs.T *
-                           rows_to_nests.multiply(choice_vec[:, None])).A
+    obs_to_chosen_nests_temp = (rows_to_obs.T *
+                               rows_to_nests.multiply(choice_vec[:, None]))
+    if isinstance(obs_to_chosen_nests_temp, np.matrixlib.defmatrix.matrix):
+        obs_to_chosen_nests = np.asarray(obs_to_chosen_nests_temp)
+    else:
+        obs_to_chosen_nests = obs_to_chosen_nests_temp.toarray()
     row_to_chosen_nest = rows_to_obs * obs_to_chosen_nests
     # Determine whether the given row is part of the nest that was chosen
-    long_chosen_nest = (rows_to_nests.multiply(row_to_chosen_nest)
-                                     .sum(axis=1)
-                                     .A
-                                     .ravel())
+    long_chosen_nest_temp = rows_to_nests.multiply(row_to_chosen_nest).sum(axis=1)
+    if isinstance(long_chosen_nest_temp, np.matrixlib.defmatrix.matrix):
+        long_chosen_nest = np.asarray(long_chosen_nest_temp).ravel()
+    else:
+        long_chosen_nest = long_chosen_nest_temp.toarray().ravel()
 
     # Get the various probabilities
     prob_dict = calc_nested_probs(nest_coefs,
@@ -566,7 +574,10 @@ def calc_nested_gradient(orig_nest_coefs,
     # Calculate the weights for the sample
     if weights is None:
         weights = np.ones(design.shape[0])
-    weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+    if isinstance(rows_to_obs, np.matrixlib.defmatrix.matrix):
+        weights_per_obs = np.max(np.asarray(rows_to_obs) * weights[:, None], axis=0)
+    else:
+        weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
 
     # Transform the nest coefficients into their "always positive" versions
     nest_coefs = naturalize_nest_coefs(orig_nest_coefs)
@@ -743,7 +754,10 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     # Calculate the weights for the sample
     if weights is None:
         weights = np.ones(design.shape[0])
-    weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
+    if isinstance(rows_to_obs, np.matrixlib.defmatrix.matrix):
+        weights_per_obs = np.max(np.asarray(rows_to_obs) * weights[:, None], axis=0)
+    else:
+        weights_per_obs = np.max(rows_to_obs.toarray() * weights[:, None], axis=0)
 
     # Transform the nest coefficients into their "always positive" versions
     nest_coefs = naturalize_nest_coefs(orig_nest_coefs)
@@ -790,7 +804,11 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
     spread_half_deriv = rows_to_nests.multiply(half_deriv)
     # Aggregate the spread out half-derivatives to the individual level
     # This object should have shape (num_obs, num_nests)
-    nest_gradient_term_2 = rows_to_obs.transpose().dot(spread_half_deriv).A
+    nest_gradient_term_2_temp = rows_to_obs.transpose().dot(spread_half_deriv)
+    if isinstance(nest_gradient_term_2_temp, np.matrixlib.defmatrix.matrix):
+        nest_gradient_term_2 = np.asarray(nest_gradient_term_2_temp)
+    else:
+        nest_gradient_term_2 = nest_gradient_term_2_temp.toarray()
 
     # Calculate the third term of the derivative of the log-likelihood
     # with respect to the nest parameters
@@ -810,7 +828,11 @@ def calc_bhhh_hessian_approximation(orig_nest_coefs,
 
     # Get the nest-wide version of this piece of the gradient
     spread_out_term_3b = rows_to_nests.multiply(nest_gradient_term_3b[:, None])
-    nest_gradient_term_3 = rows_to_obs.transpose().dot(spread_out_term_3b).A
+    nest_gradient_term_3_temp = rows_to_obs.transpose().dot(spread_out_term_3b)
+    if isinstance(nest_gradient_term_3_temp, np.matrixlib.defmatrix.matrix):
+        nest_gradient_term_3 = np.asarray(nest_gradient_term_3_temp)
+    else:
+        nest_gradient_term_3 = nest_gradient_term_3_temp.toarray()
 
     # Combine the terms. Note the "nest_coefs * (1 - nest_coefs)" is due to the
     # fact that we're estimating the logit of the nest coefficients instead of

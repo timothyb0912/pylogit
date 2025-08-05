@@ -321,7 +321,7 @@ class ChoiceObjectTests(GenericTestCase):
         # Test to ensure that the raised Value Err is printed when using
         # either of these two kwargs
         for kwargs in [kwargs_1, kwargs_2]:
-            self.assertRaisesRegexp(TypeError,
+            self.assertRaisesRegex(TypeError,
                                     "ridge",
                                     self.model_obj.fit_mle,
                                     *fit_args,
@@ -343,7 +343,7 @@ class ChoiceObjectTests(GenericTestCase):
 
                 # Test to ensure that the ValueError when using an
                 # init_intercepts kwarg with an incorrect number of parameters
-                self.assertRaisesRegexp(ValueError,
+                self.assertRaisesRegex(ValueError,
                                         "dimension",
                                         self.model_obj.fit_mle,
                                         np.arange(num_coefs),
@@ -552,7 +552,7 @@ class HelperFuncTests(GenericTestCase):
         # overflow when calculating the derivative.
         test_index = np.array([-2, 0, 2, -3000, 800])
         # Note we use a compressed sparse-row matrix so that we can easily
-        # convert the output matrix to a numpy array using the '.A' attribute.
+        # convert the output matrix to a numpy array using the '.toarray()' attribute.
         num_rows = test_index.shape[0]
         test_output = diags(np.ones(num_rows),
                             0, format='csr')
@@ -587,7 +587,7 @@ class HelperFuncTests(GenericTestCase):
         self.assertEqual(len(derivative.shape), 2)
         self.assertEqual(derivative.shape, (num_rows, num_rows))
         npt.assert_allclose(correct_derivatives,
-                            np.diag(derivative.A))
+                            np.diag(derivative.toarray()))
 
         return None
 
@@ -612,7 +612,7 @@ class HelperFuncTests(GenericTestCase):
             if test_output is None:
                 self.assertIsNone(derivative_results)
             else:
-                npt.assert_allclose(test_output.A, derivative_results.A)
+                npt.assert_allclose(test_output.toarray(), derivative_results.toarray())
 
         return None
 
@@ -633,7 +633,7 @@ class HelperFuncTests(GenericTestCase):
         test_index = np.array([-10, 0, 2, -10000, 1e8])
 
         # Note we use a compressed sparse-row matrix so that we can easily
-        # convert the output matrix to a numpy array using the '.A' attribute.
+        # convert the output matrix to a numpy array using the '.toarray()' attribute.
         num_rows = test_index.shape[0]
         test_output = diags(np.ones(num_rows),
                             0, format='csr')
@@ -673,6 +673,6 @@ class HelperFuncTests(GenericTestCase):
         self.assertEqual(len(derivative.shape), 2)
         self.assertEqual(derivative.shape, (num_rows, num_rows))
         npt.assert_allclose(correct_derivatives,
-                            np.diag(derivative.A))
+                            np.diag(derivative.toarray()))
 
         return None

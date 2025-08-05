@@ -276,7 +276,7 @@ class NestedLogitTests(unittest.TestCase):
         for i in [-1, 1]:
             init_values = np.arange(self.fake_all_params.shape[0] + i)
 
-            self.assertRaisesRegexp(ValueError,
+            self.assertRaisesRegex(ValueError,
                                     "values are of the wrong dimension",
                                     func,
                                     init_values)
